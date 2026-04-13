@@ -7,7 +7,6 @@ This application listens for Twitch Channel Point redemptions and plays a random
 - **Twitch Integration**: Automatically detects when a specific reward is redeemed.
 - **Web Overlay**: A simple HTML/JS overlay to be used in OBS or other streaming software.
 - **Database Backed**: Songs are stored in a MariaDB database.
-- **Caching**: Uses Redis for state management.
 
 ## Prerequisites
 
@@ -29,6 +28,13 @@ The application is configured using environment variables. You can create a `.en
 | `TWITCH_CHANNEL_NAME` | Your Twitch channel name |
 | `TWITCH_REDEEM_TITLE` | The exact title of the Channel Point reward (Default: `Play Random Song`) |
 | `API_KEY` | Secret key for REST API Authorization (Default: `default_secret_key`) |
+| `TWITCH_LOCAL_CLI_URL` | URL of the local Twitch CLI mock server (Default: `http://localhost:8080`) |
+| `SONG_DELAY_SECONDS` | Delay between songs in seconds (Default: `5`) |
+| `DB_HOST` | MariaDB host (Default: `localhost`) |
+| `DB_PORT` | MariaDB port (Default: `3306`) |
+| `DB_NAME` | MariaDB database name (Default: `twitchdb`) |
+| `DB_USER` | MariaDB username (Default: `twitchuser`) |
+| `DB_PASSWORD` | MariaDB password (Default: `twitchpass`) |
 
 ## Running with Docker Compose
 
@@ -46,7 +52,7 @@ The application is configured using environment variables. You can create a `.en
    ```bash
    docker-compose up -d
    ```
-   This will start MariaDB, Redis, and the Twitch Bot application.
+   This will start MariaDB and the Twitch Bot application.
 
 4. **Add songs to the database:**
    The application uses a `songs` table. You can add songs by connecting to the MariaDB container:
@@ -57,6 +63,21 @@ The application is configured using environment variables. You can create a `.en
    ```sql
    INSERT INTO songs (name, artist, url) VALUES ('Song Name', 'Artist Name', 'https://example.com/song.mp3');
    ```
+
+## Admin UI
+
+The application includes a built-in Admin UI for managing songs and configuration.
+Access it at: `http://localhost:8080/admin.html`
+
+You will need to provide your `API_KEY` to log in and perform actions.
+
+## OpenAPI Documentation
+
+Interactive API documentation is available via Swagger UI:
+`http://localhost:8080/swagger-ui.html`
+
+The raw OpenAPI spec can be found at:
+`http://localhost:8080/api-docs`
 
 ## Usage
 
@@ -78,6 +99,7 @@ curl -H "X-API-Key: your_api_key" http://localhost:8080/api/test/play
 
 ### REST API
 You can manage the song database using the following REST API endpoints. All requests to `/api/**` require an `X-API-Key` header with your set API key.
+Interactive documentation is available at `/swagger-ui.html`.
 
 - **GET `/api/songs`**: List all songs.
 - **GET `/api/songs/{id}`**: Get a specific song by ID.
@@ -90,7 +112,7 @@ You can manage the song database using the following REST API endpoints. All req
 ## Development
 
 If you want to run the application locally without Docker for development:
-- Ensure MariaDB and Redis are running on `localhost`.
+- Ensure MariaDB is running on `localhost`.
 - Update `src/main/resources/application.yml` or set environment variables.
 - Run with Maven:
   ```bash

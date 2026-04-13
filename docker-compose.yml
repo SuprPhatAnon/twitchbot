@@ -19,17 +19,6 @@ services:
       timeout: 5s
       retries: 5
 
-  redis:
-    image: redis:7-alpine
-    container_name: twitchbot-redis
-    ports:
-      - "6379:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   app:
     build: .
     container_name: twitchbot-app
@@ -41,8 +30,6 @@ services:
       DB_NAME: twitchdb
       DB_USER: twitchuser
       DB_PASSWORD: twitchpass
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
       TWITCH_CLIENT_ID: ${TWITCH_CLIENT_ID}
       TWITCH_CLIENT_SECRET: ${TWITCH_CLIENT_SECRET}
       TWITCH_ACCESS_TOKEN: ${TWITCH_ACCESS_TOKEN}
@@ -51,8 +38,6 @@ services:
       API_KEY: ${API_KEY:-default_secret_key}
     depends_on:
       mariadb:
-        condition: service_healthy
-      redis:
         condition: service_healthy
 
 volumes:

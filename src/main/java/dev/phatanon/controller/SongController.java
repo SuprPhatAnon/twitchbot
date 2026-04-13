@@ -29,8 +29,8 @@ public class SongController {
     }
 
     /**
-     * Retrieves all songs from the repository.
-     * @return A list of all songs.
+     * Retrieves all songs from the {@link SongRepository}.
+     * @return A list of all {@link Song} entities.
      */
     @GetMapping
     @Operation(summary = "Get all songs")
@@ -39,9 +39,9 @@ public class SongController {
     }
 
     /**
-     * Retrieves a song by its ID.
-     * @param id The ID of the song.
-     * @return The song if found, or 404 Not Found.
+     * Retrieves a specific song by its unique ID.
+     * @param id The ID of the song to retrieve.
+     * @return The {@link Song} if found, or 404 Not Found if no song exists with the given ID.
      */
     @GetMapping("/{id}")
     @Operation(summary = "Get a song by ID")
@@ -52,9 +52,9 @@ public class SongController {
     }
 
     /**
-     * Adds a new song to the repository.
-     * @param song The song to add.
-     * @return The saved song.
+     * Adds a new song to the {@link SongRepository}.
+     * @param song The {@link Song} entity to create.
+     * @return The saved {@link Song} entity with its generated ID.
      */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -64,10 +64,10 @@ public class SongController {
     }
 
     /**
-     * Updates an existing song.
+     * Updates an existing song in the {@link SongRepository}.
      * @param id The ID of the song to update.
-     * @param songDetails The new details for the song.
-     * @return The updated song if found, or 404 Not Found.
+     * @param songDetails The new details to apply to the existing song.
+     * @return The updated {@link Song} if found, or 404 Not Found if the ID does not exist.
      */
     @PutMapping("/{id}")
     @Operation(summary = "Update an existing song")
@@ -85,9 +85,10 @@ public class SongController {
     }
 
     /**
-     * Triggers playback of a song by its ID.
+     * Triggers playback of a song by its ID through the {@link dev.phatanon.service.TwitchBotService}.
+     * The song will only be queued if the stream is currently online.
      * @param id The ID of the song to play.
-     * @return Success message if queued, or error status.
+     * @return A success message if the song was queued, or an error status (e.g., 400 Bad Request if stream is offline).
      */
     @PostMapping("/{id}/play")
     @Operation(summary = "Play a song by ID")
@@ -104,9 +105,9 @@ public class SongController {
     }
 
     /**
-     * Deletes a song from the repository.
+     * Deletes a song from the {@link SongRepository}.
      * @param id The ID of the song to delete.
-     * @return No Content if successful, or 404 Not Found.
+     * @return 204 No Content if successful, or 404 Not Found if the ID does not exist.
      */
     @DeleteMapping("/{id}")
     @Operation(summary = "Delete a song")

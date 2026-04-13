@@ -46,6 +46,9 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
      */
     public record RedeemLog(String user, String rewardTitle, LocalDateTime timestamp) {}
 
+    /**
+     * Recent channel point redeems stored in-memory.
+     */
     private final List<RedeemLog> recentRedeems = new LinkedList<>();
     private static final int MAX_REDEEM_LOGS = 50;
 
@@ -111,12 +114,13 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
      */
     @PostConstruct
     public void init() {
-        if ("test-token".equals(accessToken)) {
-            log.info("Skipping Twitch client initialization in test environment");
+        if ("test-token".equals(accessToken) && !useLocalCli) {
+            log.info("Skipping Twitch client initialization in test environment without local CLI");
             return;
         }
 
-        TwitchConfig config = twitchConfigRepository.findAll().stream().findFirst().orElseGet(() -> {
+        try {
+            TwitchConfig config = twitchConfigRepository.findAll().stream().findFirst().orElseGet(() -> {
             log.info("No Twitch configuration found in database. Creating initial configuration from properties.");
             TwitchConfig newConfig = new TwitchConfig();
             newConfig.setClientId(clientId);
@@ -232,16 +236,29 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
         });
 
         log.info("Twitch bot initialized for channel: {}", currentChannelName);
+        } catch (Exception e) {
+            log.error("Failed to initialize Twitch bot: {}", e.getMessage());
+            if ("test-token".equals(accessToken)) {
+                log.warn("Allowing initialization failure in test environment");
+            } else {
+                throw e;
+            }
+        }
     }
 
     /**
      * Checks if the stream is currently online.
+     * Stream status is updated via {@link ChannelGoLiveEvent} and {@link ChannelGoOfflineEvent}.
      * @return true if online, false otherwise
      */
     public synchronized boolean isStreamOnline() {
         return isStreamOnline;
     }
 
+    /**
+     * Schedules a greeting message for the channel.
+     * The greeting is sent 2 minutes after the stream goes online, and only once per stream session.
+     */
     private void scheduleThumboGreeting() {
         if (greetingSentThisSession.get()) {
             return;
@@ -318,7 +335,8 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
     }
 
     /**
-     * Queues a specific song by its ID.
+     * Triggers the playback of a specific song by its ID.
+     * This is typically used by the Admin UI for manual testing.
      * @param id The ID of the song to play.
      */
     public synchronized void playSongById(Long id) {
