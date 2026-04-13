@@ -129,4 +129,34 @@ public class SongControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(content().string("Cannot queue song: Stream is offline."));
     }
+
+    @Test
+    void shouldGetQueueSize() throws Exception {
+        when(twitchBotService.getQueueSize()).thenReturn(5);
+
+        mockMvc.perform(get("/api/songs/queue-size")
+                        .header("X-API-Key", "test-api-key"))
+                .andExpect(status().isOk())
+                .andExpect(content().string("5"));
+    }
+
+    @Test
+    void shouldGetCurrentlyPlayingSong() throws Exception {
+        Song song = new Song("Now Playing", "Artist", "url");
+        when(twitchBotService.getCurrentlyPlayingSong()).thenReturn(song);
+
+        mockMvc.perform(get("/api/songs/current")
+                        .header("X-API-Key", "test-api-key"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name", is("Now Playing")));
+    }
+
+    @Test
+    void shouldReturnNoContentWhenNoSongPlaying() throws Exception {
+        when(twitchBotService.getCurrentlyPlayingSong()).thenReturn(null);
+
+        mockMvc.perform(get("/api/songs/current")
+                        .header("X-API-Key", "test-api-key"))
+                .andExpect(status().isNoContent());
+    }
 }

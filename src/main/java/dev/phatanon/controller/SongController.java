@@ -105,6 +105,30 @@ public class SongController {
     }
 
     /**
+     * Retrieves the current number of songs in the playback queue.
+     * @return The current queue size.
+     */
+    @GetMapping("/queue-size")
+    @Operation(summary = "Get current song queue size")
+    public int getQueueSize() {
+        return twitchBotService.getQueueSize();
+    }
+
+    /**
+     * Retrieves the currently playing song.
+     * @return The currently playing {@link Song}, or 204 No Content if no song is playing.
+     */
+    @GetMapping("/current")
+    @Operation(summary = "Get currently playing song")
+    public ResponseEntity<Song> getCurrentlyPlayingSong() {
+        Song song = twitchBotService.getCurrentlyPlayingSong();
+        if (song == null) {
+            return ResponseEntity.noContent().build();
+        }
+        return ResponseEntity.ok(song);
+    }
+
+    /**
      * Deletes a song from the {@link SongRepository}.
      * @param id The ID of the song to delete.
      * @return 204 No Content if successful, or 404 Not Found if the ID does not exist.

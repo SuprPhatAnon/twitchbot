@@ -6,33 +6,50 @@
     <title>Twitch Bot Admin UI</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        body { padding-top: 20px; background-color: #f8f9fa; }
+        body { padding-top: 70px; background-color: #f8f9fa; height: 100vh; display: flex; flex-direction: column; }
+        .status-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background-color: #343a40;
+            color: white;
+            z-index: 1030;
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            justify-content: space-between;
+        }
+        .status-item { margin-right: 20px; font-size: 0.9rem; }
+        .status-label { color: #adb5bd; margin-right: 5px; }
+        .status-value { font-weight: bold; }
+        .status-online { color: #28a745; }
+        .status-offline { color: #dc3545; }
+        
+        .main-container { display: flex; flex: 1; overflow: hidden; }
+        .left-panel { flex: 7; overflow-y: auto; padding: 20px; border-right: 1px solid #dee2e6; }
+        .right-panel { flex: 3; overflow-y: auto; padding: 20px; background-color: #fff; }
+
         .card { margin-bottom: 20px; }
-        .health-status { font-weight: bold; }
-        .status-up { color: green; }
-        .status-down { color: red; }
         #redeem-log {
-            height: 300px;
-            overflow-y: auto;
-            background-color: #f1f3f5;
-            padding: 10px;
-            border-radius: 4px;
             font-family: monospace;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
         }
         .redeem-entry {
-            margin-bottom: 5px;
-            padding-bottom: 5px;
-            border-bottom: 1px solid #dee2e6;
+            margin-bottom: 8px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #f1f3f5;
         }
-        .redeem-time { color: #6c757d; font-size: 0.8rem; }
+        .redeem-time { color: #6c757d; font-size: 0.75rem; }
         .redeem-user { font-weight: bold; color: #0d6efd; }
         .redeem-reward { color: #198754; }
+
         #auth-overlay {
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.8);
-            z-index: 1000;
+            z-index: 2000;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -58,126 +75,129 @@
         </div>
     </div>
 
-    <div class="container">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h1>Twitch Bot Admin</h1>
-            <button class="btn btn-outline-danger btn-sm" onclick="logout()">Logout</button>
+    <div class="status-bar">
+        <div class="d-flex align-items-center">
+            <span class="h5 mb-0 me-4">Twitch Bot Admin</span>
+            <div class="status-item">
+                <span class="status-label">Stream:</span>
+                <span id="stat-stream" class="status-value status-offline">OFFLINE</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Twitch:</span>
+                <span id="stat-twitch" class="status-value status-offline">DISCONNECTED</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Queue:</span>
+                <span id="stat-queue" class="status-value">0</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Playing:</span>
+                <span id="stat-playing" class="status-value text-info">None</span>
+            </div>
         </div>
-        
-        <div class="row">
-            <!-- Health Section -->
-            <div class="col-md-4">
-                <div class="card">
-                    <div class="card-header">System Health</div>
-                    <div class="card-body">
-                        <p>System Status: <span id="system-status" class="health-status">Loading...</span></p>
-                        <p>Stream Status: <span id="stream-status" class="health-status">Loading...</span></p>
-                        <div id="health-details"></div>
-                        <button class="btn btn-sm btn-outline-primary mt-2" onclick="refreshAllHealth()">Refresh Status</button>
-                    </div>
-                </div>
+        <div>
+            <button class="btn btn-outline-light btn-sm" onclick="logout()">Logout</button>
+        </div>
+    </div>
 
-                <!-- Recent Redeems Section -->
-                <div class="card">
-                    <div class="card-header">Recent Redeems</div>
-                    <div class="card-body">
-                        <div id="redeem-log">
-                            <!-- Redeems will be added here -->
+    <div class="main-container">
+        <div class="left-panel">
+            <div class="card">
+                <div class="card-header">Add New Song</div>
+                <div class="card-body">
+                    <form id="add-song-form">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label small">Song Name</label>
+                                <input type="text" class="form-control form-control-sm" id="song-name" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small">Artist</label>
+                                <input type="text" class="form-control form-control-sm" id="song-artist" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small">Redeem Name</label>
+                                <input type="text" class="form-control form-control-sm" id="song-redeem" value="Play Random Song" required>
+                            </div>
+                            <div class="col-md-9">
+                                <label class="form-label small">Audio URL</label>
+                                <input type="url" class="form-control form-control-sm" id="song-url" placeholder="https://example.com/audio.mp3" required>
+                            </div>
+                            <div class="col-md-3 d-flex align-items-end">
+                                <button type="submit" class="btn btn-primary btn-sm w-100">Add Song</button>
+                            </div>
                         </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    Songs Database
+                    <button class="btn btn-sm btn-outline-secondary" onclick="fetchSongs()">Refresh</button>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Name</th>
+                                    <th>Artist</th>
+                                    <th>Redeem</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="songs-table-body">
+                                <!-- Songs loaded here -->
+                            </tbody>
+                        </table>
                     </div>
                 </div>
+            </div>
 
-                <!-- Twitch Config Section -->
-                <div class="card">
-                    <div class="card-header">Twitch Configuration</div>
-                    <div class="card-body">
-                        <form id="twitch-config-form">
-                            <div class="mb-2">
+            <div class="card">
+                <div class="card-header">Twitch Configuration</div>
+                <div class="card-body">
+                    <form id="twitch-config-form">
+                        <div class="row g-2">
+                            <div class="col-md-4">
                                 <label class="form-label small">Client ID</label>
                                 <input type="password" class="form-control form-control-sm" id="twitch-client-id">
                             </div>
-                            <div class="mb-2">
+                            <div class="col-md-4">
                                 <label class="form-label small">Client Secret</label>
                                 <input type="password" class="form-control form-control-sm" id="twitch-client-secret">
                             </div>
-                            <div class="mb-2">
+                            <div class="col-md-4">
                                 <label class="form-label small">Access Token</label>
                                 <input type="password" class="form-control form-control-sm" id="twitch-access-token">
                             </div>
-                            <div class="mb-2">
+                            <div class="col-md-4">
                                 <label class="form-label small">Channel Name</label>
                                 <input type="text" class="form-control form-control-sm" id="twitch-channel-name">
                             </div>
-                            <div class="mb-2">
+                            <div class="col-md-4">
                                 <label class="form-label small">Redeem Title</label>
                                 <input type="text" class="form-control form-control-sm" id="twitch-redeem-title">
                             </div>
-                            <div class="mb-2">
-                                <label class="form-label small">Song Delay (seconds)</label>
+                            <div class="col-md-2">
+                                <label class="form-label small">Delay (s)</label>
                                 <input type="number" class="form-control form-control-sm" id="twitch-song-delay">
                             </div>
-                            <button type="submit" class="btn btn-sm btn-primary w-100 mt-2">Update Config</button>
-                        </form>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Add Song Section -->
-            <div class="col-md-8">
-                <div class="card">
-                    <div class="card-header">Add New Song</div>
-                    <div class="card-body">
-                        <form id="add-song-form">
-                            <div class="row g-3">
-                                <div class="col-md-6">
-                                    <label class="form-label">Song Name</label>
-                                    <input type="text" class="form-control" id="song-name" required>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label">Artist</label>
-                                    <input type="text" class="form-control" id="song-artist" required>
-                                </div>
-                                <div class="col-md-12">
-                                    <label class="form-label">Audio URL</label>
-                                    <input type="url" class="form-control" id="song-url" placeholder="https://example.com/audio.mp3" required>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label">Redeem Name</label>
-                                    <input type="text" class="form-control" id="song-redeem" value="Play Random Song" required>
-                                </div>
-                                <div class="col-md-6 d-flex align-items-end">
-                                    <button type="submit" class="btn btn-primary w-100">Add Song</button>
-                                </div>
+                            <div class="col-md-2 d-flex align-items-end">
+                                <button type="submit" class="btn btn-sm btn-primary w-100">Update</button>
                             </div>
-                        </form>
-                    </div>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
 
-        <!-- Songs List Section -->
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                Songs in Database
-                <button class="btn btn-sm btn-outline-secondary" onclick="fetchSongs()">Refresh List</button>
-            </div>
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-hover">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Name</th>
-                                <th>Artist</th>
-                                <th>Redeem</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="songs-table-body">
-                            <!-- Songs will be loaded here -->
-                        </tbody>
-                    </table>
-                </div>
+        <div class="right-panel">
+            <h5 class="mb-3">Event Log</h5>
+            <div id="redeem-log">
+                <!-- Redeems added here -->
             </div>
         </div>
     </div>
@@ -190,11 +210,22 @@
         function connectWebSocket() {
             const socket = new SockJS('/ws');
             stompClient = Stomp.over(socket);
-            stompClient.debug = null; // Disable debug logging
+            stompClient.debug = null;
             stompClient.connect({}, function (frame) {
                 stompClient.subscribe('/topic/redeems', function (response) {
-                    const redeem = JSON.parse(response.body);
-                    addRedeemToLog(redeem);
+                    addRedeemToLog(JSON.parse(response.body));
+                });
+                stompClient.subscribe('/topic/queue-size', function (response) {
+                    updateQueueSizeDisplay(JSON.parse(response.body));
+                });
+                stompClient.subscribe('/topic/stream-status', function (response) {
+                    updateStreamStatusDisplay(JSON.parse(response.body));
+                });
+                stompClient.subscribe('/topic/connection-status', function (response) {
+                    updateConnectionStatusDisplay(JSON.parse(response.body));
+                });
+                stompClient.subscribe('/topic/current-song', function (response) {
+                    updateCurrentSongDisplay(JSON.parse(response.body));
                 });
             }, function (error) {
                 console.error('WebSocket Error: ' + error);
@@ -222,114 +253,92 @@
             const key = getApiKey();
             if (!key) return;
             try {
-                const response = await fetch('/api/twitch-config/redeems', {
-                    headers: { 'X-API-Key': key }
-                });
+                const response = await fetch('/api/twitch-config/redeems', { headers: { 'X-API-Key': key } });
                 if (response.status === 401) return logout();
                 const redeems = await response.json();
                 const logEl = document.getElementById('redeem-log');
                 logEl.innerHTML = '';
-                // Redeems from API are in chronological order, we want to show newest first
                 redeems.reverse().forEach(redeem => addRedeemToLog(redeem, false));
-            } catch (error) {
-                console.error('Error fetching recent redeems:', error);
-            }
+            } catch (error) { console.error('Error fetching redeems:', error); }
         }
 
-        function getApiKey() {
-            return localStorage.getItem('twitch_bot_api_key') || '';
-        }
-
+        function getApiKey() { return localStorage.getItem('twitch_bot_api_key') || ''; }
         function saveApiKey() {
             const key = document.getElementById('api-key-input').value;
             if (key) {
                 localStorage.setItem('twitch_bot_api_key', key);
-                checkAuth();
-                refreshAllHealth();
-                fetchSongs();
-                fetchTwitchConfig();
-                fetchRecentRedeems();
-                connectWebSocket();
+                location.reload();
             }
         }
-
         function logout() {
             localStorage.removeItem('twitch_bot_api_key');
             location.reload();
         }
-
         function checkAuth() {
             const key = getApiKey();
-            const overlay = document.getElementById('auth-overlay');
-            if (key) {
-                overlay.style.display = 'none';
+            document.getElementById('auth-overlay').style.display = key ? 'none' : 'flex';
+        }
+
+        function updateQueueSizeDisplay(size) {
+            document.getElementById('stat-queue').innerText = size;
+        }
+
+        function updateStreamStatusDisplay(isOnline) {
+            const el = document.getElementById('stat-stream');
+            el.innerText = isOnline ? 'ONLINE' : 'OFFLINE';
+            el.className = 'status-value ' + (isOnline ? 'status-online' : 'status-offline');
+        }
+
+        function updateConnectionStatusDisplay(isConnected) {
+            const el = document.getElementById('stat-twitch');
+            el.innerText = isConnected ? 'CONNECTED' : 'DISCONNECTED';
+            el.className = 'status-value ' + (isConnected ? 'status-online' : 'status-offline');
+        }
+
+        function updateCurrentSongDisplay(song) {
+            const el = document.getElementById('stat-playing');
+            if (song) {
+                el.innerText = `${song.name} - ${song.artist}`;
+                el.classList.add('text-info');
             } else {
-                overlay.style.display = 'flex';
+                el.innerText = 'None';
+                el.classList.remove('text-info');
             }
         }
 
-        function refreshAllHealth() {
-            fetchHealth();
-            fetchStreamStatus();
-        }
-
-        async function fetchHealth() {
+        async function refreshInitialStatus() {
             const key = getApiKey();
             if (!key) return;
             try {
-                const response = await fetch('/actuator/health', {
-                    headers: { 'X-API-Key': key }
-                });
-                if (response.status === 401) return logout();
-                const data = await response.json();
-                const statusEl = document.getElementById('system-status');
-                statusEl.innerText = data.status;
-                statusEl.className = 'health-status ' + (data.status === 'UP' ? 'status-up' : 'status-down');
-                
-                let detailsHtml = '<ul>';
-                if (data.components) {
-                    for (const [key, value] of Object.entries(data.components)) {
-                        detailsHtml += `<li>${key}: <span class="${value.status === 'UP' ? 'status-up' : 'status-down'}">${value.status}</span></li>`;
-                    }
-                }
-                detailsHtml += '</ul>';
-                document.getElementById('health-details').innerHTML = detailsHtml;
-            } catch (error) {
-                document.getElementById('system-status').innerText = 'Error';
-                console.error('Error fetching health:', error);
-            }
-        }
+                // Stream status
+                let res = await fetch('/api/twitch-config/status', { headers: { 'X-API-Key': key } });
+                if (res.ok) updateStreamStatusDisplay(await res.json());
 
-        async function fetchStreamStatus() {
-            const key = getApiKey();
-            if (!key) return;
-            try {
-                const response = await fetch('/api/twitch-config/status', {
-                    headers: { 'X-API-Key': key }
-                });
-                if (response.status === 401) return logout();
-                const isOnline = await response.json();
-                const statusEl = document.getElementById('stream-status');
-                statusEl.innerText = isOnline ? 'ONLINE' : 'OFFLINE';
-                statusEl.className = 'health-status ' + (isOnline ? 'status-up' : 'status-down');
-            } catch (error) {
-                document.getElementById('stream-status').innerText = 'Error';
-                console.error('Error fetching stream status:', error);
-            }
+                // Connection status
+                res = await fetch('/api/twitch-config/connection', { headers: { 'X-API-Key': key } });
+                if (res.ok) updateConnectionStatusDisplay(await res.json());
+
+                // Queue size
+                res = await fetch('/api/songs/queue-size', { headers: { 'X-API-Key': key } });
+                if (res.ok) updateQueueSizeDisplay(await res.json());
+
+                // Current song
+                res = await fetch('/api/songs/current', { headers: { 'X-API-Key': key } });
+                if (res.status === 200) updateCurrentSongDisplay(await res.json());
+                else updateCurrentSongDisplay(null);
+
+            } catch (e) { console.error('Error refreshing status:', e); }
         }
 
         async function fetchSongs() {
             const key = getApiKey();
             if (!key) return;
             try {
-                const response = await fetch('/api/songs', {
-                    headers: { 'X-API-Key': key }
-                });
+                const response = await fetch('/api/songs', { headers: { 'X-API-Key': key } });
                 if (response.status === 401) return logout();
                 const songs = await response.json();
                 const tbody = document.getElementById('songs-table-body');
                 tbody.innerHTML = '';
-                
                 songs.forEach(song => {
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
@@ -344,18 +353,14 @@
                     `;
                     tbody.appendChild(tr);
                 });
-            } catch (error) {
-                console.error('Error fetching songs:', error);
-            }
+            } catch (error) { console.error('Error fetching songs:', error); }
         }
 
         async function fetchTwitchConfig() {
             const key = getApiKey();
             if (!key) return;
             try {
-                const response = await fetch('/api/twitch-config', {
-                    headers: { 'X-API-Key': key }
-                });
+                const response = await fetch('/api/twitch-config', { headers: { 'X-API-Key': key } });
                 if (response.status === 401) return logout();
                 if (response.ok) {
                     const config = await response.json();
@@ -366,9 +371,7 @@
                     document.getElementById('twitch-redeem-title').value = config.redeemTitle || '';
                     document.getElementById('twitch-song-delay').value = config.songDelaySeconds || 0;
                 }
-            } catch (error) {
-                console.error('Error fetching twitch config:', error);
-            }
+            } catch (error) { console.error('Error fetching config:', error); }
         }
 
         document.getElementById('twitch-config-form').onsubmit = async (e) => {
@@ -382,63 +385,32 @@
                 redeemTitle: document.getElementById('twitch-redeem-title').value,
                 songDelaySeconds: parseInt(document.getElementById('twitch-song-delay').value)
             };
-
             try {
                 const response = await fetch('/api/twitch-config', {
                     method: 'PUT',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'X-API-Key': key
-                    },
+                    headers: { 'Content-Type': 'application/json', 'X-API-Key': key },
                     body: JSON.stringify(config)
                 });
-                if (response.status === 401) return logout();
-                if (response.ok) {
-                    alert('Twitch configuration updated!');
-                    fetchTwitchConfig();
-                } else {
-                    alert('Failed to update Twitch configuration.');
-                }
-            } catch (error) {
-                console.error('Error updating twitch config:', error);
-            }
+                if (response.ok) { alert('Config updated!'); fetchTwitchConfig(); }
+            } catch (error) { console.error('Error updating config:', error); }
         };
 
         async function playSong(id) {
             const key = getApiKey();
             try {
-                const response = await fetch(`/api/songs/${id}/play`, { 
-                    method: 'POST',
-                    headers: { 'X-API-Key': key }
-                });
-                if (response.status === 401) return logout();
-                if (response.ok) {
-                    alert('Song queued for playing!');
-                } else {
-                    alert('Failed to play song.');
-                }
-            } catch (error) {
-                console.error('Error playing song:', error);
-            }
+                const response = await fetch(`/api/songs/${id}/play`, { method: 'POST', headers: { 'X-API-Key': key } });
+                if (response.ok) { /* WebSocket will update queue size */ }
+                else { alert(await response.text()); }
+            } catch (error) { console.error('Error playing song:', error); }
         }
 
         async function deleteSong(id) {
-            if (!confirm('Are you sure you want to delete this song?')) return;
+            if (!confirm('Are you sure?')) return;
             const key = getApiKey();
             try {
-                const response = await fetch(`/api/songs/${id}`, { 
-                    method: 'DELETE',
-                    headers: { 'X-API-Key': key }
-                });
-                if (response.status === 401) return logout();
-                if (response.ok) {
-                    fetchSongs();
-                } else {
-                    alert('Failed to delete song.');
-                }
-            } catch (error) {
-                console.error('Error deleting song:', error);
-            }
+                const response = await fetch(`/api/songs/${id}`, { method: 'DELETE', headers: { 'X-API-Key': key } });
+                if (response.ok) fetchSongs();
+            } catch (error) { console.error('Error deleting song:', error); }
         }
 
         document.getElementById('add-song-form').onsubmit = async (e) => {
@@ -450,33 +422,23 @@
                 url: document.getElementById('song-url').value,
                 redeemName: document.getElementById('song-redeem').value
             };
-
             try {
                 const response = await fetch('/api/songs', {
                     method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'X-API-Key': key
-                    },
+                    headers: { 'Content-Type': 'application/json', 'X-API-Key': key },
                     body: JSON.stringify(song)
                 });
-                if (response.status === 401) return logout();
                 if (response.ok) {
                     document.getElementById('add-song-form').reset();
                     document.getElementById('song-redeem').value = 'Play Random Song';
                     fetchSongs();
-                } else {
-                    alert('Failed to add song.');
                 }
-            } catch (error) {
-                console.error('Error adding song:', error);
-            }
+            } catch (error) { console.error('Error adding song:', error); }
         };
 
-        // Initial load
         checkAuth();
         if (getApiKey()) {
-            refreshAllHealth();
+            refreshInitialStatus();
             fetchSongs();
             fetchTwitchConfig();
             fetchRecentRedeems();

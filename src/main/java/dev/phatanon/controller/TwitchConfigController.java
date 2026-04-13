@@ -50,6 +50,16 @@ public class TwitchConfigController {
     }
 
     /**
+     * Retrieves the current Twitch connection status from the {@link TwitchBotService}.
+     * @return true if the Twitch IRC client is connected, false otherwise.
+     */
+    @GetMapping("/connection")
+    @Operation(summary = "Get current Twitch connection status")
+    public ResponseEntity<Boolean> getConnectionStatus() {
+        return ResponseEntity.ok(twitchBotService.isTwitchConnected());
+    }
+
+    /**
      * Retrieves the current Twitch configuration from the database.
      * Only one configuration entry is expected to exist.
      * @return The {@link TwitchConfig} if found, or 404 Not Found.

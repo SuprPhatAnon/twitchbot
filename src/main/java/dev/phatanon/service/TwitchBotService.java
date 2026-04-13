@@ -87,6 +87,23 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
 
     private final java.util.Queue<Song> songQueue = new java.util.concurrent.LinkedBlockingQueue<>();
     private boolean isSongPlaying = false;
+    private Song currentlyPlayingSong = null;
+
+    /**
+     * Retrieves the current number of songs in the queue.
+     * @return The size of the song queue.
+     */
+    public synchronized int getQueueSize() {
+        return songQueue.size();
+    }
+
+    private void broadcastQueueSize() {
+        messagingTemplate.convertAndSend("/topic/queue-size", getQueueSize());
+    }
+
+    private void broadcastCurrentSong() {
+        messagingTemplate.convertAndSend("/topic/current-song", currentlyPlayingSong);
+    }
     private boolean isStreamOnline = false;
     private final AtomicBoolean greetingSentThisSession = new AtomicBoolean(false);
 
@@ -158,6 +175,7 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
         log.info("Registering connection state listeners...");
         twitchClient.getEventManager().onEvent(ChatConnectionStateEvent.class, event -> {
             log.info("IRC Connection State Change: {} -> {}", event.getPreviousState(), event.getState());
+            messagingTemplate.convertAndSend("/topic/connection-status", event.getState().name().equals("CONNECTED"));
         });
 
         twitchClient.getEventManager().onEvent(PubSubConnectionStateEvent.class, event -> {
@@ -222,16 +240,19 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
         twitchClient.getEventManager().onEvent(ChannelGoLiveEvent.class, event -> {
             log.info("Stream started for channel: {}", event.getChannel().getName());
             isStreamOnline = true;
+            messagingTemplate.convertAndSend("/topic/stream-status", true);
             scheduleThumboGreeting();
         });
 
         twitchClient.getEventManager().onEvent(ChannelGoOfflineEvent.class, event -> {
             log.info("Stream ended for channel: {}", event.getChannel().getName());
             isStreamOnline = false;
+            messagingTemplate.convertAndSend("/topic/stream-status", false);
             greetingSentThisSession.set(false);
             synchronized (this) {
                 songQueue.clear();
                 log.info("Stream ended. Song queue cleared.");
+                broadcastQueueSize();
             }
         });
 
@@ -253,6 +274,14 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
      */
     public synchronized boolean isStreamOnline() {
         return isStreamOnline;
+    }
+
+    /**
+     * Retrieves the currently playing song.
+     * @return The currently playing {@link Song}, or null if no song is playing.
+     */
+    public synchronized Song getCurrentlyPlayingSong() {
+        return currentlyPlayingSong;
     }
 
     /**
@@ -300,13 +329,16 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
         } else {
             songQueue.add(song);
             log.info("Song added to queue. Queue size: {}", songQueue.size());
+            broadcastQueueSize();
         }
     }
 
     private void playSong(Song song) {
         isSongPlaying = true;
+        currentlyPlayingSong = song;
         log.info("Playing song: {} by {}", song.getName(), song.getArtist());
         messagingTemplate.convertAndSend("/topic/play", song);
+        broadcastCurrentSong();
     }
 
     /**
@@ -317,16 +349,22 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
         if (!isStreamOnline) {
             log.info("Song finished, but stream is offline. Stopping playback and clearing queue.");
             isSongPlaying = false;
+            currentlyPlayingSong = null;
             songQueue.clear();
+            broadcastQueueSize();
+            broadcastCurrentSong();
             return;
         }
         log.info("Song finished. Waiting {} seconds before next song...", currentSongDelaySeconds);
         isSongPlaying = false;
+        currentlyPlayingSong = null;
+        broadcastCurrentSong();
 
         scheduler.schedule(() -> {
             synchronized (this) {
                 if (!songQueue.isEmpty()) {
                     playSong(songQueue.poll());
+                    broadcastQueueSize();
                 } else {
                     log.info("Queue is empty, no more songs to play.");
                 }
@@ -351,6 +389,7 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
             } else {
                 songQueue.add(song);
                 log.info("Song added to queue. Queue size: {}", songQueue.size());
+                broadcastQueueSize();
             }
         });
     }
@@ -386,6 +425,7 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
         } else {
             songQueue.add(song);
             log.info("Song added to queue. Queue size: {}", songQueue.size());
+            broadcastQueueSize();
         }
     }
 }
