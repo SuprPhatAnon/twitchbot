@@ -12,10 +12,6 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MariaDBDialect
-  data:
-    redis:
-      host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
 management:
   endpoints:
     web:
@@ -28,7 +24,7 @@ management:
       show-details: always
       group:
         readiness:
-          include: readinessState,db,redis
+          include: readinessState,db
 server:
   port: 8080
 
@@ -39,6 +35,7 @@ twitch:
   channel-name: ${TWITCH_CHANNEL_NAME:your_channel_name}
   redeem-title: ${TWITCH_REDEEM_TITLE:Play Random Song}
   api-key: ${API_KEY:default_secret_key}
+  song-delay-seconds: ${SONG_DELAY_SECONDS:5}
 springdoc:
   api-docs:
     path: /api-docs

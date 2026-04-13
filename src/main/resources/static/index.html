@@ -39,9 +39,11 @@
         const songTitle = document.getElementById('song-title');
         const audioPlayer = document.getElementById('audio-player');
 
+        let stompClient = null;
+
         function connect() {
             const socket = new SockJS('/ws');
-            const stompClient = Stomp.over(socket);
+            stompClient = Stomp.over(socket);
 
             stompClient.connect({}, function (frame) {
                 console.log('Connected: ' + frame);
@@ -63,6 +65,9 @@
 
             audioPlayer.onended = () => {
                 songDisplay.style.display = 'none';
+                if (stompClient && stompClient.connected) {
+                    stompClient.send("/app/song-finished", {}, {});
+                }
             };
 
             // Hide after 10 seconds if audio is long or doesn't end

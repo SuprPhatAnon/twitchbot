@@ -1,6 +1,5 @@
 package dev.phatanon.controller;
 
-import dev.phatanon.TestRedisConfiguration;
 import dev.phatanon.entity.Song;
 import dev.phatanon.repository.SongRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -8,7 +7,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
@@ -21,7 +19,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-@Import(TestRedisConfiguration.class)
 public class SongControllerTest {
 
     @Autowired
@@ -102,5 +99,14 @@ public class SongControllerTest {
         mockMvc.perform(get("/api/songs/" + song.getId())
                         .header("X-API-Key", "test-api-key"))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldPlaySong() throws Exception {
+        Song song = songRepository.save(new Song("Play Me", "Artist", "url"));
+
+        mockMvc.perform(post("/api/songs/" + song.getId() + "/play")
+                        .header("X-API-Key", "test-api-key"))
+                .andExpect(status().isOk());
     }
 }

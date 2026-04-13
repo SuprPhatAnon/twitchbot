@@ -24,4 +24,11 @@ public class TestController {
         twitchBotService.playRandomSong();
         return "Song triggered!";
     }
+
+    @GetMapping("/finish")
+    @Operation(summary = "Trigger song finished (simulates frontend callback)")
+    public String triggerFinish() {
+        twitchBotService.handleSongFinished();
+        return "Song finish triggered!";
+    }
 }

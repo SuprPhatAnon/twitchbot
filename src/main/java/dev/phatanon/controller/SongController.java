@@ -16,9 +16,11 @@ import java.util.List;
 public class SongController {
 
     private final SongRepository songRepository;
+    private final dev.phatanon.service.TwitchBotService twitchBotService;
 
-    public SongController(SongRepository songRepository) {
+    public SongController(SongRepository songRepository, dev.phatanon.service.TwitchBotService twitchBotService) {
         this.songRepository = songRepository;
+        this.twitchBotService = twitchBotService;
     }
 
     @GetMapping
@@ -52,6 +54,17 @@ public class SongController {
                     song.setUrl(songDetails.getUrl());
                     song.setRedeemName(songDetails.getRedeemName());
                     return ResponseEntity.ok(songRepository.save(song));
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PostMapping("/{id}/play")
+    @Operation(summary = "Play a song by ID")
+    public ResponseEntity<Void> playSong(@PathVariable Long id) {
+        return songRepository.findById(id)
+                .map(song -> {
+                    twitchBotService.playSongById(id);
+                    return ResponseEntity.ok().<Void>build();
                 })
                 .orElse(ResponseEntity.notFound().build());
     }
