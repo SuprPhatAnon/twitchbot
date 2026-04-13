@@ -161,6 +161,7 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
                 .withClientId(config.getClientId())
                 .withClientSecret(config.getClientSecret())
                 .withEnablePubSub(!useLocalCli)
+                .withEnableEventSocket(useLocalCli) // Enable EventSocket for local CLI
                 .withEnableHelix(true)
                 .withChatAccount(credential);
 

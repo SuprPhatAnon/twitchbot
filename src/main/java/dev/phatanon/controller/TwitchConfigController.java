@@ -6,10 +6,13 @@ import dev.phatanon.service.TwitchBotService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.core.env.Environment;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * REST controller for managing {@link TwitchConfig} entities and Twitch-related status.
@@ -22,10 +25,12 @@ public class TwitchConfigController {
 
     private final TwitchConfigRepository twitchConfigRepository;
     private final TwitchBotService twitchBotService;
+    private final Environment environment;
 
-    public TwitchConfigController(TwitchConfigRepository twitchConfigRepository, TwitchBotService twitchBotService) {
+    public TwitchConfigController(TwitchConfigRepository twitchConfigRepository, TwitchBotService twitchBotService, Environment environment) {
         this.twitchConfigRepository = twitchConfigRepository;
         this.twitchBotService = twitchBotService;
+        this.environment = environment;
     }
 
     /**
@@ -90,5 +95,15 @@ public class TwitchConfigController {
                     return twitchConfigRepository.save(config);
                 })
                 .orElseGet(() -> twitchConfigRepository.save(config));
+    }
+
+    /**
+     * Retrieves the currently active Spring profiles.
+     * @return A list of active profile names.
+     */
+    @GetMapping("/profiles")
+    @Operation(summary = "Get active Spring profiles")
+    public List<String> getActiveProfiles() {
+        return Arrays.asList(environment.getActiveProfiles());
     }
 }

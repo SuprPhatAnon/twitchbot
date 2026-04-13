@@ -96,6 +96,7 @@
             </div>
         </div>
         <div>
+            <a href="/admin-qa.html" id="qa-link" class="btn btn-outline-info btn-sm me-2" style="display: none;">QA UI</a>
             <button class="btn btn-outline-light btn-sm" onclick="logout()">Logout</button>
         </div>
     </div>
@@ -326,6 +327,15 @@
                 res = await fetch('/api/songs/current', { headers: { 'X-API-Key': key } });
                 if (res.status === 200) updateCurrentSongDisplay(await res.json());
                 else updateCurrentSongDisplay(null);
+
+                // Check profiles for QA UI visibility
+                res = await fetch('/api/twitch-config/profiles', { headers: { 'X-API-Key': key } });
+                if (res.ok) {
+                    const profiles = await res.json();
+                    if (profiles.includes('test')) {
+                        document.getElementById('qa-link').style.display = 'inline-block';
+                    }
+                }
 
             } catch (e) { console.error('Error refreshing status:', e); }
         }
