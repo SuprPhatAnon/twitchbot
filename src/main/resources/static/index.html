@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Twitch Song Overlay</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.5.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: transparent;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: white;
+            text-shadow: 2px 2px 4px #000000;
+        }
+        #song-display {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            font-size: 24px;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 10px 20px;
+            border-radius: 5px;
+            display: none;
+            border-left: 5px solid #6441a5; /* Twitch Purple */
+        }
+    </style>
+</head>
+<body>
+    <div id="song-display">
+        Now Playing: <span id="song-title"></span>
+    </div>
+    <audio id="audio-player"></audio>
+
+    <script>
+        const songDisplay = document.getElementById('song-display');
+        const songTitle = document.getElementById('song-title');
+        const audioPlayer = document.getElementById('audio-player');
+
+        function connect() {
+            const socket = new SockJS('/ws');
+            const stompClient = Stomp.over(socket);
+
+            stompClient.connect({}, function (frame) {
+                console.log('Connected: ' + frame);
+                stompClient.subscribe('/topic/play', function (message) {
+                    const song = JSON.parse(message.body);
+                    playSong(song);
+                });
+            }, function (error) {
+                console.log('STOMP error ' + error);
+                setTimeout(connect, 5000);
+            });
+        }
+
+        function playSong(song) {
+            songTitle.innerText = song.name + ' - ' + song.artist;
+            songDisplay.style.display = 'block';
+            audioPlayer.src = song.url;
+            audioPlayer.play();
+
+            audioPlayer.onended = () => {
+                songDisplay.style.display = 'none';
+            };
+
+            // Hide after 10 seconds if audio is long or doesn't end
+            setTimeout(() => {
+                 // songDisplay.style.display = 'none';
+            }, 10000);
+        }
+
+        connect();
+    </script>
+</body>
+</html>

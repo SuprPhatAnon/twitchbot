@@ -12,3 +12,9 @@ spring:
     redis:
       host: localhost
       port: 6379
+twitch:
+  client-id: test-id
+  client-secret: test-secret
+  access-token: test-token
+  channel-name: test-channel
+  redeem-title: Play Random Song
