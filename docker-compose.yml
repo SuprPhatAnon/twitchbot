@@ -37,9 +37,21 @@ services:
       TWITCH_CHANNEL_NAME: ${TWITCH_CHANNEL_NAME}
       TWITCH_REDEEM_TITLE: ${TWITCH_REDEEM_TITLE:-Play Random Song}
       API_KEY: ${API_KEY:-default_secret_key}
+      TWITCH_USE_LOCAL_CLI: ${TWITCH_USE_LOCAL_CLI:-false}
+      TWITCH_LOCAL_CLI_URL: http://twitch-cli:8080
     depends_on:
       mariadb:
         condition: service_healthy
+      twitch-cli:
+        condition: service_started
+
+  twitch-cli:
+    build:
+      context: .
+      dockerfile: Dockerfile.twitch-cli
+    container_name: twitch-cli
+    ports:
+      - "8081:8080"
 
 volumes:
   mariadb_data:
