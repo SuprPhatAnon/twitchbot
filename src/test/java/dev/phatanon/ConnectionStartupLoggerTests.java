@@ -1,5 +1,6 @@
 package dev.phatanon;
 
+import dev.phatanon.service.TwitchBotService;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -26,6 +27,7 @@ class ConnectionStartupLoggerTests {
         void testConnectionLogging(CapturedOutput output) {
             assertThat(output.getOut()).contains("Starting connection acquisition checks...");
             assertThat(output.getOut()).contains("✅ Successfully connected to MariaDB.");
+            assertThat(output.getOut()).contains("Verifying Twitch connection status...");
             assertThat(output.getOut()).contains("Startup connection checks completed.");
         }
     }
@@ -37,12 +39,14 @@ class ConnectionStartupLoggerTests {
         void testMariaDBConnectionFailure(CapturedOutput output) {
             // Arrange
             JdbcOperations jdbcTemplate = mock(JdbcOperations.class);
+            // Using a simple lambda to mock the service behavior without ByteBuddy issues on the class
+            ConnectionStartupLogger.ITwitchBotService twitchBotService = () -> false;
             
             when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class)))
                     .thenThrow(new RuntimeException("Connection refused"));
             
             // Act
-            ConnectionStartupLogger logger = new ConnectionStartupLogger(jdbcTemplate);
+            ConnectionStartupLogger logger = new ConnectionStartupLogger(jdbcTemplate, twitchBotService);
             logger.run();
 
             // Assert

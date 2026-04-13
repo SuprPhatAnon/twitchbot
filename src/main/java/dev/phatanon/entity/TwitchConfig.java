@@ -6,6 +6,9 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
+/**
+ * Entity representing the Twitch bot configuration and credentials.
+ */
 @Entity
 @Table(name = "twitch_config")
 public class TwitchConfig {

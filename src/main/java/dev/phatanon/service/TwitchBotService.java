@@ -3,7 +3,16 @@ package dev.phatanon.service;
 import com.github.philippheuer.credentialmanager.domain.OAuth2Credential;
 import com.github.twitch4j.TwitchClient;
 import com.github.twitch4j.TwitchClientBuilder;
+import com.github.twitch4j.chat.events.ChatConnectionStateEvent;
+import com.github.twitch4j.common.events.domain.EventChannel;
+import com.github.twitch4j.events.ChannelGoLiveEvent;
+import com.github.twitch4j.events.ChannelGoOfflineEvent;
+import com.github.twitch4j.eventsub.socket.events.EventSocketConnectionStateEvent;
+import com.github.twitch4j.helix.domain.StreamList;
+import com.github.twitch4j.pubsub.events.ChannelBitsEvent;
+import com.github.twitch4j.pubsub.events.PubSubConnectionStateEvent;
 import com.github.twitch4j.pubsub.events.RewardRedeemedEvent;
+import dev.phatanon.ConnectionStartupLogger;
 import dev.phatanon.entity.Song;
 import dev.phatanon.entity.TwitchConfig;
 import dev.phatanon.repository.SongRepository;
@@ -15,14 +24,30 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
+/**
+ * Service responsible for interacting with Twitch API and managing song playback.
+ * It handles Twitch IRC connection, PubSub events for rewards, and maintains a song queue.
+ */
 @Service
-public class TwitchBotService {
+public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotService {
 
     private static final Logger log = LoggerFactory.getLogger(TwitchBotService.class);
+
+    /**
+     * Record to log recent channel point redeems.
+     */
+    public record RedeemLog(String user, String rewardTitle, LocalDateTime timestamp) {}
+
+    private final List<RedeemLog> recentRedeems = new LinkedList<>();
+    private static final int MAX_REDEEM_LOGS = 50;
 
     @Value("${twitch.client-id}")
     private String clientId;
@@ -42,6 +67,12 @@ public class TwitchBotService {
     @Value("${twitch.song-delay-seconds:5}")
     private int defaultSongDelaySeconds;
 
+    @Value("${twitch.use-local-cli:false}")
+    private boolean useLocalCli;
+
+    @Value("${twitch.local-cli-url:http://localhost:8080}")
+    private String localCliUrl;
+
     private final SimpMessagingTemplate messagingTemplate;
     private final SongRepository songRepository;
     private final TwitchConfigRepository twitchConfigRepository;
@@ -53,6 +84,8 @@ public class TwitchBotService {
 
     private final java.util.Queue<Song> songQueue = new java.util.concurrent.LinkedBlockingQueue<>();
     private boolean isSongPlaying = false;
+    private boolean isStreamOnline = false;
+    private final AtomicBoolean greetingSentThisSession = new AtomicBoolean(false);
 
     private final Random random = new Random();
     private final java.util.concurrent.ScheduledExecutorService scheduler = java.util.concurrent.Executors.newSingleThreadScheduledExecutor();
@@ -63,6 +96,19 @@ public class TwitchBotService {
         this.twitchConfigRepository = twitchConfigRepository;
     }
 
+    /**
+     * Checks if the Twitch IRC client is connected.
+     * @return true if connected, false otherwise
+     */
+    public synchronized boolean isTwitchConnected() {
+        return twitchClient != null && 
+               twitchClient.getChat().getConnectionState().name().equals("CONNECTED");
+    }
+
+    /**
+     * Initializes the Twitch client and registers event listeners.
+     * This method is called after dependency injection is complete.
+     */
     @PostConstruct
     public void init() {
         if ("test-token".equals(accessToken)) {
@@ -82,37 +128,151 @@ public class TwitchBotService {
             return twitchConfigRepository.save(newConfig);
         });
 
-        this.currentAccessToken = config.getAccessToken();
-        this.currentChannelName = config.getChannelName();
-        this.currentSongDelaySeconds = config.getSongDelaySeconds();
+        currentAccessToken = config.getAccessToken();
+        currentChannelName = config.getChannelName();
+        currentSongDelaySeconds = config.getSongDelaySeconds();
 
+        log.info("Attempting to initialize Twitch bot for channel: {}", currentChannelName);
         OAuth2Credential credential = new OAuth2Credential("twitch", currentAccessToken);
 
-        twitchClient = TwitchClientBuilder.builder()
+        log.info("Building TwitchClient...");
+        TwitchClientBuilder builder = TwitchClientBuilder.builder()
                 .withClientId(config.getClientId())
                 .withClientSecret(config.getClientSecret())
-                .withEnablePubSub(true)
-                .withChatAccount(credential)
-                .build();
+                .withEnablePubSub(!useLocalCli)
+                .withEnableHelix(true)
+                .withChatAccount(credential);
 
+        if (useLocalCli) {
+            log.info("Using local Twitch CLI mock server at {}", localCliUrl);
+            builder.withHelixBaseUrl(localCliUrl);
+        }
+
+        twitchClient = builder.build();
+        log.info("TwitchClient built successfully.");
+
+        log.info("Registering connection state listeners...");
+        twitchClient.getEventManager().onEvent(ChatConnectionStateEvent.class, event -> {
+            log.info("IRC Connection State Change: {} -> {}", event.getPreviousState(), event.getState());
+        });
+
+        twitchClient.getEventManager().onEvent(PubSubConnectionStateEvent.class, event -> {
+            log.info("PubSub Connection State Change: {} -> {}", event.getPreviousState(), event.getState());
+        });
+
+        twitchClient.getEventManager().onEvent(EventSocketConnectionStateEvent.class, event -> {
+            log.info("EventSub Socket Connection State Change: {} -> {}", event.getPreviousState(), event.getState());
+        });
+
+        log.info("Fetching channel ID for {}...", currentChannelName);
         String channelId = twitchClient.getHelix().getUsers(currentAccessToken, null, List.of(currentChannelName)).execute().getUsers().get(0).getId();
+        log.info("Channel ID for {}: {}", currentChannelName, channelId);
 
-        twitchClient.getPubSub().listenForChannelPointsRedemptionEvents(credential, channelId);
+        // Check initial stream status
+        log.info("Checking initial stream status...");
+        StreamList streamList = twitchClient.getHelix().getStreams(currentAccessToken, null, null, 1, null, null, List.of(channelId), null).execute();
+        isStreamOnline = !streamList.getStreams().isEmpty();
+        log.info("Initial stream status for {}: {}", currentChannelName, isStreamOnline ? "ONLINE" : "OFFLINE");
+
+        if (isStreamOnline) {
+            scheduleThumboGreeting();
+        }
+
+        if (!useLocalCli) {
+            twitchClient.getPubSub().listenForChannelPointsRedemptionEvents(credential, channelId);
+            twitchClient.getPubSub().listenForCheerEvents(credential, channelId);
+        }
 
         twitchClient.getEventManager().onEvent(RewardRedeemedEvent.class, event -> {
             String title = event.getRedemption().getReward().getTitle();
             String user = event.getRedemption().getUser().getDisplayName();
             log.info("Reward '{}' redeemed by {}", title, user);
+            
+            RedeemLog redeemLog = new RedeemLog(user, title, LocalDateTime.now());
+            synchronized (recentRedeems) {
+                if (recentRedeems.size() >= MAX_REDEEM_LOGS) {
+                    recentRedeems.remove(0);
+                }
+                recentRedeems.add(redeemLog);
+            }
+            messagingTemplate.convertAndSend("/topic/redeems", redeemLog);
+            
             playRandomSong(title);
+        });
+
+        twitchClient.getEventManager().onEvent(ChannelBitsEvent.class, event -> {
+            String user = event.getData().getUserName();
+            Integer bits = event.getData().getBitsUsed();
+            log.info("{} cheered {} bits", user, bits);
+
+            RedeemLog redeemLog = new RedeemLog(user, bits + " Bits", LocalDateTime.now());
+            synchronized (recentRedeems) {
+                if (recentRedeems.size() >= MAX_REDEEM_LOGS) {
+                    recentRedeems.remove(0);
+                }
+                recentRedeems.add(redeemLog);
+            }
+            messagingTemplate.convertAndSend("/topic/redeems", redeemLog);
+        });
+
+        twitchClient.getEventManager().onEvent(ChannelGoLiveEvent.class, event -> {
+            log.info("Stream started for channel: {}", event.getChannel().getName());
+            isStreamOnline = true;
+            scheduleThumboGreeting();
+        });
+
+        twitchClient.getEventManager().onEvent(ChannelGoOfflineEvent.class, event -> {
+            log.info("Stream ended for channel: {}", event.getChannel().getName());
+            isStreamOnline = false;
+            greetingSentThisSession.set(false);
+            synchronized (this) {
+                songQueue.clear();
+                log.info("Stream ended. Song queue cleared.");
+            }
         });
 
         log.info("Twitch bot initialized for channel: {}", currentChannelName);
     }
 
+    /**
+     * Checks if the stream is currently online.
+     * @return true if online, false otherwise
+     */
+    public synchronized boolean isStreamOnline() {
+        return isStreamOnline;
+    }
+
+    private void scheduleThumboGreeting() {
+        if (greetingSentThisSession.get()) {
+            return;
+        }
+
+        log.info("Scheduling Thumbo greeting in 2 minutes...");
+        scheduler.schedule(() -> {
+            if (isStreamOnline() && greetingSentThisSession.compareAndSet(false, true)) {
+                log.info("Sending Thumbo greeting message.");
+                twitchClient.getChat().sendMessage(currentChannelName, "Hi Thumbo <3");
+            } else {
+                log.info("Thumbo greeting conditions not met: stream online: {}, greeting already sent: {}",
+                        isStreamOnline(), greetingSentThisSession.get());
+            }
+        }, 2, TimeUnit.MINUTES);
+    }
+
+    /**
+     * Queues a random song from the repository for a specific redeem name.
+     * @param redeemName The name of the redeem that triggered this call.
+     */
     public synchronized void playRandomSong(String redeemName) {
-        List<Song> songs = songRepository.findByRedeemName(redeemName);
+        if (!isStreamOnline) {
+            log.info("Stream is offline. Ignoring playRandomSong request for redeem: {}", redeemName);
+            return;
+        }
+        List<Song> songs = songRepository.findByRedeemName(redeemName).stream()
+                .filter(Song::isEnabled)
+                .toList();
         if (songs.isEmpty()) {
-            log.warn("No songs found in the database for redeem: {}", redeemName);
+            log.warn("No enabled songs found in the database for redeem: {}", redeemName);
             return;
         }
         Song song = songs.get(random.nextInt(songs.size()));
@@ -132,7 +292,17 @@ public class TwitchBotService {
         messagingTemplate.convertAndSend("/topic/play", song);
     }
 
+    /**
+     * Handles the event when a song has finished playing.
+     * Triggers the playback of the next song in the queue after a configured delay.
+     */
     public synchronized void handleSongFinished() {
+        if (!isStreamOnline) {
+            log.info("Song finished, but stream is offline. Stopping playback and clearing queue.");
+            isSongPlaying = false;
+            songQueue.clear();
+            return;
+        }
         log.info("Song finished. Waiting {} seconds before next song...", currentSongDelaySeconds);
         isSongPlaying = false;
 
@@ -147,7 +317,15 @@ public class TwitchBotService {
         }, currentSongDelaySeconds, java.util.concurrent.TimeUnit.SECONDS);
     }
 
+    /**
+     * Queues a specific song by its ID.
+     * @param id The ID of the song to play.
+     */
     public synchronized void playSongById(Long id) {
+        if (!isStreamOnline) {
+            log.info("Stream is offline. Ignoring playSongById request for song ID: {}", id);
+            return;
+        }
         songRepository.findById(id).ifPresent(song -> {
             log.info("Manually queueing song: {} by {}", song.getName(), song.getArtist());
             if (!isSongPlaying) {
@@ -159,10 +337,27 @@ public class TwitchBotService {
         });
     }
 
+    /**
+     * Retrieves a list of recent channel point redeems.
+     * @return A list of {@link RedeemLog} objects.
+     */
+    public List<RedeemLog> getRecentRedeems() {
+        synchronized (recentRedeems) {
+            return List.copyOf(recentRedeems);
+        }
+    }
+
+    /**
+     * Queues a random song from all available songs in the repository.
+     */
     public synchronized void playRandomSong() {
-        List<Song> songs = songRepository.findAll();
+        if (!isStreamOnline) {
+            log.info("Stream is offline. Ignoring playRandomSong request.");
+            return;
+        }
+        List<Song> songs = songRepository.findByEnabled(true);
         if (songs.isEmpty()) {
-            log.warn("No songs found in the database");
+            log.warn("No enabled songs found in the database");
             return;
         }
         Song song = songs.get(random.nextInt(songs.size()));

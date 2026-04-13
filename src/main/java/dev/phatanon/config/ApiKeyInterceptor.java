@@ -6,6 +6,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
+/**
+ * Interceptor that validates the "X-API-Key" header in incoming requests.
+ */
 @Component
 public class ApiKeyInterceptor implements HandlerInterceptor {
 

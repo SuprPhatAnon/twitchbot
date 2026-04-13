@@ -15,3 +15,6 @@ twitch:
   channel-name: test-channel
   redeem-title: Play Random Song
   api-key: test-api-key
+  use-local-cli: false
+  local-cli-url: http://localhost:8080
+  song-delay-seconds: 5

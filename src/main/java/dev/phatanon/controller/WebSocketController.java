@@ -4,6 +4,9 @@ import dev.phatanon.service.TwitchBotService;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.stereotype.Controller;
 
+/**
+ * Controller for handling WebSocket messages.
+ */
 @Controller
 public class WebSocketController {
 
@@ -13,6 +16,10 @@ public class WebSocketController {
         this.twitchBotService = twitchBotService;
     }
 
+    /**
+     * Endpoint for receiving "song-finished" messages from the frontend.
+     * Triggers the next song in the queue.
+     */
     @MessageMapping("/song-finished")
     public void songFinished() {
         twitchBotService.handleSongFinished();

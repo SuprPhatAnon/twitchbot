@@ -36,6 +36,8 @@ twitch:
   redeem-title: ${TWITCH_REDEEM_TITLE:Play Random Song}
   api-key: ${API_KEY:default_secret_key}
   song-delay-seconds: ${SONG_DELAY_SECONDS:5}
+  use-local-cli: ${TWITCH_USE_LOCAL_CLI:false}
+  local-cli-url: ${TWITCH_LOCAL_CLI_URL:http://localhost:8080}
 springdoc:
   api-docs:
     path: /api-docs

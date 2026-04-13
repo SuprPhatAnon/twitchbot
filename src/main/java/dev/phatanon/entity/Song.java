@@ -6,6 +6,9 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
+/**
+ * Entity representing a song in the system.
+ */
 @Entity
 @Table(name = "songs")
 public class Song {
@@ -18,6 +21,7 @@ public class Song {
     private String artist;
     private String url;
     private String redeemName;
+    private boolean enabled = true;
 
     public Song() {
     }
@@ -33,6 +37,14 @@ public class Song {
         this.artist = artist;
         this.url = url;
         this.redeemName = redeemName;
+    }
+
+    public Song(String name, String artist, String url, String redeemName, boolean enabled) {
+        this.name = name;
+        this.artist = artist;
+        this.url = url;
+        this.redeemName = redeemName;
+        this.enabled = enabled;
     }
 
     public Long getId() {
@@ -73,5 +85,13 @@ public class Song {
 
     public void setRedeemName(String redeemName) {
         this.redeemName = redeemName;
+    }
+
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
     }
 }

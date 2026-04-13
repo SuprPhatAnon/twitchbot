@@ -11,6 +11,23 @@
         .health-status { font-weight: bold; }
         .status-up { color: green; }
         .status-down { color: red; }
+        #redeem-log {
+            height: 300px;
+            overflow-y: auto;
+            background-color: #f1f3f5;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.9rem;
+        }
+        .redeem-entry {
+            margin-bottom: 5px;
+            padding-bottom: 5px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .redeem-time { color: #6c757d; font-size: 0.8rem; }
+        .redeem-user { font-weight: bold; color: #0d6efd; }
+        .redeem-reward { color: #198754; }
         #auth-overlay {
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -53,9 +70,20 @@
                 <div class="card">
                     <div class="card-header">System Health</div>
                     <div class="card-body">
-                        <p>Status: <span id="system-status" class="health-status">Loading...</span></p>
+                        <p>System Status: <span id="system-status" class="health-status">Loading...</span></p>
+                        <p>Stream Status: <span id="stream-status" class="health-status">Loading...</span></p>
                         <div id="health-details"></div>
-                        <button class="btn btn-sm btn-outline-primary mt-2" onclick="fetchHealth()">Refresh Health</button>
+                        <button class="btn btn-sm btn-outline-primary mt-2" onclick="refreshAllHealth()">Refresh Status</button>
+                    </div>
+                </div>
+
+                <!-- Recent Redeems Section -->
+                <div class="card">
+                    <div class="card-header">Recent Redeems</div>
+                    <div class="card-body">
+                        <div id="redeem-log">
+                            <!-- Redeems will be added here -->
+                        </div>
                     </div>
                 </div>
 
@@ -154,7 +182,60 @@
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
     <script>
+        let stompClient = null;
+
+        function connectWebSocket() {
+            const socket = new SockJS('/ws');
+            stompClient = Stomp.over(socket);
+            stompClient.debug = null; // Disable debug logging
+            stompClient.connect({}, function (frame) {
+                stompClient.subscribe('/topic/redeems', function (response) {
+                    const redeem = JSON.parse(response.body);
+                    addRedeemToLog(redeem);
+                });
+            }, function (error) {
+                console.error('WebSocket Error: ' + error);
+                setTimeout(connectWebSocket, 5000);
+            });
+        }
+
+        function addRedeemToLog(redeem, prepend = true) {
+            const logEl = document.getElementById('redeem-log');
+            const entry = document.createElement('div');
+            entry.className = 'redeem-entry';
+            const time = new Date(redeem.timestamp).toLocaleTimeString();
+            entry.innerHTML = `
+                <div class="redeem-time">${time}</div>
+                <div><span class="redeem-user">${redeem.user}</span>: <span class="redeem-reward">${redeem.rewardTitle}</span></div>
+            `;
+            if (prepend) {
+                logEl.insertBefore(entry, logEl.firstChild);
+            } else {
+                logEl.appendChild(entry);
+            }
+        }
+
+        async function fetchRecentRedeems() {
+            const key = getApiKey();
+            if (!key) return;
+            try {
+                const response = await fetch('/api/twitch-config/redeems', {
+                    headers: { 'X-API-Key': key }
+                });
+                if (response.status === 401) return logout();
+                const redeems = await response.json();
+                const logEl = document.getElementById('redeem-log');
+                logEl.innerHTML = '';
+                // Redeems from API are in chronological order, we want to show newest first
+                redeems.reverse().forEach(redeem => addRedeemToLog(redeem, false));
+            } catch (error) {
+                console.error('Error fetching recent redeems:', error);
+            }
+        }
+
         function getApiKey() {
             return localStorage.getItem('twitch_bot_api_key') || '';
         }
@@ -164,8 +245,11 @@
             if (key) {
                 localStorage.setItem('twitch_bot_api_key', key);
                 checkAuth();
-                fetchHealth();
+                refreshAllHealth();
                 fetchSongs();
+                fetchTwitchConfig();
+                fetchRecentRedeems();
+                connectWebSocket();
             }
         }
 
@@ -182,6 +266,11 @@
             } else {
                 overlay.style.display = 'flex';
             }
+        }
+
+        function refreshAllHealth() {
+            fetchHealth();
+            fetchStreamStatus();
         }
 
         async function fetchHealth() {
@@ -208,6 +297,24 @@
             } catch (error) {
                 document.getElementById('system-status').innerText = 'Error';
                 console.error('Error fetching health:', error);
+            }
+        }
+
+        async function fetchStreamStatus() {
+            const key = getApiKey();
+            if (!key) return;
+            try {
+                const response = await fetch('/api/twitch-config/status', {
+                    headers: { 'X-API-Key': key }
+                });
+                if (response.status === 401) return logout();
+                const isOnline = await response.json();
+                const statusEl = document.getElementById('stream-status');
+                statusEl.innerText = isOnline ? 'ONLINE' : 'OFFLINE';
+                statusEl.className = 'health-status ' + (isOnline ? 'status-up' : 'status-down');
+            } catch (error) {
+                document.getElementById('stream-status').innerText = 'Error';
+                console.error('Error fetching stream status:', error);
             }
         }
 
@@ -369,9 +476,11 @@
         // Initial load
         checkAuth();
         if (getApiKey()) {
-            fetchHealth();
+            refreshAllHealth();
             fetchSongs();
             fetchTwitchConfig();
+            fetchRecentRedeems();
+            connectWebSocket();
         }
     </script>
 </body>

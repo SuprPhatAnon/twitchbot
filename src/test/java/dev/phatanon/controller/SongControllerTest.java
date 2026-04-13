@@ -2,21 +2,24 @@ package dev.phatanon.controller;
 
 import dev.phatanon.entity.Song;
 import dev.phatanon.repository.SongRepository;
+import dev.phatanon.service.TwitchBotService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringBootTest
+@SpringBootTest(properties = "spring.main.allow-bean-definition-overriding=true")
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 public class SongControllerTest {
@@ -26,6 +29,9 @@ public class SongControllerTest {
 
     @Autowired
     private SongRepository songRepository;
+
+    @MockBean
+    private TwitchBotService twitchBotService;
 
     @BeforeEach
     void setUp() {
@@ -77,7 +83,7 @@ public class SongControllerTest {
     @Test
     void shouldUpdateSong() throws Exception {
         Song song = songRepository.save(new Song("Old Song", "Old Artist", "old_url", "Old Redeem"));
-        String updateJson = "{\"name\": \"Updated Song\", \"artist\": \"Updated Artist\", \"url\": \"updated_url\", \"redeemName\": \"Updated Redeem\"}";
+        String updateJson = "{\"name\": \"Updated Song\", \"artist\": \"Updated Artist\", \"url\": \"updated_url\", \"redeemName\": \"Updated Redeem\", \"enabled\": false}";
 
         mockMvc.perform(put("/api/songs/" + song.getId())
                         .header("X-API-Key", "test-api-key")
@@ -85,7 +91,8 @@ public class SongControllerTest {
                         .content(updateJson))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name", is("Updated Song")))
-                .andExpect(jsonPath("$.redeemName", is("Updated Redeem")));
+                .andExpect(jsonPath("$.redeemName", is("Updated Redeem")))
+                .andExpect(jsonPath("$.enabled", is(false)));
     }
 
     @Test
@@ -104,9 +111,22 @@ public class SongControllerTest {
     @Test
     void shouldPlaySong() throws Exception {
         Song song = songRepository.save(new Song("Play Me", "Artist", "url"));
+        when(twitchBotService.isStreamOnline()).thenReturn(true);
 
         mockMvc.perform(post("/api/songs/" + song.getId() + "/play")
                         .header("X-API-Key", "test-api-key"))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(content().string("Song queued successfully."));
+    }
+
+    @Test
+    void shouldNotPlaySongWhenStreamOffline() throws Exception {
+        Song song = songRepository.save(new Song("Play Me", "Artist", "url"));
+        when(twitchBotService.isStreamOnline()).thenReturn(false);
+
+        mockMvc.perform(post("/api/songs/" + song.getId() + "/play")
+                        .header("X-API-Key", "test-api-key"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string("Cannot queue song: Stream is offline."));
     }
 }
