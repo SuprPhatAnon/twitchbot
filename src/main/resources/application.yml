@@ -38,3 +38,11 @@ twitch:
   access-token: ${TWITCH_ACCESS_TOKEN:your_access_token}
   channel-name: ${TWITCH_CHANNEL_NAME:your_channel_name}
   redeem-title: ${TWITCH_REDEEM_TITLE:Play Random Song}
+  api-key: ${API_KEY:default_secret_key}
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha

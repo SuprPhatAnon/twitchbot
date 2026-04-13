@@ -17,6 +17,7 @@ public class Song {
     private String name;
     private String artist;
     private String url;
+    private String redeemName;
 
     public Song() {
     }
@@ -25,6 +26,13 @@ public class Song {
         this.name = name;
         this.artist = artist;
         this.url = url;
+    }
+
+    public Song(String name, String artist, String url, String redeemName) {
+        this.name = name;
+        this.artist = artist;
+        this.url = url;
+        this.redeemName = redeemName;
     }
 
     public Long getId() {
@@ -57,5 +65,13 @@ public class Song {
 
     public void setUrl(String url) {
         this.url = url;
+    }
+
+    public String getRedeemName() {
+        return redeemName;
+    }
+
+    public void setRedeemName(String redeemName) {
+        this.redeemName = redeemName;
     }
 }

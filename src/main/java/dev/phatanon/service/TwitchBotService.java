@@ -70,12 +70,21 @@ public class TwitchBotService {
         twitchClient.getEventManager().onEvent(RewardRedeemedEvent.class, event -> {
             String title = event.getRedemption().getReward().getTitle();
             log.info("Reward redeemed: {}", title);
-            if (redeemTitle.equalsIgnoreCase(title)) {
-                playRandomSong();
-            }
+            playRandomSong(title);
         });
         
         log.info("Twitch bot initialized for channel: {}", channelName);
+    }
+
+    public void playRandomSong(String redeemName) {
+        List<Song> songs = songRepository.findByRedeemName(redeemName);
+        if (songs.isEmpty()) {
+            log.warn("No songs found in the database for redeem: {}", redeemName);
+            return;
+        }
+        Song song = songs.get(random.nextInt(songs.size()));
+        log.info("Playing song: {} by {} for redeem: {}", song.getName(), song.getArtist(), redeemName);
+        messagingTemplate.convertAndSend("/topic/play", song);
     }
 
     public void playRandomSong() {

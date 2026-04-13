@@ -18,3 +18,4 @@ twitch:
   access-token: test-token
   channel-name: test-channel
   redeem-title: Play Random Song
+  api-key: test-api-key
