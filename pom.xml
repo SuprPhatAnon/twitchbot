@@ -89,7 +89,11 @@
                                 <argument>compose</argument>
                                 <argument>up</argument>
                                 <argument>-d</argument>
+                                <argument>--build</argument>
                             </arguments>
+                            <environmentVariables>
+                                <SPRING_PROFILES_ACTIVE>test</SPRING_PROFILES_ACTIVE>
+                            </environmentVariables>
                         </configuration>
                     </execution>
                 </executions>
