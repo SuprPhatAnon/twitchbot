@@ -307,8 +307,6 @@
 
                 // Initial songs and stats
                 fetchSongs();
-                fetchRecentPlays();
-
             } catch (e) { console.error('Error refreshing status:', e); }
         }
 
@@ -369,7 +367,7 @@
             });
 
             // Also fetch recent plays
-            fetchRecentPlays();
+            // fetchRecentPlays();
         }
 
         async function fetchRecentPlays() {
