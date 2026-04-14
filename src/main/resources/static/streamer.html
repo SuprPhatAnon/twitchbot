@@ -45,6 +45,16 @@
         .redeem-user { font-weight: bold; color: #0d6efd; }
         .redeem-reward { color: #198754; }
 
+        .stat-card {
+            background-color: #f1f3f5;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+        .stat-rank { font-weight: bold; margin-right: 10px; color: #6c757d; }
+        .stat-title { font-weight: bold; }
+        .stat-count { float: right; color: #0d6efd; font-weight: bold; }
+
         #auth-overlay {
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -96,6 +106,7 @@
             </div>
         </div>
         <div>
+            <a href="/statistics.html" class="btn btn-outline-light btn-sm me-2">Statistics</a>
             <button class="btn btn-outline-light btn-sm" onclick="logout()">Logout</button>
         </div>
     </div>
@@ -114,6 +125,25 @@
                 </div>
             </div>
 
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">Top 5 Songs (All Time)</div>
+                        <div id="top-songs-stats" class="card-body">
+                            <!-- Stats here -->
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">Recent Plays</div>
+                        <div id="recent-plays-stats" class="card-body">
+                            <!-- Recent plays here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     Songs Database
@@ -127,6 +157,7 @@
                                     <th>ID</th>
                                     <th>Name</th>
                                     <th>Artist</th>
+                                    <th>Plays</th>
                                     <th>Redeems</th>
                                     <th>Actions</th>
                                 </tr>
@@ -234,6 +265,7 @@
 
         function updateQueueSizeDisplay(size) {
             document.getElementById('stat-queue').innerText = size;
+            document.getElementById('stat-queue-count').innerText = size;
         }
 
         function updateStreamStatusDisplay(isOnline) {
@@ -250,12 +282,18 @@
 
         function updateCurrentSongDisplay(song) {
             const el = document.getElementById('stat-playing');
+            const statusEl = document.getElementById('stat-play-status');
             if (song) {
-                el.innerText = `${song.name} - ${song.artist}`;
+                const text = `${song.name} - ${song.artist}`;
+                el.innerText = text;
                 el.classList.add('text-info');
+                statusEl.innerText = "Playing";
+                statusEl.className = "stat-count text-info";
             } else {
                 el.innerText = 'None';
                 el.classList.remove('text-info');
+                statusEl.innerText = "Idle";
+                statusEl.className = "stat-count";
             }
         }
 
@@ -292,6 +330,10 @@
                 const songs = await response.json();
                 const tbody = document.getElementById('songs-table-body');
                 tbody.innerHTML = '';
+                
+                // Update stats
+                updateTopSongs(songs);
+
                 songs.forEach(song => {
                     const tr = document.createElement('tr');
                     const redeemTitles = song.redeems.map(r => r.title).join(', ');
@@ -299,6 +341,7 @@
                         <td>${song.id}</td>
                         <td>${song.name}</td>
                         <td>${song.artist}</td>
+                        <td><span class="badge bg-light text-dark">${song.playCount || 0}</span></td>
                         <td>${redeemTitles}</td>
                         <td>
                             <button class="btn btn-sm btn-success" onclick="playSong(${song.id})">Play</button>
@@ -307,6 +350,63 @@
                     tbody.appendChild(tr);
                 });
             } catch (error) { console.error('Error fetching songs:', error); }
+        }
+
+        function updateTopSongs(songs) {
+            const topSongs = [...songs]
+                .sort((a, b) => (b.playCount || 0) - (a.playCount || 0))
+                .slice(0, 5);
+            
+            const statsEl = document.getElementById('top-songs-stats');
+            statsEl.innerHTML = '';
+            
+            if (topSongs.length === 0 || topSongs[0].playCount === 0) {
+                statsEl.innerHTML = '<div class="text-muted text-center py-3">No play data yet</div>';
+                return;
+            }
+
+            topSongs.forEach((song, index) => {
+                if ((song.playCount || 0) === 0) return;
+                const div = document.createElement('div');
+                div.className = 'stat-card';
+                div.innerHTML = `
+                    <span class="stat-rank">#${index + 1}</span>
+                    <span class="stat-title">${song.name}</span>
+                    <span class="stat-count">${song.playCount} plays</span>
+                `;
+                statsEl.appendChild(div);
+            });
+
+            // Also fetch recent plays
+            fetchRecentPlays();
+        }
+
+        async function fetchRecentPlays() {
+            const key = getApiKey();
+            try {
+                const response = await fetch('/api/songs/plays/recent?limit=5', { headers: { 'X-API-Key': key } });
+                if (!response.ok) return;
+                const plays = await response.json();
+                const statsEl = document.getElementById('recent-plays-stats');
+                statsEl.innerHTML = '';
+                
+                if (plays.length === 0) {
+                    statsEl.innerHTML = '<div class="text-muted text-center py-3">No recent plays</div>';
+                    return;
+                }
+
+                plays.forEach(play => {
+                    const div = document.createElement('div');
+                    div.className = 'stat-card';
+                    const time = new Date(play.timestamp).toLocaleTimeString();
+                    div.innerHTML = `
+                        <span class="stat-rank">${time}</span>
+                        <span class="stat-title">${play.song.name}</span>
+                        <span class="stat-count">${play.source}</span>
+                    `;
+                    statsEl.appendChild(div);
+                });
+            } catch (error) { console.error('Error fetching recent plays:', error); }
         }
 
         async function fetchRedeems() {
@@ -333,7 +433,7 @@
         async function playSong(id) {
             const key = getApiKey();
             try {
-                const response = await fetch(`/api/songs/${id}/play`, { method: 'POST', headers: { 'X-API-Key': key } });
+                const response = await fetch(`/api/songs/${id}/play?incrementStats=true`, { method: 'POST', headers: { 'X-API-Key': key } });
                 if (response.ok) { /* WebSocket will update queue size */ }
                 else { alert(await response.text()); }
             } catch (error) { console.error('Error playing song:', error); }

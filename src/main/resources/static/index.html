@@ -51,6 +51,13 @@
                     const song = JSON.parse(message.body);
                     playSong(song);
                 });
+
+                stompClient.subscribe('/topic/current-song', function (message) {
+                    const song = message.body ? JSON.parse(message.body) : null;
+                    if (!song) {
+                        songDisplay.style.display = 'none';
+                    }
+                });
             }, function (error) {
                 console.log('STOMP error ' + error);
                 setTimeout(connect, 5000);
@@ -64,7 +71,8 @@
             audioPlayer.play();
 
             audioPlayer.onended = () => {
-                songDisplay.style.display = 'none';
+                // Hide only if there's no more song in queue
+                // The server will notify us via /topic/current-song if it's empty
                 if (stompClient && stompClient.connected) {
                     stompClient.send("/app/song-finished", {}, {});
                 }

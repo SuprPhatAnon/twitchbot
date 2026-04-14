@@ -1,7 +1,10 @@
 package dev.phatanon.controller;
 
+import dev.phatanon.dto.SongStatsDTO;
 import dev.phatanon.entity.Redeem;
 import dev.phatanon.entity.Song;
+import dev.phatanon.entity.SongPlay;
+import dev.phatanon.repository.SongPlayRepository;
 import dev.phatanon.repository.SongRepository;
 import dev.phatanon.repository.TwitchConfigRepository;
 import dev.phatanon.service.TwitchBotService;
@@ -15,6 +18,8 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static org.hamcrest.Matchers.hasSize;
@@ -30,6 +35,9 @@ public class SongControllerTest {
 
     @Mock
     private SongRepository songRepository;
+
+    @Mock
+    private SongPlayRepository songPlayRepository;
 
     @Mock
     private TwitchBotService twitchBotService;
@@ -135,6 +143,22 @@ public class SongControllerTest {
         mockMvc.perform(post("/api/songs/1/play"))
                 .andExpect(status().isOk())
                 .andExpect(content().string("Song queued successfully."));
+        
+        org.mockito.Mockito.verify(twitchBotService).playSongById(1L, false);
+    }
+
+    @Test
+    void shouldPlaySongWithStats() throws Exception {
+        Song song = new Song("Play Me", "Artist", "url");
+        song.setId(1L);
+        when(songRepository.findById(1L)).thenReturn(Optional.of(song));
+        when(twitchBotService.isStreamOnline()).thenReturn(true);
+
+        mockMvc.perform(post("/api/songs/1/play").param("incrementStats", "true"))
+                .andExpect(status().isOk())
+                .andExpect(content().string("Song queued successfully."));
+
+        org.mockito.Mockito.verify(twitchBotService).playSongById(1L, true);
     }
 
     @Test
@@ -171,5 +195,49 @@ public class SongControllerTest {
 
         mockMvc.perform(get("/api/songs/current"))
                 .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void shouldGetRecentPlays() throws Exception {
+        Song song = new Song("Played Song", "Artist", "url");
+        SongPlay play = new SongPlay(song, java.time.LocalDateTime.now(), "manual");
+        when(songPlayRepository.findAllByOrderByTimestampDesc(any(org.springframework.data.domain.Pageable.class)))
+                .thenReturn(java.util.List.of(play));
+
+        mockMvc.perform(get("/api/songs/plays/recent"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].song.name", is("Played Song")))
+                .andExpect(jsonPath("$[0].source", is("manual")));
+    }
+
+    @Test
+    void shouldGetStatisticsBySong() throws Exception {
+        SongStatsDTO stat = new SongStatsDTO("Song 1", "Artist 1", 5);
+        when(songPlayRepository.getStatsBySong(any(LocalDateTime.class)))
+                .thenReturn(List.of(stat));
+
+        mockMvc.perform(get("/api/songs/statistics")
+                        .param("range", "daily")
+                        .param("groupBy", "song"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].name", is("Song 1")))
+                .andExpect(jsonPath("$[0].playCount", is(5)));
+    }
+
+    @Test
+    void shouldGetStatisticsByArtist() throws Exception {
+        SongStatsDTO stat = new SongStatsDTO(null, "Artist 1", 10);
+        when(songPlayRepository.getStatsByArtist(any(LocalDateTime.class)))
+                .thenReturn(List.of(stat));
+
+        mockMvc.perform(get("/api/songs/statistics")
+                        .param("range", "alltime")
+                        .param("groupBy", "artist"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].artist", is("Artist 1")))
+                .andExpect(jsonPath("$[0].playCount", is(10)));
     }
 }

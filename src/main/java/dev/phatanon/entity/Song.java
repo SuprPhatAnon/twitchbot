@@ -58,6 +58,7 @@ public class Song {
     private java.util.Set<Redeem> redeems = new java.util.HashSet<>();
 
     private boolean enabled = true;
+    private int playCount = 0;
 
     public Song() {
     }
@@ -133,5 +134,17 @@ public class Song {
 
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
+    }
+
+    public int getPlayCount() {
+        return playCount;
+    }
+
+    public void setPlayCount(int playCount) {
+        this.playCount = playCount;
+    }
+
+    public void incrementPlayCount() {
+        this.playCount++;
     }
 }

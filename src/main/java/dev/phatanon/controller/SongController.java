@@ -1,6 +1,9 @@
 package dev.phatanon.controller;
 
+import dev.phatanon.dto.SongStatsDTO;
 import dev.phatanon.entity.Song;
+import dev.phatanon.entity.SongPlay;
+import dev.phatanon.repository.SongPlayRepository;
 import dev.phatanon.repository.SongRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -10,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -22,11 +26,13 @@ import java.util.List;
 public class SongController {
 
     private final SongRepository songRepository;
+    private final SongPlayRepository songPlayRepository;
     private final dev.phatanon.service.TwitchBotService twitchBotService;
     private final SimpMessagingTemplate messagingTemplate;
 
-    public SongController(SongRepository songRepository, dev.phatanon.service.TwitchBotService twitchBotService, SimpMessagingTemplate messagingTemplate) {
+    public SongController(SongRepository songRepository, SongPlayRepository songPlayRepository, dev.phatanon.service.TwitchBotService twitchBotService, SimpMessagingTemplate messagingTemplate) {
         this.songRepository = songRepository;
+        this.songPlayRepository = songPlayRepository;
         this.twitchBotService = twitchBotService;
         this.messagingTemplate = messagingTemplate;
     }
@@ -99,13 +105,13 @@ public class SongController {
      */
     @PostMapping("/{id}/play")
     @Operation(summary = "Play a song by ID")
-    public ResponseEntity<String> playSong(@PathVariable Long id) {
+    public ResponseEntity<String> playSong(@PathVariable Long id, @RequestParam(required = false, defaultValue = "false") boolean incrementStats) {
         if (!twitchBotService.isStreamOnline()) {
             return ResponseEntity.badRequest().body("Cannot queue song: Stream is offline.");
         }
         return songRepository.findById(id)
                 .map(song -> {
-                    twitchBotService.playSongById(id);
+                    twitchBotService.playSongById(id, incrementStats);
                     return ResponseEntity.ok().body("Song queued successfully.");
                 })
                 .orElse(ResponseEntity.notFound().build());
@@ -150,5 +156,53 @@ public class SongController {
                     return ResponseEntity.noContent().<Void>build();
                 })
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    /**
+     * Retrieves recent song plays.
+     * @param limit The maximum number of plays to retrieve.
+     * @return A list of recent {@link SongPlay} entities.
+     */
+    @GetMapping("/plays/recent")
+    @Operation(summary = "Get recent song plays")
+    public List<SongPlay> getRecentPlays(@RequestParam(defaultValue = "10") int limit) {
+        return songPlayRepository.findAllByOrderByTimestampDesc(org.springframework.data.domain.PageRequest.of(0, limit));
+    }
+
+    /**
+     * Retrieves song play statistics.
+     * @param range The time range (daily, weekly, monthly, yearly, alltime).
+     * @param groupBy The grouping (song, artist).
+     * @return A list of {@link SongStatsDTO} entities.
+     */
+    @GetMapping("/statistics")
+    @Operation(summary = "Get song play statistics")
+    public List<SongStatsDTO> getStatistics(@RequestParam(defaultValue = "alltime") String range,
+                                            @RequestParam(defaultValue = "song") String groupBy) {
+        LocalDateTime since;
+        switch (range.toLowerCase()) {
+            case "daily":
+                since = LocalDateTime.now().minusDays(1);
+                break;
+            case "weekly":
+                since = LocalDateTime.now().minusWeeks(1);
+                break;
+            case "monthly":
+                since = LocalDateTime.now().minusMonths(1);
+                break;
+            case "yearly":
+                since = LocalDateTime.now().minusYears(1);
+                break;
+            case "alltime":
+            default:
+                since = LocalDateTime.of(1970, 1, 1, 0, 0);
+                break;
+        }
+
+        if ("artist".equalsIgnoreCase(groupBy)) {
+            return songPlayRepository.getStatsByArtist(since);
+        } else {
+            return songPlayRepository.getStatsBySong(since);
+        }
     }
 }

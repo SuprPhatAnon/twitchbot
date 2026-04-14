@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Song Play Statistics</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f9;
+        }
+        h1 { color: #333; }
+        .controls {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        select, button {
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        th, td {
+            text-align: left;
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+        }
+        th {
+            background-color: #6441a5;
+            color: white;
+        }
+        tr:hover { background-color: #f9f9f9; }
+        .nav { margin-bottom: 20px; }
+        .nav a {
+            text-decoration: none;
+            color: #6441a5;
+            font-weight: bold;
+            margin-right: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="nav">
+        <a href="/admin.html">Admin</a>
+        <a href="/streamer.html">Streamer View</a>
+        <a href="/index.html">Overlay</a>
+    </div>
+
+    <h1>Song Play Statistics</h1>
+
+    <div class="controls">
+        <div>
+            <label for="range">Time Range:</label>
+            <select id="range">
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+                <option value="yearly">Yearly</option>
+                <option value="alltime" selected>All Time</option>
+            </select>
+        </div>
+        <div>
+            <label for="groupBy">Group By:</label>
+            <select id="groupBy">
+                <option value="song" selected>Song Name</option>
+                <option value="artist">Artist</option>
+            </select>
+        </div>
+        <button onclick="loadStatistics()">Refresh</button>
+    </div>
+
+    <table id="stats-table">
+        <thead>
+            <tr id="table-header">
+                <!-- Headers will be dynamic -->
+            </tr>
+        </thead>
+        <tbody id="stats-body">
+            <!-- Data will be loaded here -->
+        </tbody>
+    </table>
+
+    <script>
+        const apiKey = localStorage.getItem('api_key') || '';
+
+        async function loadStatistics() {
+            const range = document.getElementById('range').value;
+            const groupBy = document.getElementById('groupBy').value;
+            const headerRow = document.getElementById('table-header');
+            const body = document.getElementById('stats-body');
+
+            // Set Headers
+            headerRow.innerHTML = '';
+            if (groupBy === 'song') {
+                headerRow.innerHTML = '<th>Song</th><th>Artist</th><th>Plays</th>';
+            } else {
+                headerRow.innerHTML = '<th>Artist</th><th>Plays</th>';
+            }
+
+            try {
+                const response = await fetch(`/api/songs/statistics?range=${range}&groupBy=${groupBy}`, {
+                    headers: { 'X-API-Key': apiKey }
+                });
+                const stats = await response.json();
+
+                body.innerHTML = '';
+                stats.forEach(item => {
+                    const tr = document.createElement('tr');
+                    if (groupBy === 'song') {
+                        tr.innerHTML = `<td>${item.name}</td><td>${item.artist}</td><td>${item.playCount}</td>`;
+                    } else {
+                        tr.innerHTML = `<td>${item.artist}</td><td>${item.playCount}</td>`;
+                    }
+                    body.appendChild(tr);
+                });
+            } catch (error) {
+                console.error('Error loading statistics:', error);
+                body.innerHTML = '<tr><td colspan="3">Error loading statistics. Make sure your API key is set in Admin page.</td></tr>';
+            }
+        }
+
+        // Load default on startup
+        loadStatistics();
+    </script>
+</body>
+</html>

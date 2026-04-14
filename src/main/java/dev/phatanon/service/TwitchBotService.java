@@ -14,7 +14,9 @@ import com.github.twitch4j.pubsub.events.PubSubConnectionStateEvent;
 import com.github.twitch4j.pubsub.events.RewardRedeemedEvent;
 import dev.phatanon.ConnectionStartupLogger;
 import dev.phatanon.entity.Song;
+import dev.phatanon.entity.SongPlay;
 import dev.phatanon.entity.TwitchConfig;
+import dev.phatanon.repository.SongPlayRepository;
 import dev.phatanon.repository.SongRepository;
 import dev.phatanon.repository.TwitchConfigRepository;
 import jakarta.annotation.PostConstruct;
@@ -78,6 +80,7 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
 
     private final SimpMessagingTemplate messagingTemplate;
     private final SongRepository songRepository;
+    private final SongPlayRepository songPlayRepository;
     private final TwitchConfigRepository twitchConfigRepository;
     private TwitchClient twitchClient;
 
@@ -110,9 +113,10 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
     private final Random random = new Random();
     private final java.util.concurrent.ScheduledExecutorService scheduler = java.util.concurrent.Executors.newSingleThreadScheduledExecutor();
 
-    public TwitchBotService(SimpMessagingTemplate messagingTemplate, SongRepository songRepository, TwitchConfigRepository twitchConfigRepository) {
+    public TwitchBotService(SimpMessagingTemplate messagingTemplate, SongRepository songRepository, SongPlayRepository songPlayRepository, TwitchConfigRepository twitchConfigRepository) {
         this.messagingTemplate = messagingTemplate;
         this.songRepository = songRepository;
+        this.songPlayRepository = songPlayRepository;
         this.twitchConfigRepository = twitchConfigRepository;
     }
 
@@ -328,6 +332,9 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
             return;
         }
         Song song = songs.get(random.nextInt(songs.size()));
+        song.incrementPlayCount();
+        songRepository.save(song);
+        songPlayRepository.save(new SongPlay(song, LocalDateTime.now(), redeemName));
         log.info("Queueing song: {} by {} for redeem: {}", song.getName(), song.getArtist(), redeemName);
 
         if (!isSongPlaying) {
@@ -363,8 +370,11 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
         }
         log.info("Song finished. Waiting {} seconds before next song...", currentSongDelaySeconds);
         isSongPlaying = false;
-        currentlyPlayingSong = null;
-        broadcastCurrentSong();
+
+        if (songQueue.isEmpty()) {
+            currentlyPlayingSong = null;
+            broadcastCurrentSong();
+        }
 
         scheduler.schedule(() -> {
             synchronized (this) {
@@ -373,6 +383,8 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
                     broadcastQueueSize();
                 } else {
                     log.info("Queue is empty, no more songs to play.");
+                    currentlyPlayingSong = null;
+                    broadcastCurrentSong();
                 }
             }
         }, currentSongDelaySeconds, java.util.concurrent.TimeUnit.SECONDS);
@@ -380,16 +392,22 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
 
     /**
      * Triggers the playback of a specific song by its ID.
-     * This is typically used by the Admin UI for manual testing.
+     * This is typically used by the Admin UI or Streamer UI for manual testing.
      * @param id The ID of the song to play.
+     * @param incrementStats Whether to increment the play count for this song.
      */
-    public synchronized void playSongById(Long id) {
+    public synchronized void playSongById(Long id, boolean incrementStats) {
         if (!isStreamOnline) {
             log.info("Stream is offline. Ignoring playSongById request for song ID: {}", id);
             return;
         }
         songRepository.findById(id).ifPresent(song -> {
-            log.info("Manually queueing song: {} by {}", song.getName(), song.getArtist());
+            log.info("Manually queueing song: {} by {} (incrementStats: {})", song.getName(), song.getArtist(), incrementStats);
+            if (incrementStats) {
+                song.incrementPlayCount();
+                songRepository.save(song);
+                songPlayRepository.save(new SongPlay(song, LocalDateTime.now(), "manual"));
+            }
             if (!isSongPlaying) {
                 playSong(song);
             } else {
@@ -398,6 +416,15 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
                 broadcastQueueSize();
             }
         });
+    }
+
+    /**
+     * Triggers the playback of a specific song by its ID.
+     * This is typically used by the Admin UI for manual testing.
+     * @param id The ID of the song to play.
+     */
+    public synchronized void playSongById(Long id) {
+        playSongById(id, false);
     }
 
     /**
@@ -424,6 +451,9 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
             return;
         }
         Song song = songs.get(random.nextInt(songs.size()));
+        song.incrementPlayCount();
+        songRepository.save(song);
+        songPlayRepository.save(new SongPlay(song, LocalDateTime.now(), "random"));
         log.info("Queueing song: {} by {}", song.getName(), song.getArtist());
 
         if (!isSongPlaying) {
