@@ -11,7 +11,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/test")
 @Tag(name = "Test Endpoints", description = "Endpoints for manual testing")
-@SecurityRequirement(name = "X-API-Key")
 public class TestController {
 
     private final TwitchBotService twitchBotService;
@@ -20,6 +19,11 @@ public class TestController {
         this.twitchBotService = twitchBotService;
     }
 
+    /**
+     * Triggers a random song to play through the {@link TwitchBotService}.
+     * This is intended for manual testing of the overlay.
+     * @return A success message.
+     */
     @GetMapping("/play")
     @Operation(summary = "Trigger a random song to play")
     public String triggerPlay() {
@@ -27,6 +31,11 @@ public class TestController {
         return "Song triggered!";
     }
 
+    /**
+     * Simulates a "song-finished" event from the frontend.
+     * This triggers the next song in the queue (if any).
+     * @return A success message.
+     */
     @GetMapping("/finish")
     @Operation(summary = "Trigger song finished (simulates frontend callback)")
     public String triggerFinish() {

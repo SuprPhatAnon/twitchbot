@@ -4,15 +4,18 @@ This application listens for Twitch Channel Point redemptions and plays a random
 
 ## Features
 
-- **Twitch Integration**: Automatically detects when a specific reward is redeemed.
-- **Web Overlay**: A simple HTML/JS overlay to be used in OBS or other streaming software.
-- **Database Backed**: Songs are stored in a MariaDB database.
+- **Twitch Integration**: Automatically detects when a specific reward is redeemed via Twitch EventSub.
+- **Web Overlay**: A real-time HTML/JS/CSS overlay for OBS or other streaming software using WebSockets.
+- **Admin & Streamer UIs**: Built-in dashboards to manage songs, rewards, and monitor status.
+- **Database Driven**: All songs, rewards, and statistics are stored in a MariaDB database.
+- **API First**: Fully documented REST API with OpenAPI/Swagger support.
 
 ## Prerequisites
 
 - [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/)
 - A Twitch Developer account and a registered application to get your Client ID and Secret.
-- A Twitch Access Token (User Access Token with `channel:read:redemptions` scope).
+- A Twitch Access Token (Streamer User Access Token with `channel:read:redemptions`, `channel:read:subscriptions`, `moderator:read:followers`, `bits:read`, `chat:read`, `chat:edit`, and `channel:bot` scopes).
+- (Optional) A separate Twitch Access Token for a bot account with `user:bot`, `user:read:chat`, and `user:write:chat` scopes.
 
 ## Setup and Configuration
 
@@ -24,17 +27,24 @@ The application is configured using environment variables. You can create a `.en
 | --- | --- |
 | `TWITCH_CLIENT_ID` | Your Twitch Application Client ID |
 | `TWITCH_CLIENT_SECRET` | Your Twitch Application Client Secret |
-| `TWITCH_ACCESS_TOKEN` | A User Access Token for your channel |
+| `TWITCH_ACCESS_TOKEN` | A User Access Token for your channel (Streamer) |
+| `TWITCH_REFRESH_TOKEN` | (Recommended) A Refresh Token for the streamer account |
+| `TWITCH_BOT_ACCESS_TOKEN` | (Optional) A User Access Token for a separate bot account |
+| `TWITCH_BOT_REFRESH_TOKEN` | (Optional) A Refresh Token for the bot account |
 | `TWITCH_CHANNEL_NAME` | Your Twitch channel name |
-| `TWITCH_REDEEM_TITLE` | The exact title of the Channel Point reward (Default: `Play Random Song`) |
 | `API_KEY` | Secret key for REST API Authorization (Default: `default_secret_key`) |
-| `TWITCH_LOCAL_CLI_URL` | URL of the local Twitch CLI mock server (Default: `http://localhost:8080`) |
-| `SONG_DELAY_SECONDS` | Delay between songs in seconds (Default: `5`) |
 | `DB_HOST` | MariaDB host (Default: `localhost`) |
-| `DB_PORT` | MariaDB port (Default: `3306`) |
-| `DB_NAME` | MariaDB database name (Default: `mariadb`) |
 | `DB_USER` | MariaDB username (Default: `mariadb`) |
 | `DB_PASSWORD` | MariaDB password (Default: `mariadb`) |
+
+### Optional Environment Variables
+
+| Variable | Description |
+| --- | --- |
+| `TWITCH_USE_LOCAL_CLI` | Use local Twitch CLI mock server (Default: `false`) |
+| `TWITCH_LOCAL_CLI_URL` | URL of the local Twitch CLI mock server (Default: `http://localhost:8080`) |
+| `TWITCH_REDIRECT_URI_HOST` | Host part of the OAuth redirect URI (e.g., `https://mybot.com`). Default: `https://stream.phat.wtf` |
+| `SPRING_PROFILES_ACTIVE` | Active Spring profiles (e.g. `prod`, `test`) |
 
 ## Running with Docker Compose
 
@@ -44,8 +54,8 @@ The application is configured using environment variables. You can create a `.en
    TWITCH_CLIENT_ID=your_client_id
    TWITCH_CLIENT_SECRET=your_client_secret
    TWITCH_ACCESS_TOKEN=your_access_token
+   TWITCH_BOT_ACCESS_TOKEN=your_bot_access_token
    TWITCH_CHANNEL_NAME=your_channel_name
-   TWITCH_REDEEM_TITLE=Play Random Song
    API_KEY=your_api_key
    ```
 3. **Start the application:**
@@ -73,8 +83,10 @@ The application includes a built-in Admin UI for full management and a Streamer 
 - **Streamer UI**: `http://localhost:8080/streamer.html`
   - Read-only access to view configuration, songs, and logs.
   - Allows triggering song playback ("Play" button).
+- **Public Player**: `http://localhost:8080/player.html`
+  - Simple UI for regular people to play songs directly in their browser.
 
-You will need to provide your `API_KEY` in the UI to log in and perform actions.
+You will need to provide your `API_KEY` in the Admin and Streamer UIs to log in and perform actions. The Public Player and Statistics pages do not require an API key.
 
 ## OpenAPI Documentation
 
@@ -95,15 +107,15 @@ When the reward is redeemed on Twitch, the overlay will pick a random song from 
 ### Testing
 You can manually trigger a song play (for testing the overlay) by visiting:
 `http://localhost:8080/api/songs/{id}/play`
-(Note: This requires the `X-API-Key` header).
 
 Example using `curl`:
 ```bash
-curl -X POST -H "X-API-Key: your_api_key" http://localhost:8080/api/songs/1/play
+curl -X POST http://localhost:8080/api/songs/1/play -H "X-API-Key: your_api_key"
 ```
+*(Note: As this is a POST request, it requires the `X-API-Key` header.)*
 
 ### REST API
-You can manage the application using the following REST API endpoints. All requests to `/api/**` require an `X-API-Key` header with your set API key.
+You can manage the application using the following REST API endpoints. All write requests (**POST, PUT, DELETE**) to `/api/**` require an `X-API-Key` header with your set API key. Read-only requests (**GET**) are public.
 Interactive documentation is available at `/swagger-ui.html`.
 
 #### Song Management (`/api/songs`)
@@ -131,7 +143,7 @@ Interactive documentation is available at `/swagger-ui.html`.
 - **GET `/api/twitch-config`**: Get current Twitch credentials and settings.
 - **PUT `/api/twitch-config`**: Update Twitch configuration.
 - **GET `/api/twitch-config/status`**: Check if the stream is currently online.
-- **GET `/api/twitch-config/connection`**: Check Twitch IRC connection status.
+- **GET `/api/twitch-config/connection`**: Check Twitch EventSub connection status.
 - **GET `/api/twitch-config/redeems`**: Get a log of recent channel point redemption events.
 - **GET `/api/twitch-config/profiles`**: Get active Spring profiles.
 

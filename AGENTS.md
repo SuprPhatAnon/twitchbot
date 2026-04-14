@@ -12,7 +12,7 @@ This is a Spring Boot application that integrates with Twitch to play songs on a
 - **Database**: MariaDB
 - **Messaging**: WebSocket (STOMP) for real-time updates to the overlay.
 - **Frontend**: Simple HTML/JS/CSS served as static resources.
-- **External Integrations**: Twitch API (Helix), Twitch PubSub, Twitch IRC (via `twitch4j`).
+- **External Integrations**: Twitch API (Helix) and Twitch EventSub (via `twitch4j`).
 
 ## Key Components
 
@@ -40,7 +40,9 @@ This is a Spring Boot application that integrates with Twitch to play songs on a
 3. When a song finishes, the overlay sends a message to `/app/song-finished`.
 
 ### Authentication
-- Most API endpoints (`/api/**`) require an `X-API-Key` header.
+- Some API endpoints (`/api/**`) require an `X-API-Key` header.
+- **Read-only requests (GET)** are public and do not require an API key.
+- **Write requests (POST, PUT, DELETE)** require an `X-API-Key` header with your set API key.
 - The default key is `default_secret_key` if not configured via environment variables.
 
 ### Database Schema

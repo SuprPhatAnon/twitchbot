@@ -18,7 +18,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/redeems")
 @Tag(name = "Redeem Management", description = "Endpoints for managing Twitch channel point redeems")
-@SecurityRequirement(name = "X-API-Key")
 public class RedeemController {
 
     private final RedeemRepository redeemRepository;
@@ -30,7 +29,7 @@ public class RedeemController {
     }
 
     /**
-     * Retrieves all redeems.
+     * Retrieves all defined Twitch channel point redeems from the {@link RedeemRepository}.
      * @return A list of all {@link Redeem} entities.
      */
     @GetMapping
@@ -40,13 +39,14 @@ public class RedeemController {
     }
 
     /**
-     * Adds a new redeem.
+     * Adds a new redeem title to the system and broadcasts a refresh message to WebSocket subscribers.
+     * Requires an API key for authorization.
      * @param redeem The {@link Redeem} entity to create.
      * @return The saved {@link Redeem} entity.
      */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Add a new redeem")
+    @Operation(summary = "Add a new redeem", security = @SecurityRequirement(name = "X-API-Key"))
     public Redeem addRedeem(@RequestBody Redeem redeem) {
         Redeem savedRedeem = redeemRepository.save(redeem);
         messagingTemplate.convertAndSend("/topic/redeems-list", "refresh");
@@ -54,12 +54,13 @@ public class RedeemController {
     }
 
     /**
-     * Deletes a redeem.
+     * Deletes a redeem from the system and broadcasts a refresh message to WebSocket subscribers.
+     * Requires an API key for authorization.
      * @param id The ID of the redeem to delete.
      * @return 204 No Content if successful, or 404 Not Found if the ID does not exist.
      */
     @DeleteMapping("/{id}")
-    @Operation(summary = "Delete a redeem")
+    @Operation(summary = "Delete a redeem", security = @SecurityRequirement(name = "X-API-Key"))
     public ResponseEntity<Void> deleteRedeem(@PathVariable Long id) {
         return redeemRepository.findById(id)
                 .map(redeem -> {

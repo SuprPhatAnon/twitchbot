@@ -37,10 +37,6 @@ spec:
           env:
             - name: DB_HOST
               value: "mariadb"
-            - name: DB_PORT
-              value: "3306"
-            - name: DB_NAME
-              value: "mariadb"
             - name: DB_USER
               value: "mariadb"
             - name: DB_PASSWORD

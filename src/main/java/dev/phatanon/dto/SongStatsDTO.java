@@ -1,5 +1,9 @@
 package dev.phatanon.dto;
 
+/**
+ * Data Transfer Object for song play statistics.
+ * Used for reporting aggregated play counts for songs or artists.
+ */
 public class SongStatsDTO {
     private String name;
     private String artist;

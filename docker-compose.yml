@@ -33,7 +33,6 @@ services:
       TWITCH_CLIENT_SECRET: ${TWITCH_CLIENT_SECRET:-your_client_secret}
       TWITCH_ACCESS_TOKEN: ${TWITCH_ACCESS_TOKEN:-test-token}
       TWITCH_CHANNEL_NAME: ${TWITCH_CHANNEL_NAME:-your_channel_name}
-      TWITCH_REDEEM_TITLE: ${TWITCH_REDEEM_TITLE:-Play Random Song}
       API_KEY: ${API_KEY:-default_secret_key}
       TWITCH_USE_LOCAL_CLI: ${TWITCH_USE_LOCAL_CLI:-true}
       TWITCH_LOCAL_CLI_URL: http://twitch-cli:8080

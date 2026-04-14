@@ -1,17 +1,26 @@
 package dev.phatanon.service;
 
+import com.github.philippheuer.credentialmanager.CredentialManager;
+import com.github.philippheuer.credentialmanager.CredentialManagerBuilder;
 import com.github.philippheuer.credentialmanager.domain.OAuth2Credential;
+import com.github.philippheuer.events4j.core.EventManager;
 import com.github.twitch4j.TwitchClient;
+import com.github.twitch4j.auth.domain.TwitchScopes;
+import com.github.twitch4j.auth.providers.TwitchIdentityProvider;
 import com.github.twitch4j.TwitchClientBuilder;
 import com.github.twitch4j.chat.events.ChatConnectionStateEvent;
 import com.github.twitch4j.common.events.domain.EventChannel;
 import com.github.twitch4j.events.ChannelGoLiveEvent;
 import com.github.twitch4j.events.ChannelGoOfflineEvent;
+import com.github.twitch4j.eventsub.events.ChannelCheerEvent;
+import com.github.twitch4j.eventsub.events.ChannelFollowEvent;
+import com.github.twitch4j.eventsub.events.ChannelSubscribeEvent;
+import com.github.twitch4j.eventsub.events.ChannelSubscriptionGiftEvent;
+import com.github.twitch4j.eventsub.events.ChannelSubscriptionMessageEvent;
+import com.github.twitch4j.eventsub.events.CustomRewardRedemptionAddEvent;
 import com.github.twitch4j.eventsub.socket.events.EventSocketConnectionStateEvent;
+import com.github.twitch4j.helix.domain.ChatMessage;
 import com.github.twitch4j.helix.domain.StreamList;
-import com.github.twitch4j.pubsub.events.ChannelBitsEvent;
-import com.github.twitch4j.pubsub.events.PubSubConnectionStateEvent;
-import com.github.twitch4j.pubsub.events.RewardRedeemedEvent;
 import dev.phatanon.ConnectionStartupLogger;
 import dev.phatanon.entity.Song;
 import dev.phatanon.entity.SongPlay;
@@ -36,7 +45,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Service responsible for interacting with Twitch API and managing song playback.
- * It handles Twitch IRC connection, PubSub events for rewards, and maintains a song queue.
+ * It handles Twitch IRC connection, EventSub events for rewards, and maintains a song queue.
  */
 @Service
 public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotService {
@@ -63,6 +72,15 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
     @Value("${twitch.access-token}")
     private String accessToken;
 
+    @Value("${twitch.bot-access-token:}")
+    private String botAccessToken;
+
+    @Value("${twitch.refresh-token:}")
+    private String refreshToken;
+
+    @Value("${twitch.bot-refresh-token:}")
+    private String botRefreshToken;
+
     @Value("${twitch.channel-name}")
     private String channelName;
 
@@ -85,7 +103,10 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
     private TwitchClient twitchClient;
 
     private String currentAccessToken;
+    private String currentBotAccessToken;
     private String currentChannelName;
+    private String broadcasterId;
+    private String botUserId;
     private int currentSongDelaySeconds;
 
     private final java.util.Queue<Song> songQueue = new java.util.concurrent.LinkedBlockingQueue<>();
@@ -100,10 +121,16 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
         return songQueue.size();
     }
 
+    /**
+     * Broadcasts the current queue size to WebSocket subscribers on /topic/queue-size.
+     */
     private void broadcastQueueSize() {
         messagingTemplate.convertAndSend("/topic/queue-size", getQueueSize());
     }
 
+    /**
+     * Broadcasts the currently playing song to WebSocket subscribers on /topic/current-song.
+     */
     private void broadcastCurrentSong() {
         messagingTemplate.convertAndSend("/topic/current-song", currentlyPlayingSong);
     }
@@ -150,6 +177,9 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
                 newConfig.setClientId(clientId);
                 newConfig.setClientSecret(clientSecret);
                 newConfig.setAccessToken(accessToken);
+                newConfig.setRefreshToken(refreshToken);
+                newConfig.setBotAccessToken(botAccessToken);
+                newConfig.setBotRefreshToken(botRefreshToken);
                 newConfig.setChannelName(channelName);
                 newConfig.setRedeemTitle(redeemTitle);
                 newConfig.setSongDelaySeconds(defaultSongDelaySeconds);
@@ -159,20 +189,51 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
             }
 
         currentAccessToken = config.getAccessToken();
+        currentBotAccessToken = config.getBotAccessToken();
         currentChannelName = config.getChannelName();
-        currentSongDelaySeconds = config.getSongDelaySeconds();
 
         log.info("Attempting to initialize Twitch bot for channel: {}", currentChannelName);
-        OAuth2Credential credential = new OAuth2Credential("twitch", currentAccessToken);
+        
+        CredentialManager credentialManager = CredentialManagerBuilder.builder().build();
+        TwitchIdentityProvider twitchIdentityProvider = new TwitchIdentityProvider(config.getClientId(), config.getClientSecret(), null);
+        credentialManager.registerIdentityProvider(twitchIdentityProvider);
+
+        OAuth2Credential streamerCredential = new OAuth2Credential(
+                "twitch",
+                config.getAccessToken(),
+                config.getRefreshToken(),
+                null,
+                null,
+                null,
+                null
+        );
+        credentialManager.addCredential("streamer", streamerCredential);
+        
+        OAuth2Credential botCredential = (config.getBotAccessToken() != null && !config.getBotAccessToken().isBlank())
+                ? new OAuth2Credential(
+                        "twitch",
+                        config.getBotAccessToken(),
+                        config.getBotRefreshToken(),
+                        null,
+                        null,
+                        null,
+                        null
+                )
+                : streamerCredential;
+        
+        if (botCredential != streamerCredential) {
+            credentialManager.addCredential("bot", botCredential);
+        }
 
         log.info("Building TwitchClient...");
         TwitchClientBuilder builder = TwitchClientBuilder.builder()
                 .withClientId(config.getClientId())
                 .withClientSecret(config.getClientSecret())
-                .withEnablePubSub(!useLocalCli)
-                .withEnableEventSocket(useLocalCli) // Enable EventSocket for local CLI
+                .withCredentialManager(credentialManager)
+                .withEnableEventSocket(true)
                 .withEnableHelix(true)
-                .withChatAccount(credential);
+                .withDefaultAuthToken(streamerCredential)
+                .withChatAccount(botCredential);
 
         if (useLocalCli) {
             log.info("Using local Twitch CLI mock server at {}", localCliUrl);
@@ -182,27 +243,53 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
         twitchClient = builder.build();
         log.info("TwitchClient built successfully.");
 
+        scheduler.scheduleAtFixedRate(() -> {
+            try {
+                List<TwitchConfig> currentConfigs = twitchConfigRepository.findAll();
+                if (!currentConfigs.isEmpty()) {
+                    TwitchConfig currentConfig = currentConfigs.get(0);
+                    boolean updated = false;
+
+                    if (streamerCredential.getAccessToken() != null && !streamerCredential.getAccessToken().equals(currentConfig.getAccessToken())) {
+                        log.info("Streamer access token changed (refreshed). Saving new tokens.");
+                        currentConfig.setAccessToken(streamerCredential.getAccessToken());
+                        currentConfig.setRefreshToken(streamerCredential.getRefreshToken());
+                        updated = true;
+                    }
+
+                    if (botCredential != streamerCredential && botCredential.getAccessToken() != null && !botCredential.getAccessToken().equals(currentConfig.getBotAccessToken())) {
+                        log.info("Bot access token changed (refreshed). Saving new tokens.");
+                        currentConfig.setBotAccessToken(botCredential.getAccessToken());
+                        currentConfig.setBotRefreshToken(botCredential.getRefreshToken());
+                        updated = true;
+                    }
+
+                    if (updated) {
+                        twitchConfigRepository.save(currentConfig);
+                    }
+                }
+            } catch (Exception e) {
+                log.error("Error checking for token refreshes: {}", e.getMessage());
+            }
+        }, 5, 5, TimeUnit.MINUTES);
+
         log.info("Registering connection state listeners...");
-        twitchClient.getEventManager().onEvent(ChatConnectionStateEvent.class, event -> {
-            log.info("IRC Connection State Change: {} -> {}", event.getPreviousState(), event.getState());
+        twitchClient.getEventManager().onEvent(EventSocketConnectionStateEvent.class, event -> {
+            log.info("EventSub Socket Connection State Change: {} -> {}", event.getPreviousState(), event.getState());
             messagingTemplate.convertAndSend("/topic/connection-status", event.getState().name().equals("CONNECTED"));
         });
 
-        twitchClient.getEventManager().onEvent(PubSubConnectionStateEvent.class, event -> {
-            log.info("PubSub Connection State Change: {} -> {}", event.getPreviousState(), event.getState());
-        });
-
-        twitchClient.getEventManager().onEvent(EventSocketConnectionStateEvent.class, event -> {
-            log.info("EventSub Socket Connection State Change: {} -> {}", event.getPreviousState(), event.getState());
-        });
-
         log.info("Fetching channel ID for {}...", currentChannelName);
-        String channelId = twitchClient.getHelix().getUsers(currentAccessToken, null, List.of(currentChannelName)).execute().getUsers().get(0).getId();
-        log.info("Channel ID for {}: {}", currentChannelName, channelId);
+        broadcasterId = twitchClient.getHelix().getUsers(currentAccessToken, null, List.of(currentChannelName)).execute().getUsers().get(0).getId();
+        log.info("Channel ID for {}: {}", currentChannelName, broadcasterId);
+
+        log.info("Fetching bot user ID...");
+        botUserId = twitchClient.getHelix().getUsers(currentBotAccessToken != null && !currentBotAccessToken.isBlank() ? currentBotAccessToken : currentAccessToken, null, null).execute().getUsers().get(0).getId();
+        log.info("Bot User ID: {}", botUserId);
 
         // Check initial stream status
         log.info("Checking initial stream status...");
-        StreamList streamList = twitchClient.getHelix().getStreams(currentAccessToken, null, null, 1, null, null, List.of(channelId), null).execute();
+        StreamList streamList = twitchClient.getHelix().getStreams(currentAccessToken, null, null, 1, null, null, List.of(broadcasterId), null).execute();
         isStreamOnline = !streamList.getStreams().isEmpty();
         log.info("Initial stream status for {}: {}", currentChannelName, isStreamOnline ? "ONLINE" : "OFFLINE");
 
@@ -210,14 +297,9 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
             scheduleThumboGreeting();
         }
 
-        if (!useLocalCli) {
-            twitchClient.getPubSub().listenForChannelPointsRedemptionEvents(credential, channelId);
-            twitchClient.getPubSub().listenForCheerEvents(credential, channelId);
-        }
-
-        twitchClient.getEventManager().onEvent(RewardRedeemedEvent.class, event -> {
-            String title = event.getRedemption().getReward().getTitle();
-            String user = event.getRedemption().getUser().getDisplayName();
+        twitchClient.getEventManager().onEvent(CustomRewardRedemptionAddEvent.class, event -> {
+            String title = event.getReward().getTitle();
+            String user = event.getUserName();
             log.info("Reward '{}' redeemed by {}", title, user);
             
             RedeemLog redeemLog = new RedeemLog(user, title, LocalDateTime.now());
@@ -232,12 +314,74 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
             playRandomSong(title);
         });
 
-        twitchClient.getEventManager().onEvent(ChannelBitsEvent.class, event -> {
-            String user = event.getData().getUserName();
-            Integer bits = event.getData().getBitsUsed();
+        twitchClient.getEventManager().onEvent(ChannelCheerEvent.class, event -> {
+            String user = event.getUserName();
+            Integer bits = event.getBits();
             log.info("{} cheered {} bits", user, bits);
 
             RedeemLog redeemLog = new RedeemLog(user, bits + " Bits", LocalDateTime.now());
+            synchronized (recentRedeems) {
+                if (recentRedeems.size() >= MAX_REDEEM_LOGS) {
+                    recentRedeems.remove(0);
+                }
+                recentRedeems.add(redeemLog);
+            }
+            messagingTemplate.convertAndSend("/topic/redeems", redeemLog);
+        });
+
+        twitchClient.getEventManager().onEvent(ChannelFollowEvent.class, event -> {
+            String user = event.getUserName();
+            log.info("{} followed the channel", user);
+
+            RedeemLog redeemLog = new RedeemLog(user, "Followed!", LocalDateTime.now());
+            synchronized (recentRedeems) {
+                if (recentRedeems.size() >= MAX_REDEEM_LOGS) {
+                    recentRedeems.remove(0);
+                }
+                recentRedeems.add(redeemLog);
+            }
+            messagingTemplate.convertAndSend("/topic/redeems", redeemLog);
+        });
+
+        twitchClient.getEventManager().onEvent(ChannelSubscribeEvent.class, event -> {
+            String user = event.getUserName();
+            String tier = event.getTier().name();
+            log.info("{} subscribed at Tier {}", user, tier);
+
+            RedeemLog redeemLog = new RedeemLog(user, "Subscribed (Tier " + tier + ")", LocalDateTime.now());
+            synchronized (recentRedeems) {
+                if (recentRedeems.size() >= MAX_REDEEM_LOGS) {
+                    recentRedeems.remove(0);
+                }
+                recentRedeems.add(redeemLog);
+            }
+            messagingTemplate.convertAndSend("/topic/redeems", redeemLog);
+        });
+
+        twitchClient.getEventManager().onEvent(ChannelSubscriptionGiftEvent.class, event -> {
+            String user = event.getUserName();
+            Integer count = event.getTotal();
+            String tier = event.getTier().name();
+            String logMsg = count != null && count > 1 ? "gifted " + count + " subs (Tier " + tier + ")" : "gifted a sub (Tier " + tier + ")";
+            log.info("{} {}", user, logMsg);
+
+            RedeemLog redeemLog = new RedeemLog(user, logMsg, LocalDateTime.now());
+            synchronized (recentRedeems) {
+                if (recentRedeems.size() >= MAX_REDEEM_LOGS) {
+                    recentRedeems.remove(0);
+                }
+                recentRedeems.add(redeemLog);
+            }
+            messagingTemplate.convertAndSend("/topic/redeems", redeemLog);
+        });
+
+        twitchClient.getEventManager().onEvent(ChannelSubscriptionMessageEvent.class, event -> {
+            String user = event.getUserName();
+            int months = event.getCumulativeMonths();
+            String tier = event.getTier().name();
+            log.info("{} resubscribed for {} months (Tier {})", user, months, tier);
+
+            RedeemLog redeemLog = new RedeemLog(user, "Resubscribed (" + months + " months, Tier " + tier + ")", LocalDateTime.now());
             synchronized (recentRedeems) {
                 if (recentRedeems.size() >= MAX_REDEEM_LOGS) {
                     recentRedeems.remove(0);
@@ -307,7 +451,17 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
         scheduler.schedule(() -> {
             if (isStreamOnline() && greetingSentThisSession.compareAndSet(false, true)) {
                 log.info("Sending Thumbo greeting message.");
-                twitchClient.getChat().sendMessage(currentChannelName, "Hi Thumbo <3");
+                try {
+                    String token = currentBotAccessToken != null && !currentBotAccessToken.isBlank() ? currentBotAccessToken : currentAccessToken;
+                    ChatMessage chatMessage = ChatMessage.builder()
+                            .broadcasterId(broadcasterId)
+                            .senderId(botUserId)
+                            .message("Hi Thumbo <3")
+                            .build();
+                    twitchClient.getHelix().sendChatMessage(token, chatMessage).execute();
+                } catch (Exception e) {
+                    log.error("Failed to send Thumbo greeting via Helix: {}", e.getMessage());
+                }
             } else {
                 log.info("Thumbo greeting conditions not met: stream online: {}, greeting already sent: {}",
                         isStreamOnline(), greetingSentThisSession.get());

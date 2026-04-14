@@ -22,7 +22,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/songs")
 @Tag(name = "Song Management", description = "Endpoints for managing songs")
-@SecurityRequirement(name = "X-API-Key")
 public class SongController {
 
     private final SongRepository songRepository;
@@ -38,7 +37,7 @@ public class SongController {
     }
 
     /**
-     * Retrieves all songs from the {@link SongRepository}.
+     * Retrieves all available songs from the {@link SongRepository}, ordered by their sort name.
      * @return A list of all {@link Song} entities.
      */
     @GetMapping
@@ -48,9 +47,9 @@ public class SongController {
     }
 
     /**
-     * Retrieves a specific song by its unique ID.
-     * @param id The ID of the song to retrieve.
-     * @return The {@link Song} if found, or 404 Not Found if no song exists with the given ID.
+     * Retrieves a specific song by its unique identifier.
+     * @param id The unique ID of the song to retrieve.
+     * @return A {@link ResponseEntity} containing the {@link Song} if found, or 404 Not Found otherwise.
      */
     @GetMapping("/{id}")
     @Operation(summary = "Get a song by ID")
@@ -61,13 +60,14 @@ public class SongController {
     }
 
     /**
-     * Adds a new song to the {@link SongRepository}.
-     * @param song The {@link Song} entity to create.
-     * @return The saved {@link Song} entity with its generated ID.
+     * Adds a new song to the system and broadcasts a refresh message to WebSocket subscribers.
+     * Requires an API key for authorization.
+     * @param song The {@link Song} entity to be created.
+     * @return The newly created {@link Song} entity with its assigned ID.
      */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Add a new song")
+    @Operation(summary = "Add a new song", security = @SecurityRequirement(name = "X-API-Key"))
     public Song addSong(@RequestBody Song song) {
         Song savedSong = songRepository.save(song);
         messagingTemplate.convertAndSend("/topic/songs", "refresh");
@@ -75,13 +75,14 @@ public class SongController {
     }
 
     /**
-     * Updates an existing song in the {@link SongRepository}.
-     * @param id The ID of the song to update.
-     * @param songDetails The new details to apply to the existing song.
-     * @return The updated {@link Song} if found, or 404 Not Found if the ID does not exist.
+     * Updates an existing song's details and broadcasts a refresh message to WebSocket subscribers.
+     * Requires an API key for authorization.
+     * @param id The unique ID of the song to update.
+     * @param songDetails The new details to be applied to the song.
+     * @return A {@link ResponseEntity} containing the updated {@link Song} if successful, or 404 Not Found if not.
      */
     @PutMapping("/{id}")
-    @Operation(summary = "Update an existing song")
+    @Operation(summary = "Update an existing song", security = @SecurityRequirement(name = "X-API-Key"))
     public ResponseEntity<Song> updateSong(@PathVariable Long id, @RequestBody Song songDetails) {
         return songRepository.findById(id)
                 .map(song -> {
@@ -98,13 +99,15 @@ public class SongController {
     }
 
     /**
-     * Triggers playback of a song by its ID through the {@link dev.phatanon.service.TwitchBotService}.
-     * The song will only be queued if the stream is currently online.
-     * @param id The ID of the song to play.
-     * @return A success message if the song was queued, or an error status (e.g., 400 Bad Request if stream is offline).
+     * Queues a song for playback via the {@link dev.phatanon.service.TwitchBotService}.
+     * Playback is only possible when the stream is currently online.
+     * Requires an API key for authorization.
+     * @param id The unique ID of the song to play.
+     * @param incrementStats Whether to count this play towards song statistics (default: false).
+     * @return A {@link ResponseEntity} indicating whether the song was successfully queued.
      */
     @PostMapping("/{id}/play")
-    @Operation(summary = "Play a song by ID")
+    @Operation(summary = "Play a song by ID", security = @SecurityRequirement(name = "X-API-Key"))
     public ResponseEntity<String> playSong(@PathVariable Long id, @RequestParam(required = false, defaultValue = "false") boolean incrementStats) {
         if (!twitchBotService.isStreamOnline()) {
             return ResponseEntity.badRequest().body("Cannot queue song: Stream is offline.");
@@ -147,7 +150,7 @@ public class SongController {
      * @return 204 No Content if successful, or 404 Not Found if the ID does not exist.
      */
     @DeleteMapping("/{id}")
-    @Operation(summary = "Delete a song")
+    @Operation(summary = "Delete a song", security = @SecurityRequirement(name = "X-API-Key"))
     public ResponseEntity<Void> deleteSong(@PathVariable Long id) {
         return songRepository.findById(id)
                 .map(song -> {
@@ -159,9 +162,9 @@ public class SongController {
     }
 
     /**
-     * Retrieves recent song plays.
-     * @param limit The maximum number of plays to retrieve.
-     * @return A list of recent {@link SongPlay} entities.
+     * Retrieves recent song plays from the {@link SongPlayRepository}.
+     * @param limit The maximum number of plays to retrieve (default is 10).
+     * @return A list of the most recent {@link SongPlay} entities.
      */
     @GetMapping("/plays/recent")
     @Operation(summary = "Get recent song plays")
@@ -170,10 +173,10 @@ public class SongController {
     }
 
     /**
-     * Retrieves song play statistics.
-     * @param range The time range (daily, weekly, monthly, yearly, alltime).
-     * @param groupBy The grouping (song, artist).
-     * @return A list of {@link SongStatsDTO} entities.
+     * Retrieves song play statistics aggregated by song or artist over a specified time range.
+     * @param range The time range for statistics (e.g., 'daily', 'weekly', 'monthly', 'yearly', or 'alltime').
+     * @param groupBy The field to group by (e.g., 'song' or 'artist').
+     * @return A list of {@link SongStatsDTO} containing the aggregated statistics.
      */
     @GetMapping("/statistics")
     @Operation(summary = "Get song play statistics")

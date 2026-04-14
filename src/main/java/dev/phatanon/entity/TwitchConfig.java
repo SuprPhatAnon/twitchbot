@@ -20,6 +20,9 @@ public class TwitchConfig {
     private String clientId;
     private String clientSecret;
     private String accessToken;
+    private String refreshToken;
+    private String botAccessToken;
+    private String botRefreshToken;
     private String channelName;
     private String redeemTitle;
     private int songDelaySeconds;
@@ -57,6 +60,30 @@ public class TwitchConfig {
 
     public void setAccessToken(String accessToken) {
         this.accessToken = accessToken;
+    }
+
+    public String getRefreshToken() {
+        return refreshToken;
+    }
+
+    public void setRefreshToken(String refreshToken) {
+        this.refreshToken = refreshToken;
+    }
+
+    public String getBotAccessToken() {
+        return botAccessToken;
+    }
+
+    public void setBotAccessToken(String botAccessToken) {
+        this.botAccessToken = botAccessToken;
+    }
+
+    public String getBotRefreshToken() {
+        return botRefreshToken;
+    }
+
+    public void setBotRefreshToken(String botRefreshToken) {
+        this.botRefreshToken = botRefreshToken;
     }
 
     public String getChannelName() {

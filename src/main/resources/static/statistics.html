@@ -94,8 +94,6 @@
     </table>
 
     <script>
-        const apiKey = localStorage.getItem('api_key') || '';
-
         async function loadStatistics() {
             const range = document.getElementById('range').value;
             const groupBy = document.getElementById('groupBy').value;
@@ -111,9 +109,7 @@
             }
 
             try {
-                const response = await fetch(`/api/songs/statistics?range=${range}&groupBy=${groupBy}`, {
-                    headers: { 'X-API-Key': apiKey }
-                });
+                const response = await fetch(`/api/songs/statistics?range=${range}&groupBy=${groupBy}`);
                 const stats = await response.json();
 
                 body.innerHTML = '';
@@ -128,7 +124,7 @@
                 });
             } catch (error) {
                 console.error('Error loading statistics:', error);
-                body.innerHTML = '<tr><td colspan="3">Error loading statistics. Make sure your API key is set in Admin page.</td></tr>';
+                body.innerHTML = '<tr><td colspan="3">Error loading statistics.</td></tr>';
             }
         }
 

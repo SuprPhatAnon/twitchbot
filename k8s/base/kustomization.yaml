@@ -22,8 +22,8 @@ secretGenerator:
       - TWITCH_CLIENT_ID=your_client_id
       - TWITCH_CLIENT_SECRET=your_client_secret
       - TWITCH_ACCESS_TOKEN=test-token
+      - TWITCH_BOT_ACCESS_TOKEN=your_bot_access_token
       - TWITCH_CHANNEL_NAME=your_channel_name
-      - TWITCH_REDEEM_TITLE=Play Random Song
       - API_KEY=default_secret_key
   - name: db-secrets
     literals:

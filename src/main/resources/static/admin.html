@@ -198,6 +198,18 @@
                                 <input type="password" class="form-control form-control-sm" id="twitch-access-token">
                             </div>
                             <div class="col-md-4">
+                                <label class="form-label small">Refresh Token</label>
+                                <input type="password" class="form-control form-control-sm" id="twitch-refresh-token">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small">Bot Access Token</label>
+                                <input type="password" class="form-control form-control-sm" id="twitch-bot-access-token" placeholder="Leave empty to use main token">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small">Bot Refresh Token</label>
+                                <input type="password" class="form-control form-control-sm" id="twitch-bot-refresh-token">
+                            </div>
+                            <div class="col-md-4">
                                 <label class="form-label small">Channel Name</label>
                                 <input type="text" class="form-control form-control-sm" id="twitch-channel-name">
                             </div>
@@ -209,11 +221,26 @@
                                 <label class="form-label small">Delay (s)</label>
                                 <input type="number" class="form-control form-control-sm" id="twitch-song-delay">
                             </div>
-                            <div class="col-md-2 d-flex align-items-end">
+                        <div class="col-md-2 d-flex align-items-end">
                                 <button type="submit" class="btn btn-sm btn-primary w-100">Update</button>
                             </div>
                         </div>
                     </form>
+                    <div class="mt-3">
+                        <h6>OAuth Helper</h6>
+                        <p class="small text-muted">Generate a Twitch authorization URL with the required scopes for the streamer or bot account.</p>
+                        <div class="input-group input-group-sm mb-2">
+                            <span class="input-group-text">Redirect URI</span>
+                            <input type="text" class="form-control" id="oauth-redirect-uri" value="">
+                        </div>
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-outline-info" onclick="generateAuthUrl('streamer')">Streamer Auth URL</button>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="generateAuthUrl('bot')">Bot Auth URL</button>
+                        </div>
+                        <div id="auth-url-container" class="mt-2" style="display: none;">
+                            <a id="auth-url-link" href="#" target="_blank" class="small text-break"></a>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -224,7 +251,7 @@
                 <!-- Recent plays loaded here -->
             </div>
 
-            <h5 class="mb-3">Event Log (Redeems)</h5>
+            <h5 class="mb-3">Event Log (Redeems, Subs, Follows)</h5>
             <div id="redeem-log">
                 <!-- Redeems added here -->
             </div>
@@ -510,9 +537,18 @@
                     document.getElementById('twitch-client-id').value = config.clientId || '';
                     document.getElementById('twitch-client-secret').value = config.clientSecret || '';
                     document.getElementById('twitch-access-token').value = config.accessToken || '';
+                    document.getElementById('twitch-refresh-token').value = config.refreshToken || '';
+                    document.getElementById('twitch-bot-access-token').value = config.botAccessToken || '';
+                    document.getElementById('twitch-bot-refresh-token').value = config.botRefreshToken || '';
                     document.getElementById('twitch-channel-name').value = config.channelName || '';
                     document.getElementById('twitch-redeem-title').value = config.redeemTitle || '';
                     document.getElementById('twitch-song-delay').value = config.songDelaySeconds || 0;
+                }
+
+                const hostResponse = await fetch('/api/twitch-config/redirect-uri-host', { headers: { 'X-API-Key': key } });
+                if (hostResponse.ok) {
+                    const host = await hostResponse.text();
+                    document.getElementById('oauth-redirect-uri').value = host + '/admin.html';
                 }
             } catch (error) { console.error('Error fetching config:', error); }
         }
@@ -524,6 +560,9 @@
                 clientId: document.getElementById('twitch-client-id').value,
                 clientSecret: document.getElementById('twitch-client-secret').value,
                 accessToken: document.getElementById('twitch-access-token').value,
+                refreshToken: document.getElementById('twitch-refresh-token').value,
+                botAccessToken: document.getElementById('twitch-bot-access-token').value,
+                botRefreshToken: document.getElementById('twitch-bot-refresh-token').value,
                 channelName: document.getElementById('twitch-channel-name').value,
                 redeemTitle: document.getElementById('twitch-redeem-title').value,
                 songDelaySeconds: parseInt(document.getElementById('twitch-song-delay').value)
@@ -545,6 +584,43 @@
                 if (response.ok) { /* WebSocket will update queue size */ }
                 else { alert(await response.text()); }
             } catch (error) { console.error('Error playing song:', error); }
+        }
+
+        function generateAuthUrl(type = 'streamer') {
+            const clientId = document.getElementById('twitch-client-id').value;
+            const redirectUri = document.getElementById('oauth-redirect-uri').value;
+            if (!clientId) {
+                alert('Please enter a Client ID first.');
+                return;
+            }
+            
+            let scopes = [];
+            if (type === 'bot') {
+                scopes = [
+                    'user:bot',
+                    'user:read:chat',
+                    'user:write:chat'
+                ];
+            } else {
+                scopes = [
+                    'channel:read:redemptions',
+                    'channel:read:subscriptions',
+                    'moderator:read:followers',
+                    'bits:read',
+                    'chat:read',
+                    'chat:edit',
+                    'channel:bot'
+                ];
+            }
+            
+            const scopeString = scopes.join(' ');
+            const url = `https://id.twitch.tv/oauth2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=${encodeURIComponent(scopeString)}`;
+            
+            const container = document.getElementById('auth-url-container');
+            const link = document.getElementById('auth-url-link');
+            link.href = url;
+            link.innerText = `Click here to authorize as ${type === 'bot' ? 'Bot' : 'Streamer'}`;
+            container.style.display = 'block';
         }
 
         async function deleteSong(id) {
@@ -578,6 +654,23 @@
                 }
             } catch (error) { console.error('Error adding song:', error); }
         };
+
+        const fragment = new URLSearchParams(window.location.hash.substring(1));
+        const accessToken = fragment.get('access_token');
+        if (accessToken) {
+            const botTokenInput = document.getElementById('twitch-bot-access-token');
+            const streamerTokenInput = document.getElementById('twitch-access-token');
+            
+            if (confirm('Do you want to save this as the BOT access token?\n(Cancel to save as STREAMER access token)')) {
+                botTokenInput.value = accessToken;
+            } else {
+                streamerTokenInput.value = accessToken;
+            }
+            
+            // Clear fragment from URL
+            history.replaceState(null, null, window.location.pathname);
+            alert('Access token captured from URL! Don\'t forget to click Update to save it.');
+        }
 
         checkAuth();
         if (getApiKey()) {
