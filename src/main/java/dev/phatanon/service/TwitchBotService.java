@@ -142,6 +142,14 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
     }
 
     /**
+     * Checks if a song is currently playing.
+     * @return true if a song is playing, false otherwise.
+     */
+    public synchronized boolean isSongPlaying() {
+        return isSongPlaying;
+    }
+
+    /**
      * Checks if the Twitch IRC client is connected.
      * @return true if connected, false otherwise
      */
