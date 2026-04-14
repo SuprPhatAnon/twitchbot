@@ -1,0 +1,26 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - mariadb/mariadb.yaml
+  - app/app.yaml
+
+configMapGenerator:
+  - name: app-config
+    literals:
+      - SPRING_PROFILES_ACTIVE=prod
+      - TWITCH_USE_LOCAL_CLI=false
+      - TWITCH_LOCAL_CLI_URL=http://localhost:8080
+
+secretGenerator:
+  - name: app-secrets
+    literals:
+      - TWITCH_CLIENT_ID=your_client_id
+      - TWITCH_CLIENT_SECRET=your_client_secret
+      - TWITCH_ACCESS_TOKEN=test-token
+      - TWITCH_CHANNEL_NAME=your_channel_name
+      - TWITCH_REDEEM_TITLE=Play Random Song
+      - API_KEY=default_secret_key
+  - name: db-secrets
+    literals:
+      - mariadb-root-password=mariadb
