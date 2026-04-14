@@ -42,6 +42,8 @@ import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 
 /**
  * Service responsible for interacting with Twitch API and managing song playback.
@@ -63,38 +65,12 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
     private final List<RedeemLog> recentRedeems = new LinkedList<>();
     private static final int MAX_REDEEM_LOGS = 50;
 
-    @Value("${twitch.client-id}")
-    private String clientId;
-
-    @Value("${twitch.client-secret}")
-    private String clientSecret;
-
-    @Value("${twitch.access-token}")
-    private String accessToken;
-
-    @Value("${twitch.bot-access-token:}")
-    private String botAccessToken;
-
-    @Value("${twitch.refresh-token:}")
-    private String refreshToken;
-
-    @Value("${twitch.bot-refresh-token:}")
-    private String botRefreshToken;
-
-    @Value("${twitch.channel-name}")
-    private String channelName;
-
-    @Value("${twitch.redeem-title}")
-    private String redeemTitle;
+    @Value("${twitch.api-key:default_secret_key}")
+    private String apiKey;
 
     @Value("${twitch.song-delay-seconds:5}")
     private int defaultSongDelaySeconds;
 
-    @Value("${twitch.use-local-cli:false}")
-    private boolean useLocalCli;
-
-    @Value("${twitch.local-cli-url:http://localhost:8080}")
-    private String localCliUrl;
 
     private final SimpMessagingTemplate messagingTemplate;
     private final SongRepository songRepository;
@@ -138,13 +114,15 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
     private final AtomicBoolean greetingSentThisSession = new AtomicBoolean(false);
 
     private final Random random = new Random();
-    private final java.util.concurrent.ScheduledExecutorService scheduler = java.util.concurrent.Executors.newSingleThreadScheduledExecutor();
+    private final ScheduledExecutorService scheduler;
+    private ScheduledFuture<?> tokenRefreshTask;
 
-    public TwitchBotService(SimpMessagingTemplate messagingTemplate, SongRepository songRepository, SongPlayRepository songPlayRepository, TwitchConfigRepository twitchConfigRepository) {
+    public TwitchBotService(SimpMessagingTemplate messagingTemplate, SongRepository songRepository, SongPlayRepository songPlayRepository, TwitchConfigRepository twitchConfigRepository, ScheduledExecutorService scheduler) {
         this.messagingTemplate = messagingTemplate;
         this.songRepository = songRepository;
         this.songPlayRepository = songPlayRepository;
         this.twitchConfigRepository = twitchConfigRepository;
+        this.scheduler = scheduler;
     }
 
     /**
@@ -157,121 +135,128 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
     }
 
     /**
+     * Reconnects to Twitch by closing the existing client and re-initializing.
+     */
+    public synchronized void reconnect() {
+        log.info("Reconnection requested. Closing existing Twitch client...");
+        if (twitchClient != null) {
+            try {
+                twitchClient.close();
+            } catch (Exception e) {
+                log.error("Error closing Twitch client: {}", e.getMessage());
+            }
+            twitchClient = null;
+        }
+        if (tokenRefreshTask != null) {
+            tokenRefreshTask.cancel(false);
+            tokenRefreshTask = null;
+        }
+        init();
+    }
+
+    /**
      * Initializes the Twitch client and registers event listeners.
      * This method is called after dependency injection is complete.
      */
     @PostConstruct
     public void init() {
-        if ("test-token".equals(accessToken) || "your_access_token".equals(accessToken)) {
-            log.info("Skipping Twitch client initialization in test or default environment");
-            return;
-        }
-
         try {
             log.info("Checking for existing Twitch configuration...");
             List<TwitchConfig> configs = twitchConfigRepository.findAll();
-            TwitchConfig config;
             if (configs.isEmpty()) {
-                log.info("No Twitch configuration found in database. Creating initial configuration from properties.");
-                TwitchConfig newConfig = new TwitchConfig();
-                newConfig.setClientId(clientId);
-                newConfig.setClientSecret(clientSecret);
-                newConfig.setAccessToken(accessToken);
-                newConfig.setRefreshToken(refreshToken);
-                newConfig.setBotAccessToken(botAccessToken);
-                newConfig.setBotRefreshToken(botRefreshToken);
-                newConfig.setChannelName(channelName);
-                newConfig.setRedeemTitle(redeemTitle);
-                newConfig.setSongDelaySeconds(defaultSongDelaySeconds);
-                config = twitchConfigRepository.save(newConfig);
-            } else {
-                config = configs.get(0);
+                log.warn("No Twitch configuration found in database. Waiting for manual configuration.");
+                return;
             }
 
-        currentAccessToken = config.getAccessToken();
-        currentBotAccessToken = config.getBotAccessToken();
-        currentChannelName = config.getChannelName();
+            TwitchConfig config = configs.get(0);
 
-        log.info("Attempting to initialize Twitch bot for channel: {}", currentChannelName);
-        
-        CredentialManager credentialManager = CredentialManagerBuilder.builder().build();
-        TwitchIdentityProvider twitchIdentityProvider = new TwitchIdentityProvider(config.getClientId(), config.getClientSecret(), null);
-        credentialManager.registerIdentityProvider(twitchIdentityProvider);
+            if (config.getClientId() == null || config.getClientId().isBlank() ||
+                config.getClientSecret() == null || config.getClientSecret().isBlank() ||
+                config.getAccessToken() == null || config.getAccessToken().isBlank()) {
+                log.warn("Twitch configuration is incomplete (missing Client ID, Secret, or Access Token). Waiting for manual configuration.");
+                return;
+            }
 
-        OAuth2Credential streamerCredential = new OAuth2Credential(
-                "twitch",
-                config.getAccessToken(),
-                config.getRefreshToken(),
-                null,
-                null,
-                null,
-                null
-        );
-        credentialManager.addCredential("streamer", streamerCredential);
-        
-        OAuth2Credential botCredential = (config.getBotAccessToken() != null && !config.getBotAccessToken().isBlank())
-                ? new OAuth2Credential(
-                        "twitch",
-                        config.getBotAccessToken(),
-                        config.getBotRefreshToken(),
-                        null,
-                        null,
-                        null,
-                        null
-                )
-                : streamerCredential;
-        
-        if (botCredential != streamerCredential) {
-            credentialManager.addCredential("bot", botCredential);
-        }
+            currentAccessToken = config.getAccessToken();
+            currentBotAccessToken = config.getBotAccessToken();
+            currentChannelName = config.getChannelName();
+            currentSongDelaySeconds = config.getSongDelaySeconds() > 0 ? config.getSongDelaySeconds() : defaultSongDelaySeconds;
 
-        log.info("Building TwitchClient...");
-        TwitchClientBuilder builder = TwitchClientBuilder.builder()
-                .withClientId(config.getClientId())
-                .withClientSecret(config.getClientSecret())
-                .withCredentialManager(credentialManager)
-                .withEnableEventSocket(true)
-                .withEnableHelix(true)
-                .withDefaultAuthToken(streamerCredential)
-                .withChatAccount(botCredential);
+            log.info("Attempting to initialize Twitch bot for channel: {}", currentChannelName);
+            
+            CredentialManager credentialManager = CredentialManagerBuilder.builder().build();
+            TwitchIdentityProvider twitchIdentityProvider = new TwitchIdentityProvider(config.getClientId(), config.getClientSecret(), null);
+            credentialManager.registerIdentityProvider(twitchIdentityProvider);
 
-        if (useLocalCli) {
-            log.info("Using local Twitch CLI mock server at {}", localCliUrl);
-            builder.withHelixBaseUrl(localCliUrl);
-        }
+            OAuth2Credential streamerCredential = new OAuth2Credential(
+                    "twitch",
+                    config.getAccessToken(),
+                    config.getRefreshToken(),
+                    null,
+                    null,
+                    null,
+                    null
+            );
+            credentialManager.addCredential("streamer", streamerCredential);
+            
+            OAuth2Credential botCredential = (config.getBotAccessToken() != null && !config.getBotAccessToken().isBlank())
+                    ? new OAuth2Credential(
+                            "twitch",
+                            config.getBotAccessToken(),
+                            config.getBotRefreshToken(),
+                            null,
+                            null,
+                            null,
+                            null
+                    )
+                    : streamerCredential;
+            
+            if (botCredential != streamerCredential) {
+                credentialManager.addCredential("bot", botCredential);
+            }
 
-        twitchClient = builder.build();
-        log.info("TwitchClient built successfully.");
+            log.info("Building TwitchClient...");
+            TwitchClientBuilder builder = TwitchClientBuilder.builder()
+                    .withClientId(config.getClientId())
+                    .withClientSecret(config.getClientSecret())
+                    .withCredentialManager(credentialManager)
+                    .withEnableEventSocket(true)
+                    .withEnableHelix(true)
+                    .withDefaultAuthToken(streamerCredential)
+                    .withChatAccount(botCredential);
 
-        scheduler.scheduleAtFixedRate(() -> {
-            try {
-                List<TwitchConfig> currentConfigs = twitchConfigRepository.findAll();
-                if (!currentConfigs.isEmpty()) {
-                    TwitchConfig currentConfig = currentConfigs.get(0);
-                    boolean updated = false;
+            twitchClient = builder.build();
+            log.info("TwitchClient built successfully.");
 
-                    if (streamerCredential.getAccessToken() != null && !streamerCredential.getAccessToken().equals(currentConfig.getAccessToken())) {
-                        log.info("Streamer access token changed (refreshed). Saving new tokens.");
-                        currentConfig.setAccessToken(streamerCredential.getAccessToken());
-                        currentConfig.setRefreshToken(streamerCredential.getRefreshToken());
-                        updated = true;
+            tokenRefreshTask = scheduler.scheduleAtFixedRate(() -> {
+                try {
+                    List<TwitchConfig> currentConfigs = twitchConfigRepository.findAll();
+                    if (!currentConfigs.isEmpty()) {
+                        TwitchConfig currentConfig = currentConfigs.get(0);
+                        boolean updated = false;
+
+                        if (streamerCredential.getAccessToken() != null && !streamerCredential.getAccessToken().equals(currentConfig.getAccessToken())) {
+                            log.info("Streamer access token changed (refreshed). Saving new tokens.");
+                            currentConfig.setAccessToken(streamerCredential.getAccessToken());
+                            currentConfig.setRefreshToken(streamerCredential.getRefreshToken());
+                            updated = true;
+                        }
+
+                        if (botCredential != streamerCredential && botCredential.getAccessToken() != null && !botCredential.getAccessToken().equals(currentConfig.getBotAccessToken())) {
+                            log.info("Bot access token changed (refreshed). Saving new tokens.");
+                            currentConfig.setBotAccessToken(botCredential.getAccessToken());
+                            currentConfig.setBotRefreshToken(botCredential.getRefreshToken());
+                            updated = true;
+                        }
+
+                        if (updated) {
+                            twitchConfigRepository.save(currentConfig);
+                        }
                     }
-
-                    if (botCredential != streamerCredential && botCredential.getAccessToken() != null && !botCredential.getAccessToken().equals(currentConfig.getBotAccessToken())) {
-                        log.info("Bot access token changed (refreshed). Saving new tokens.");
-                        currentConfig.setBotAccessToken(botCredential.getAccessToken());
-                        currentConfig.setBotRefreshToken(botCredential.getRefreshToken());
-                        updated = true;
-                    }
-
-                    if (updated) {
-                        twitchConfigRepository.save(currentConfig);
-                    }
+                } catch (Exception e) {
+                    log.error("Error checking for token refreshes: {}", e.getMessage());
                 }
-            } catch (Exception e) {
-                log.error("Error checking for token refreshes: {}", e.getMessage());
-            }
-        }, 5, 5, TimeUnit.MINUTES);
+            }, 5, 5, TimeUnit.MINUTES);
 
         log.info("Registering connection state listeners...");
         twitchClient.getEventManager().onEvent(EventSocketConnectionStateEvent.class, event -> {
@@ -413,11 +398,7 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
         log.info("Twitch bot initialized for channel: {}", currentChannelName);
         } catch (Exception e) {
             log.error("Failed to initialize Twitch bot: {}", e.getMessage());
-            if ("test-token".equals(accessToken)) {
-                log.warn("Allowing initialization failure in test environment");
-            } else {
-                throw e;
-            }
+            throw e;
         }
     }
 

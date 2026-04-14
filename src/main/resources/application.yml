@@ -29,18 +29,8 @@ server:
   port: 8080
 
 twitch:
-  client-id: ${TWITCH_CLIENT_ID:your_client_id}
-  client-secret: ${TWITCH_CLIENT_SECRET:your_client_secret}
-  access-token: ${TWITCH_ACCESS_TOKEN:test-token}
-  refresh-token: ${TWITCH_REFRESH_TOKEN:}
-  bot-access-token: ${TWITCH_BOT_ACCESS_TOKEN:}
-  bot-refresh-token: ${TWITCH_BOT_REFRESH_TOKEN:}
-  channel-name: ${TWITCH_CHANNEL_NAME:your_channel_name}
-  redeem-title: Play Random Song
   api-key: ${API_KEY:default_secret_key}
   song-delay-seconds: 5
-  use-local-cli: ${TWITCH_USE_LOCAL_CLI:false}
-  local-cli-url: ${TWITCH_LOCAL_CLI_URL:http://localhost:8080}
   redirect-uri-host: ${TWITCH_REDIRECT_URI_HOST:https://stream.phat.wtf}
 springdoc:
   api-docs:

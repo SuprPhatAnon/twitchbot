@@ -29,28 +29,10 @@ services:
       DB_NAME: mariadb
       DB_USER: mariadb
       DB_PASSWORD: mariadb
-      TWITCH_CLIENT_ID: ${TWITCH_CLIENT_ID:-your_client_id}
-      TWITCH_CLIENT_SECRET: ${TWITCH_CLIENT_SECRET:-your_client_secret}
-      TWITCH_ACCESS_TOKEN: ${TWITCH_ACCESS_TOKEN:-test-token}
-      TWITCH_CHANNEL_NAME: ${TWITCH_CHANNEL_NAME:-your_channel_name}
       API_KEY: ${API_KEY:-default_secret_key}
-      TWITCH_USE_LOCAL_CLI: ${TWITCH_USE_LOCAL_CLI:-true}
-      TWITCH_LOCAL_CLI_URL: http://twitch-cli:8080
     depends_on:
       mariadb:
         condition: service_healthy
-      twitch-cli:
-        condition: service_started
-
-  twitch-cli:
-    build:
-      context: .
-      dockerfile: Dockerfile.twitch-cli
-    container_name: twitch-cli
-    ports:
-      - "8081:8080"
-      - "8082:8081"
-      - "8083:8082"
 
 volumes:
   mariadb_data:

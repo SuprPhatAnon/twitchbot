@@ -24,7 +24,6 @@ This is a Spring Boot application that integrates with Twitch to play songs on a
 - `SongController`: Manages song database, statistics, and manual playback.
 - `RedeemController`: Manages Twitch redemption titles that trigger the bot.
 - `TwitchConfigController`: Manages Twitch credentials and connection status.
-- `QaController`: (Test profile only) Facilitates testing by triggering mock Twitch events.
 
 ### Entities
 - `Song`: Represents a song in the database.
@@ -73,14 +72,8 @@ The database is managed by Hibernate/JPA. Key tables:
 - Run tests using Maven: `mvn test`
 - Tests are located in `src/test/java/dev/phatanon/`.
 
-### Manual Testing with Twitch CLI
-The project includes a `Dockerfile.twitch-cli` and `qa-trigger-server.go` to mock Twitch events.
-1. Run with the `test` profile enabled.
-2. Use the `/api/qa/trigger` endpoint to simulate redemptions.
-
 ## Environment Setup for Agents
 
 - Use the `CODE` mode for most tasks.
 - When investigating issues, check `src/main/resources/application.yml` for default configurations.
-- For production-like issues, check `src/main/resources/application-prod.yml`.
 - K8s configurations are available in the `k8s/` directory for deployment-related tasks.

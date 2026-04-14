@@ -92,13 +92,18 @@ public class TwitchConfigController {
     @Operation(summary = "Update Twitch configuration", security = @SecurityRequirement(name = "X-API-Key"))
     public TwitchConfig updateConfig(@RequestBody TwitchConfig config) {
         // We only ever want one configuration row
-        return twitchConfigRepository.findAll().stream()
+        TwitchConfig saved = twitchConfigRepository.findAll().stream()
                 .findFirst()
                 .map(existing -> {
                     config.setId(existing.getId());
                     return twitchConfigRepository.save(config);
                 })
                 .orElseGet(() -> twitchConfigRepository.save(config));
+        
+        // Trigger reconnection with the new configuration
+        twitchBotService.reconnect();
+        
+        return saved;
     }
 
     /**

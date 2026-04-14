@@ -19,19 +19,12 @@ This application listens for Twitch Channel Point redemptions and plays a random
 
 ## Setup and Configuration
 
-The application is configured using environment variables. You can create a `.env` file in the root directory or set them in your shell.
+ The application is configured using environment variables for the system and the database. Twitch credentials and settings are managed directly through the database via the Admin UI.
 
 ### Required Environment Variables
 
 | Variable | Description |
 | --- | --- |
-| `TWITCH_CLIENT_ID` | Your Twitch Application Client ID |
-| `TWITCH_CLIENT_SECRET` | Your Twitch Application Client Secret |
-| `TWITCH_ACCESS_TOKEN` | A User Access Token for your channel (Streamer) |
-| `TWITCH_REFRESH_TOKEN` | (Recommended) A Refresh Token for the streamer account |
-| `TWITCH_BOT_ACCESS_TOKEN` | (Optional) A User Access Token for a separate bot account |
-| `TWITCH_BOT_REFRESH_TOKEN` | (Optional) A Refresh Token for the bot account |
-| `TWITCH_CHANNEL_NAME` | Your Twitch channel name |
 | `API_KEY` | Secret key for REST API Authorization (Default: `default_secret_key`) |
 | `DB_HOST` | MariaDB host (Default: `localhost`) |
 | `DB_USER` | MariaDB username (Default: `mariadb`) |
@@ -41,21 +34,17 @@ The application is configured using environment variables. You can create a `.en
 
 | Variable | Description |
 | --- | --- |
-| `TWITCH_USE_LOCAL_CLI` | Use local Twitch CLI mock server (Default: `false`) |
-| `TWITCH_LOCAL_CLI_URL` | URL of the local Twitch CLI mock server (Default: `http://localhost:8080`) |
 | `TWITCH_REDIRECT_URI_HOST` | Host part of the OAuth redirect URI (e.g., `https://mybot.com`). Default: `https://stream.phat.wtf` |
 | `SPRING_PROFILES_ACTIVE` | Active Spring profiles (e.g. `prod`, `test`) |
 
 ## Running with Docker Compose
 
 1. **Clone the repository.**
-2. **Create a `.env` file** in the project root with your Twitch credentials:
+2. **Create a `.env` file** in the project root with your database and API credentials:
    ```env
-   TWITCH_CLIENT_ID=your_client_id
-   TWITCH_CLIENT_SECRET=your_client_secret
-   TWITCH_ACCESS_TOKEN=your_access_token
-   TWITCH_BOT_ACCESS_TOKEN=your_bot_access_token
-   TWITCH_CHANNEL_NAME=your_channel_name
+   DB_HOST=mariadb
+   DB_USER=mariadb
+   DB_PASSWORD=mariadb
    API_KEY=your_api_key
    ```
 3. **Start the application:**
@@ -64,7 +53,10 @@ The application is configured using environment variables. You can create a `.en
    ```
    This will start MariaDB and the Twitch Bot application.
 
-4. **Add songs to the database:**
+4. **Configure Twitch credentials:**
+   Access the Admin UI at `http://localhost:8080/admin.html` and use the "Twitch Configuration" section to provide your Client ID, Secret, and Access Tokens.
+
+5. **Add songs to the database:**
    The application uses a `songs` table. You can add songs by connecting to the MariaDB container:
    ```bash
    docker exec -it twitchbot-db mariadb -u mariadb -pmariadb mariadb
@@ -147,11 +139,9 @@ Interactive documentation is available at `/swagger-ui.html`.
 - **GET `/api/twitch-config/redeems`**: Get a log of recent channel point redemption events.
 - **GET `/api/twitch-config/profiles`**: Get active Spring profiles.
 
-#### Test and QA Endpoints (`/api/test` and `/api/qa`)
+#### Test Endpoints (`/api/test`)
 - **GET `/api/test/play`**: Trigger a random song to play (for testing the overlay).
 - **GET `/api/test/finish`**: Simulate a song finished event.
-- **GET `/api/qa/trigger`**: Trigger a Twitch event via a mock server (available only in `test` profile).
-  - Query parameters: `event` (event name), and any other parameters for the event.
 
 ## Development
 
