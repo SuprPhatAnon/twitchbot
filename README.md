@@ -53,10 +53,16 @@ This application listens for Twitch Channel Point redemptions and plays a random
    ```
    This will start MariaDB and the Twitch Bot application.
 
-4. **Configure Twitch credentials:**
+## Running on Minikube
+
+For instructions on how to deploy the application to a local Minikube cluster, see the [Minikube Deployment Guide](MINIKUBE.md).
+
+## Configuration and Usage
+
+1. **Configure Twitch credentials:**
    Access the Admin UI at `http://localhost:8080/admin.html` and use the "Twitch Configuration" section to provide your Client ID, Secret, and Access Tokens.
 
-5. **Add songs to the database:**
+2. **Add songs to the database:**
    The application uses a `songs` table. You can add songs by connecting to the MariaDB container:
    ```bash
    docker exec -it twitchbot-db mariadb -u mariadb -pmariadb mariadb
