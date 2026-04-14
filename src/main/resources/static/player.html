@@ -7,6 +7,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body { background-color: #f8f9fa; padding-top: 20px; }
+        [data-bs-theme="dark"] body { background-color: #212529; color: #f8f9fa; }
         .container { max-width: 800px; }
         .song-card { margin-bottom: 10px; transition: transform 0.2s; }
         .song-card:hover { transform: translateY(-2px); box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
@@ -20,6 +21,7 @@
             box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
             z-index: 1000;
         }
+        [data-bs-theme="dark"] .audio-player-container { background: #2b3035; box-shadow: 0 -2px 10px rgba(0,0,0,0.5); }
         .content-wrapper { padding-bottom: 100px; }
         #auth-overlay {
             position: fixed;
@@ -37,12 +39,24 @@
             width: 100%;
             max-width: 400px;
         }
+        [data-bs-theme="dark"] .auth-card { background: #2b3035; color: white; }
     </style>
 </head>
 <body>
     <div class="container content-wrapper">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h2>Song Library</h2>
+            <div class="d-flex gap-3 align-items-center">
+                <button id="theme-toggle" class="btn btn-outline-secondary btn-sm" onclick="toggleTheme()">🌙</button>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="continuous-play" onchange="toggleContinuousPlay()">
+                    <label class="form-check-label" for="continuous-play">Continuous Play</label>
+                </div>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="shuffle-play" onchange="toggleShuffle()">
+                    <label class="form-check-label" for="shuffle-play">Shuffle</label>
+                </div>
+            </div>
         </div>
 
         <div class="mb-4">
@@ -79,15 +93,44 @@
 
     <script>
         let allSongs = [];
+        let filteredSongs = [];
+        let currentSongId = null;
+        let isContinuousPlay = false;
+        let isShuffle = false;
+
         const audioPlayer = document.getElementById('audio-player');
         const songsContainer = document.getElementById('songs-container');
         const searchInput = document.getElementById('search-input');
+        const continuousPlayToggle = document.getElementById('continuous-play');
+        const shuffleToggle = document.getElementById('shuffle-play');
+
+        function toggleTheme() {
+            const html = document.documentElement;
+            const currentTheme = html.getAttribute('data-bs-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-bs-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            updateThemeButton(newTheme);
+        }
+
+        function updateThemeButton(theme) {
+            const btn = document.getElementById('theme-toggle');
+            if (btn) btn.innerText = theme === 'dark' ? '☀️' : '🌙';
+        }
+
+        // Apply theme on load
+        (function() {
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-bs-theme', savedTheme);
+            document.addEventListener('DOMContentLoaded', () => updateThemeButton(savedTheme));
+        })();
 
         async function fetchSongs() {
             try {
                 const response = await fetch('/api/songs');
                 allSongs = await response.json();
-                renderSongs(allSongs);
+                filteredSongs = [...allSongs];
+                renderSongs(filteredSongs);
             } catch (error) {
                 console.error('Error fetching songs:', error);
                 songsContainer.innerHTML = '<div class="alert alert-danger">Failed to load songs. Please check your connection.</div>';
@@ -101,13 +144,15 @@
             }
 
             songsContainer.innerHTML = songs.map(song => `
-                <div class="card song-card">
+                <div class="card song-card ${currentSongId === song.id ? 'border-primary' : ''}">
                     <div class="card-body d-flex justify-content-between align-items-center">
                         <div>
                             <h5 class="card-title mb-1">${escapeHtml(song.name)}</h5>
                             <h6 class="card-subtitle text-muted">${escapeHtml(song.artist)}</h6>
                         </div>
-                        <button class="btn btn-primary" onclick="playSong(${song.id})">Play</button>
+                        <button class="btn ${currentSongId === song.id ? 'btn-outline-primary' : 'btn-primary'}" onclick="playSong(${song.id})">
+                            ${currentSongId === song.id ? 'Playing...' : 'Play'}
+                        </button>
                     </div>
                 </div>
             `).join('');
@@ -115,16 +160,27 @@
 
         function filterSongs() {
             const query = searchInput.value.toLowerCase();
-            const filtered = allSongs.filter(song => 
+            filteredSongs = allSongs.filter(song => 
                 song.name.toLowerCase().includes(query) || 
                 song.artist.toLowerCase().includes(query)
             );
-            renderSongs(filtered);
+            renderSongs(filteredSongs);
+        }
+
+        function toggleContinuousPlay() {
+            isContinuousPlay = continuousPlayToggle.checked;
+        }
+
+        function toggleShuffle() {
+            isShuffle = shuffleToggle.checked;
         }
 
         function playSong(id) {
             const song = allSongs.find(s => s.id === id);
             if (!song) return;
+
+            currentSongId = id;
+            renderSongs(filteredSongs);
 
             document.getElementById('current-song-name').textContent = song.name;
             document.getElementById('current-song-artist').textContent = song.artist;
@@ -132,6 +188,30 @@
 
             audioPlayer.src = song.url;
             audioPlayer.play();
+        }
+
+        audioPlayer.addEventListener('ended', () => {
+            if (isContinuousPlay && filteredSongs.length > 0) {
+                playNextSong();
+            }
+        });
+
+        function playNextSong() {
+            if (filteredSongs.length === 0) return;
+
+            let nextSong;
+            if (isShuffle) {
+                const randomIndex = Math.floor(Math.random() * filteredSongs.length);
+                nextSong = filteredSongs[randomIndex];
+            } else {
+                const currentIndex = filteredSongs.findIndex(s => s.id === currentSongId);
+                const nextIndex = (currentIndex + 1) % filteredSongs.length;
+                nextSong = filteredSongs[nextIndex];
+            }
+
+            if (nextSong) {
+                playSong(nextSong.id);
+            }
         }
 
         function escapeHtml(text) {

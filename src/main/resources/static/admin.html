@@ -7,6 +7,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body { padding-top: 70px; background-color: #f8f9fa; height: 100vh; display: flex; flex-direction: column; }
+        [data-bs-theme="dark"] body { background-color: #212529; color: #f8f9fa; }
         .status-bar {
             position: fixed;
             top: 0;
@@ -30,6 +31,8 @@
         .main-container { display: flex; flex: 1; overflow: hidden; }
         .left-panel { flex: 7; overflow-y: auto; padding: 20px; border-right: 1px solid #dee2e6; }
         .right-panel { flex: 3; overflow-y: auto; padding: 20px; background-color: #fff; }
+        [data-bs-theme="dark"] .left-panel { border-right-color: #495057; }
+        [data-bs-theme="dark"] .right-panel { background-color: #2b3035; }
 
         .card { margin-bottom: 20px; }
         #redeem-log {
@@ -41,9 +44,12 @@
             padding-bottom: 8px;
             border-bottom: 1px solid #f1f3f5;
         }
+        [data-bs-theme="dark"] .redeem-entry { border-bottom-color: #495057; }
         .redeem-time { color: #6c757d; font-size: 0.75rem; }
         .redeem-user { font-weight: bold; color: #0d6efd; }
+        [data-bs-theme="dark"] .redeem-user { color: #3d8bfd; }
         .redeem-reward { color: #198754; }
+        [data-bs-theme="dark"] .redeem-reward { color: #75b798; }
 
         #auth-overlay {
             position: fixed;
@@ -61,6 +67,7 @@
             width: 100%;
             max-width: 400px;
         }
+        [data-bs-theme="dark"] .auth-card { background: #2b3035; color: white; }
     </style>
 </head>
 <body>
@@ -97,6 +104,7 @@
             <button class="btn btn-danger btn-sm ms-2" onclick="clearQueue()" title="Stop all songs and clear queue">Clear Queue</button>
         </div>
         <div>
+            <button id="theme-toggle" class="btn btn-outline-light btn-sm me-2" onclick="toggleTheme()">🌙</button>
             <a href="/statistics.html" class="btn btn-outline-light btn-sm me-2">Statistics</a>
             <button class="btn btn-outline-light btn-sm" onclick="logout()">Logout</button>
         </div>
@@ -377,6 +385,28 @@
             localStorage.removeItem('twitch_bot_api_key');
             location.reload();
         }
+
+        function toggleTheme() {
+            const html = document.documentElement;
+            const currentTheme = html.getAttribute('data-bs-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-bs-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            updateThemeButton(newTheme);
+        }
+
+        function updateThemeButton(theme) {
+            const btn = document.getElementById('theme-toggle');
+            if (btn) btn.innerText = theme === 'dark' ? '☀️' : '🌙';
+        }
+
+        // Apply theme on load
+        (function() {
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-bs-theme', savedTheme);
+            document.addEventListener('DOMContentLoaded', () => updateThemeButton(savedTheme));
+        })();
+
         function checkAuth() {
             const key = getApiKey();
             document.getElementById('auth-overlay').style.display = key ? 'none' : 'flex';

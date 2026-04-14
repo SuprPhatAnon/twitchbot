@@ -8,8 +8,14 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             margin: 20px;
             background-color: #f4f4f9;
+            transition: background-color 0.3s, color 0.3s;
+        }
+        [data-theme="dark"] body {
+            background-color: #1a1a1a;
+            color: #f4f4f9;
         }
         h1 { color: #333; }
+        [data-theme="dark"] h1 { color: #f4f4f9; }
         .controls {
             margin-bottom: 20px;
             display: flex;
@@ -20,10 +26,26 @@
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
+        [data-theme="dark"] .controls {
+            background: #2b2b2b;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            border: 1px solid #444;
+        }
+        [data-theme="dark"] label { color: #ccc; }
         select, button {
             padding: 8px;
             border-radius: 4px;
             border: 1px solid #ddd;
+        }
+        [data-theme="dark"] select {
+            background-color: #333;
+            color: white;
+            border-color: #555;
+        }
+        [data-theme="dark"] button {
+            background-color: #444;
+            color: white;
+            border-color: #555;
         }
         table {
             width: 100%;
@@ -33,30 +55,59 @@
             overflow: hidden;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
+        [data-theme="dark"] table {
+            background: #2b2b2b;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
         th, td {
             text-align: left;
             padding: 12px;
             border-bottom: 1px solid #eee;
+        }
+        [data-theme="dark"] td {
+            border-bottom-color: #444;
         }
         th {
             background-color: #6441a5;
             color: white;
         }
         tr:hover { background-color: #f9f9f9; }
-        .nav { margin-bottom: 20px; }
-        .nav a {
+        [data-theme="dark"] tr:hover { background-color: #333; }
+        .nav { 
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .nav-links a {
             text-decoration: none;
             color: #6441a5;
             font-weight: bold;
             margin-right: 15px;
         }
+        [data-theme="dark"] .nav-links a { color: #a970ff; }
+        #theme-toggle {
+            cursor: pointer;
+            padding: 5px 10px;
+            background: #eee;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        [data-theme="dark"] #theme-toggle {
+            background: #444;
+            border-color: #555;
+            color: white;
+        }
     </style>
 </head>
 <body>
     <div class="nav">
-        <a href="/admin.html">Admin</a>
-        <a href="/streamer.html">Streamer View</a>
-        <a href="/index.html">Overlay</a>
+        <div class="nav-links">
+            <a href="/admin.html">Admin</a>
+            <a href="/streamer.html">Streamer View</a>
+            <a href="/index.html">Overlay</a>
+        </div>
+        <button id="theme-toggle" onclick="toggleTheme()">🌙</button>
     </div>
 
     <h1>Song Play Statistics</h1>
@@ -94,6 +145,27 @@
     </table>
 
     <script>
+        function toggleTheme() {
+            const html = document.documentElement;
+            const currentTheme = html.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            updateThemeButton(newTheme);
+        }
+
+        function updateThemeButton(theme) {
+            const btn = document.getElementById('theme-toggle');
+            if (btn) btn.innerText = theme === 'dark' ? '☀️' : '🌙';
+        }
+
+        // Apply theme on load
+        (function() {
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            document.addEventListener('DOMContentLoaded', () => updateThemeButton(savedTheme));
+        })();
+
         async function loadStatistics() {
             const range = document.getElementById('range').value;
             const groupBy = document.getElementById('groupBy').value;
