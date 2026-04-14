@@ -20,7 +20,15 @@ public class Song {
     private String name;
     private String artist;
     private String url;
-    private String redeemName;
+
+    @jakarta.persistence.ManyToMany(fetch = jakarta.persistence.FetchType.EAGER)
+    @jakarta.persistence.JoinTable(
+        name = "song_redeem_link",
+        joinColumns = @jakarta.persistence.JoinColumn(name = "song_id"),
+        inverseJoinColumns = @jakarta.persistence.JoinColumn(name = "redeem_id")
+    )
+    private java.util.Set<Redeem> redeems = new java.util.HashSet<>();
+
     private boolean enabled = true;
 
     public Song() {
@@ -32,18 +40,22 @@ public class Song {
         this.url = url;
     }
 
-    public Song(String name, String artist, String url, String redeemName) {
+    public Song(String name, String artist, String url, Redeem redeem) {
         this.name = name;
         this.artist = artist;
         this.url = url;
-        this.redeemName = redeemName;
+        if (redeem != null) {
+            this.redeems.add(redeem);
+        }
     }
 
-    public Song(String name, String artist, String url, String redeemName, boolean enabled) {
+    public Song(String name, String artist, String url, Redeem redeem, boolean enabled) {
         this.name = name;
         this.artist = artist;
         this.url = url;
-        this.redeemName = redeemName;
+        if (redeem != null) {
+            this.redeems.add(redeem);
+        }
         this.enabled = enabled;
     }
 
@@ -79,12 +91,12 @@ public class Song {
         this.url = url;
     }
 
-    public String getRedeemName() {
-        return redeemName;
+    public java.util.Set<Redeem> getRedeems() {
+        return redeems;
     }
 
-    public void setRedeemName(String redeemName) {
-        this.redeemName = redeemName;
+    public void setRedeems(java.util.Set<Redeem> redeems) {
+        this.redeems = redeems;
     }
 
     public boolean isEnabled() {

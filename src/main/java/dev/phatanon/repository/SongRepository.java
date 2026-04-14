@@ -12,11 +12,12 @@ import java.util.List;
 @Repository
 public interface SongRepository extends JpaRepository<Song, Long> {
     /**
-     * Finds songs by their associated redeem name.
-     * @param redeemName The name of the channel point redeem.
-     * @return A list of songs matching the redeem name.
+     * Finds songs that are linked to a specific redeem title.
+     * @param redeemTitle The title of the channel point redeem.
+     * @return A list of songs matching the redeem title.
      */
-    List<Song> findByRedeemName(String redeemName);
+    @org.springframework.data.jpa.repository.Query("SELECT s FROM Song s JOIN s.redeems r WHERE r.title = :redeemTitle")
+    List<Song> findByRedeemTitle(String redeemTitle);
 
     /**
      * Finds all enabled songs.

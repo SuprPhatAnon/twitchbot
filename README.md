@@ -66,10 +66,15 @@ The application is configured using environment variables. You can create a `.en
 
 ## Admin UI
 
-The application includes a built-in Admin UI for managing songs and configuration.
-Access it at: `http://localhost:8080/admin.html`
+The application includes a built-in Admin UI for full management and a Streamer UI for read-only access with operational capabilities.
 
-You will need to provide your `API_KEY` to log in and perform actions.
+- **Admin UI**: `http://localhost:8080/admin.html`
+  - Full access to manage songs, redeems, and Twitch configuration.
+- **Streamer UI**: `http://localhost:8080/streamer.html`
+  - Read-only access to view configuration, songs, and logs.
+  - Allows triggering song playback ("Play" button).
+
+You will need to provide your `API_KEY` in the UI to log in and perform actions.
 
 ## OpenAPI Documentation
 
@@ -89,25 +94,44 @@ When the reward is redeemed on Twitch, the overlay will pick a random song from 
 
 ### Testing
 You can manually trigger a song play (for testing the overlay) by visiting:
-`http://localhost:8080/api/test/play`
-(Note: This now requires the `X-API-Key` header).
+`http://localhost:8080/api/songs/{id}/play`
+(Note: This requires the `X-API-Key` header).
 
 Example using `curl`:
 ```bash
-curl -H "X-API-Key: your_api_key" http://localhost:8080/api/test/play
+curl -X POST -H "X-API-Key: your_api_key" http://localhost:8080/api/songs/1/play
 ```
 
 ### REST API
-You can manage the song database using the following REST API endpoints. All requests to `/api/**` require an `X-API-Key` header with your set API key.
+You can manage the application using the following REST API endpoints. All requests to `/api/**` require an `X-API-Key` header with your set API key.
 Interactive documentation is available at `/swagger-ui.html`.
 
+#### Song Management (`/api/songs`)
 - **GET `/api/songs`**: List all songs.
 - **GET `/api/songs/{id}`**: Get a specific song by ID.
 - **POST `/api/songs`**: Add a new song.
-  - Body: `{"name": "Song Name", "artist": "Artist Name", "url": "https://example.com/song.mp3"}`
+  - Body: `{"name": "Song Name", "artist": "Artist Name", "url": "https://example.com/song.mp3", "redeems": [{"id": 1}]}`
 - **PUT `/api/songs/{id}`**: Update an existing song.
-  - Body: `{"name": "New Name", "artist": "New Artist", "url": "https://example.com/new.mp3"}`
 - **DELETE `/api/songs/{id}`**: Remove a song from the database.
+- **POST `/api/songs/{id}/play`**: Manually queue a song for playback.
+- **GET `/api/songs/queue-size`**: Get the current number of songs in the queue.
+- **GET `/api/songs/current`**: Get the currently playing song.
+
+#### Redeem Management (`/api/redeems`)
+- **GET `/api/redeems`**: List all defined Twitch channel point redeems.
+- **POST `/api/redeems`**: Add a new redeem title.
+- **DELETE `/api/redeems/{id}`**: Remove a redeem.
+
+#### Twitch Configuration (`/api/twitch-config`)
+- **GET `/api/twitch-config`**: Get current Twitch credentials and settings.
+- **PUT `/api/twitch-config`**: Update Twitch configuration.
+- **GET `/api/twitch-config/status`**: Check if the stream is currently online.
+- **GET `/api/twitch-config/connection`**: Check Twitch IRC connection status.
+- **GET `/api/twitch-config/redeems`**: Get a log of recent channel point redemption events.
+
+#### Test Endpoints (`/api/test`)
+- **GET `/api/test/play`**: Trigger a random song to play (for testing the overlay).
+- **GET `/api/test/finish`**: Simulate a song finished event.
 
 ## Development
 

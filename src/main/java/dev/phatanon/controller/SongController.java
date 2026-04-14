@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -22,10 +23,12 @@ public class SongController {
 
     private final SongRepository songRepository;
     private final dev.phatanon.service.TwitchBotService twitchBotService;
+    private final SimpMessagingTemplate messagingTemplate;
 
-    public SongController(SongRepository songRepository, dev.phatanon.service.TwitchBotService twitchBotService) {
+    public SongController(SongRepository songRepository, dev.phatanon.service.TwitchBotService twitchBotService, SimpMessagingTemplate messagingTemplate) {
         this.songRepository = songRepository;
         this.twitchBotService = twitchBotService;
+        this.messagingTemplate = messagingTemplate;
     }
 
     /**
@@ -60,7 +63,9 @@ public class SongController {
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Add a new song")
     public Song addSong(@RequestBody Song song) {
-        return songRepository.save(song);
+        Song savedSong = songRepository.save(song);
+        messagingTemplate.convertAndSend("/topic/songs", "refresh");
+        return savedSong;
     }
 
     /**
@@ -77,9 +82,11 @@ public class SongController {
                     song.setName(songDetails.getName());
                     song.setArtist(songDetails.getArtist());
                     song.setUrl(songDetails.getUrl());
-                    song.setRedeemName(songDetails.getRedeemName());
+                    song.setRedeems(songDetails.getRedeems());
                     song.setEnabled(songDetails.isEnabled());
-                    return ResponseEntity.ok(songRepository.save(song));
+                    Song updatedSong = songRepository.save(song);
+                    messagingTemplate.convertAndSend("/topic/songs", "refresh");
+                    return ResponseEntity.ok(updatedSong);
                 })
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -139,6 +146,7 @@ public class SongController {
         return songRepository.findById(id)
                 .map(song -> {
                     songRepository.delete(song);
+                    messagingTemplate.convertAndSend("/topic/songs", "refresh");
                     return ResponseEntity.noContent().<Void>build();
                 })
                 .orElse(ResponseEntity.notFound().build());

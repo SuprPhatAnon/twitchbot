@@ -320,7 +320,7 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
             log.info("Stream is offline. Ignoring playRandomSong request for redeem: {}", redeemName);
             return;
         }
-        List<Song> songs = songRepository.findByRedeemName(redeemName).stream()
+        List<Song> songs = songRepository.findByRedeemTitle(redeemName).stream()
                 .filter(Song::isEnabled)
                 .toList();
         if (songs.isEmpty()) {

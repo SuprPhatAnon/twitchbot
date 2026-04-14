@@ -1,6 +1,6 @@
 package dev.phatanon.controller;
 
-import dev.phatanon.service.TwitchBotService;
+import dev.phatanon.entity.Redeem;
 import dev.phatanon.entity.Song;
 import dev.phatanon.repository.SongRepository;
 import dev.phatanon.repository.TwitchConfigRepository;
@@ -76,35 +76,39 @@ public class SongControllerTest {
 
     @Test
     void shouldAddSong() throws Exception {
-        Song song = new Song("New Song", "New Artist", "new_url", "Play Random Song");
+        Redeem redeem = new Redeem("Play Random Song");
+        redeem.setId(1L);
+        Song song = new Song("New Song", "New Artist", "new_url", redeem);
         song.setId(1L);
         when(songRepository.save(any(Song.class))).thenReturn(song);
 
-        String songJson = "{\"name\": \"New Song\", \"artist\": \"New Artist\", \"url\": \"new_url\", \"redeemName\": \"Play Random Song\"}";
+        String songJson = "{\"name\": \"New Song\", \"artist\": \"New Artist\", \"url\": \"new_url\", \"redeems\": [{\"id\": 1, \"title\": \"Play Random Song\"}]}";
 
         mockMvc.perform(post("/api/songs")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(songJson))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.name", is("New Song")))
-                .andExpect(jsonPath("$.redeemName", is("Play Random Song")));
+                .andExpect(jsonPath("$.redeems[0].title", is("Play Random Song")));
     }
 
     @Test
     void shouldUpdateSong() throws Exception {
-        Song song = new Song("Old Song", "Old Artist", "old_url", "Old Redeem");
+        Redeem oldRedeem = new Redeem("Old Redeem");
+        oldRedeem.setId(1L);
+        Song song = new Song("Old Song", "Old Artist", "old_url", oldRedeem);
         song.setId(1L);
         when(songRepository.findById(1L)).thenReturn(Optional.of(song));
         when(songRepository.save(any(Song.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        String updateJson = "{\"name\": \"Updated Song\", \"artist\": \"Updated Artist\", \"url\": \"updated_url\", \"redeemName\": \"Updated Redeem\", \"enabled\": false}";
+        String updateJson = "{\"name\": \"Updated Song\", \"artist\": \"Updated Artist\", \"url\": \"updated_url\", \"redeems\": [{\"id\": 2, \"title\": \"Updated Redeem\"}], \"enabled\": false}";
 
         mockMvc.perform(put("/api/songs/1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(updateJson))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name", is("Updated Song")))
-                .andExpect(jsonPath("$.redeemName", is("Updated Redeem")))
+                .andExpect(jsonPath("$.redeems[0].title", is("Updated Redeem")))
                 .andExpect(jsonPath("$.enabled", is(false)));
     }
 

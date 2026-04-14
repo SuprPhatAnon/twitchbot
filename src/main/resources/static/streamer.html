@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Twitch Bot Admin UI</title>
+    <title>Twitch Bot Streamer UI</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body { padding-top: 70px; background-color: #f8f9fa; height: 100vh; display: flex; flex-direction: column; }
@@ -66,7 +66,7 @@
 <body>
     <div id="auth-overlay">
         <div class="auth-card">
-            <h3 class="mb-3">Admin Access</h3>
+            <h3 class="mb-3">Streamer Access</h3>
             <div class="mb-3">
                 <label class="form-label">API Key</label>
                 <input type="password" class="form-control" id="api-key-input">
@@ -77,7 +77,7 @@
 
     <div class="status-bar">
         <div class="d-flex align-items-center">
-            <span class="h5 mb-0 me-4">Twitch Bot Admin</span>
+            <span class="h5 mb-0 me-4">Twitch Bot Streamer UI</span>
             <div class="status-item">
                 <span class="status-label">Stream:</span>
                 <span id="stat-stream" class="status-value status-offline">OFFLINE</span>
@@ -96,7 +96,6 @@
             </div>
         </div>
         <div>
-            <a href="/admin-qa.html" id="qa-link" class="btn btn-outline-info btn-sm me-2" style="display: none;">QA UI</a>
             <button class="btn btn-outline-light btn-sm" onclick="logout()">Logout</button>
         </div>
     </div>
@@ -105,51 +104,13 @@
         <div class="left-panel">
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    Manage Redeems
+                    Redeems
                     <button class="btn btn-sm btn-outline-secondary" onclick="fetchRedeems()">Refresh</button>
                 </div>
                 <div class="card-body">
-                    <form id="add-redeem-form" class="mb-3">
-                        <div class="input-group input-group-sm">
-                            <input type="text" id="new-redeem-title" class="form-control" placeholder="Redeem Title" required>
-                            <button class="btn btn-primary" type="submit">Add Redeem</button>
-                        </div>
-                    </form>
                     <div id="redeems-list" class="d-flex flex-wrap gap-2">
                         <!-- Redeems will be loaded here as badges -->
                     </div>
-                </div>
-            </div>
-
-            <div class="card">
-                <div class="card-header">Add New Song</div>
-                <div class="card-body">
-                    <form id="add-song-form">
-                        <div class="row g-3">
-                            <div class="col-md-4">
-                                <label class="form-label small">Song Name</label>
-                                <input type="text" class="form-control form-control-sm" id="song-name" required>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label small">Artist</label>
-                                <input type="text" class="form-control form-control-sm" id="song-artist" required>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label small">Redeems</label>
-                                <select class="form-select form-select-sm" id="song-redeems" multiple required>
-                                    <!-- Options loaded from redeems -->
-                                </select>
-                                <div class="form-text" style="font-size: 0.7rem;">Hold Ctrl/Cmd to select multiple</div>
-                            </div>
-                            <div class="col-md-9">
-                                <label class="form-label small">Audio URL</label>
-                                <input type="url" class="form-control form-control-sm" id="song-url" placeholder="https://example.com/audio.mp3" required>
-                            </div>
-                            <div class="col-md-3 d-flex align-items-end">
-                                <button type="submit" class="btn btn-primary btn-sm w-100">Add Song</button>
-                            </div>
-                        </div>
-                    </form>
                 </div>
             </div>
 
@@ -178,42 +139,6 @@
                 </div>
             </div>
 
-            <div class="card">
-                <div class="card-header">Twitch Configuration</div>
-                <div class="card-body">
-                    <form id="twitch-config-form">
-                        <div class="row g-2">
-                            <div class="col-md-4">
-                                <label class="form-label small">Client ID</label>
-                                <input type="password" class="form-control form-control-sm" id="twitch-client-id">
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label small">Client Secret</label>
-                                <input type="password" class="form-control form-control-sm" id="twitch-client-secret">
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label small">Access Token</label>
-                                <input type="password" class="form-control form-control-sm" id="twitch-access-token">
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label small">Channel Name</label>
-                                <input type="text" class="form-control form-control-sm" id="twitch-channel-name">
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label small">Redeem Title</label>
-                                <input type="text" class="form-control form-control-sm" id="twitch-redeem-title">
-                            </div>
-                            <div class="col-md-2">
-                                <label class="form-label small">Delay (s)</label>
-                                <input type="number" class="form-control form-control-sm" id="twitch-song-delay">
-                            </div>
-                            <div class="col-md-2 d-flex align-items-end">
-                                <button type="submit" class="btn btn-sm btn-primary w-100">Update</button>
-                            </div>
-                        </div>
-                    </form>
-                </div>
-            </div>
         </div>
 
         <div class="right-panel">
@@ -355,15 +280,6 @@
                 if (res.status === 200) updateCurrentSongDisplay(await res.json());
                 else updateCurrentSongDisplay(null);
 
-                // Check profiles for QA UI visibility
-                res = await fetch('/api/twitch-config/profiles', { headers: { 'X-API-Key': key } });
-                if (res.ok) {
-                    const profiles = await res.json();
-                    if (profiles.includes('test')) {
-                        document.getElementById('qa-link').style.display = 'inline-block';
-                    }
-                }
-
             } catch (e) { console.error('Error refreshing status:', e); }
         }
 
@@ -385,8 +301,7 @@
                         <td>${song.artist}</td>
                         <td>${redeemTitles}</td>
                         <td>
-                            <button class="btn btn-sm btn-success me-1" onclick="playSong(${song.id})">Play</button>
-                            <button class="btn btn-sm btn-danger" onclick="deleteSong(${song.id})">Delete</button>
+                            <button class="btn btn-sm btn-success" onclick="playSong(${song.id})">Play</button>
                         </td>
                     `;
                     tbody.appendChild(tr);
@@ -394,107 +309,26 @@
             } catch (error) { console.error('Error fetching songs:', error); }
         }
 
-        let allRedeems = [];
-
         async function fetchRedeems() {
             const key = getApiKey();
             if (!key) return;
             try {
                 const response = await fetch('/api/redeems', { headers: { 'X-API-Key': key } });
                 if (response.status === 401) return logout();
-                allRedeems = await response.json();
+                const allRedeems = await response.json();
                 
-                // Update redeems list (badges with delete button)
+                // Update redeems list
                 const listEl = document.getElementById('redeems-list');
                 listEl.innerHTML = '';
                 allRedeems.forEach(redeem => {
                     const badge = document.createElement('span');
-                    badge.className = 'badge bg-secondary d-flex align-items-center';
-                    badge.innerHTML = `
-                        ${redeem.title}
-                        <button type="button" class="btn-close btn-close-white ms-2" style="font-size: 0.5rem;" onclick="deleteRedeem(${redeem.id})"></button>
-                    `;
+                    badge.className = 'badge bg-secondary';
+                    badge.textContent = redeem.title;
                     listEl.appendChild(badge);
-                });
-
-                // Update song form dropdown
-                const selectEl = document.getElementById('song-redeems');
-                const selectedValues = Array.from(selectEl.selectedOptions).map(o => o.value);
-                selectEl.innerHTML = '';
-                allRedeems.forEach(redeem => {
-                    const option = document.createElement('option');
-                    option.value = redeem.id;
-                    option.text = redeem.title;
-                    if (selectedValues.includes(redeem.id.toString())) option.selected = true;
-                    selectEl.appendChild(option);
                 });
             } catch (error) { console.error('Error fetching redeems:', error); }
         }
 
-        document.getElementById('add-redeem-form').onsubmit = async (e) => {
-            e.preventDefault();
-            const key = getApiKey();
-            const title = document.getElementById('new-redeem-title').value;
-            try {
-                const response = await fetch('/api/redeems', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-API-Key': key },
-                    body: JSON.stringify({ title: title })
-                });
-                if (response.ok) {
-                    document.getElementById('new-redeem-title').value = '';
-                    fetchRedeems();
-                }
-            } catch (error) { console.error('Error adding redeem:', error); }
-        };
-
-        async function deleteRedeem(id) {
-            if (!confirm('Are you sure? Deleting a redeem might affect songs using it.')) return;
-            const key = getApiKey();
-            try {
-                const response = await fetch(`/api/redeems/${id}`, { method: 'DELETE', headers: { 'X-API-Key': key } });
-                if (response.ok) fetchRedeems();
-            } catch (error) { console.error('Error deleting redeem:', error); }
-        }
-
-        async function fetchTwitchConfig() {
-            const key = getApiKey();
-            if (!key) return;
-            try {
-                const response = await fetch('/api/twitch-config', { headers: { 'X-API-Key': key } });
-                if (response.status === 401) return logout();
-                if (response.ok) {
-                    const config = await response.json();
-                    document.getElementById('twitch-client-id').value = config.clientId || '';
-                    document.getElementById('twitch-client-secret').value = config.clientSecret || '';
-                    document.getElementById('twitch-access-token').value = config.accessToken || '';
-                    document.getElementById('twitch-channel-name').value = config.channelName || '';
-                    document.getElementById('twitch-redeem-title').value = config.redeemTitle || '';
-                    document.getElementById('twitch-song-delay').value = config.songDelaySeconds || 0;
-                }
-            } catch (error) { console.error('Error fetching config:', error); }
-        }
-
-        document.getElementById('twitch-config-form').onsubmit = async (e) => {
-            e.preventDefault();
-            const key = getApiKey();
-            const config = {
-                clientId: document.getElementById('twitch-client-id').value,
-                clientSecret: document.getElementById('twitch-client-secret').value,
-                accessToken: document.getElementById('twitch-access-token').value,
-                channelName: document.getElementById('twitch-channel-name').value,
-                redeemTitle: document.getElementById('twitch-redeem-title').value,
-                songDelaySeconds: parseInt(document.getElementById('twitch-song-delay').value)
-            };
-            try {
-                const response = await fetch('/api/twitch-config', {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json', 'X-API-Key': key },
-                    body: JSON.stringify(config)
-                });
-                if (response.ok) { alert('Config updated!'); fetchTwitchConfig(); }
-            } catch (error) { console.error('Error updating config:', error); }
-        };
 
         async function playSong(id) {
             const key = getApiKey();
@@ -505,44 +339,11 @@
             } catch (error) { console.error('Error playing song:', error); }
         }
 
-        async function deleteSong(id) {
-            if (!confirm('Are you sure?')) return;
-            const key = getApiKey();
-            try {
-                const response = await fetch(`/api/songs/${id}`, { method: 'DELETE', headers: { 'X-API-Key': key } });
-                if (response.ok) fetchSongs();
-            } catch (error) { console.error('Error deleting song:', error); }
-        }
-
-        document.getElementById('add-song-form').onsubmit = async (e) => {
-            e.preventDefault();
-            const key = getApiKey();
-            const selectedRedeemIds = Array.from(document.getElementById('song-redeems').selectedOptions).map(o => parseInt(o.value));
-            const song = {
-                name: document.getElementById('song-name').value,
-                artist: document.getElementById('song-artist').value,
-                url: document.getElementById('song-url').value,
-                redeems: selectedRedeemIds.map(id => ({ id: id }))
-            };
-            try {
-                const response = await fetch('/api/songs', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-API-Key': key },
-                    body: JSON.stringify(song)
-                });
-                if (response.ok) {
-                    document.getElementById('add-song-form').reset();
-                    fetchSongs();
-                }
-            } catch (error) { console.error('Error adding song:', error); }
-        };
-
         checkAuth();
         if (getApiKey()) {
             refreshInitialStatus();
             fetchRedeems();
             fetchSongs();
-            fetchTwitchConfig();
             fetchRecentRedeems();
             connectWebSocket();
         }
