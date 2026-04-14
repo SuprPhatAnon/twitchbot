@@ -12,6 +12,12 @@ import java.util.List;
 @Repository
 public interface SongRepository extends JpaRepository<Song, Long> {
     /**
+     * Finds all songs sorted by sortName.
+     * @return A list of all songs sorted by sortName.
+     */
+    List<Song> findAllByOrderBySortNameAsc();
+
+    /**
      * Finds songs that are linked to a specific redeem title.
      * @param redeemTitle The title of the channel point redeem.
      * @return A list of songs matching the redeem title.

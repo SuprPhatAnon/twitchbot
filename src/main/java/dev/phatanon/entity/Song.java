@@ -18,8 +18,36 @@ public class Song {
     private Long id;
 
     private String name;
+    private String sortName;
     private String artist;
     private String url;
+
+    @jakarta.persistence.PrePersist
+    @jakarta.persistence.PreUpdate
+    private void updateSortName() {
+        if (name == null) {
+            this.sortName = null;
+            return;
+        }
+        String lowerName = name.toLowerCase();
+        if (lowerName.startsWith("the ")) {
+            this.sortName = name.substring(4) + ", " + name.substring(0, 3);
+        } else if (lowerName.startsWith("a ")) {
+            this.sortName = name.substring(2) + ", " + name.substring(0, 1);
+        } else if (lowerName.startsWith("an ")) {
+            this.sortName = name.substring(3) + ", " + name.substring(0, 2);
+        } else {
+            this.sortName = name;
+        }
+    }
+
+    public String getSortName() {
+        return sortName;
+    }
+
+    public void setSortName(String sortName) {
+        this.sortName = sortName;
+    }
 
     @jakarta.persistence.ManyToMany(fetch = jakarta.persistence.FetchType.EAGER)
     @jakarta.persistence.JoinTable(

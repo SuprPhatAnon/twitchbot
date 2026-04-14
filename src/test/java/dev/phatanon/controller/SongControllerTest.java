@@ -51,7 +51,7 @@ public class SongControllerTest {
 
     @Test
     void shouldGetAllSongs() throws Exception {
-        when(songRepository.findAll()).thenReturn(java.util.List.of(
+        when(songRepository.findAllByOrderBySortNameAsc()).thenReturn(java.util.List.of(
                 new Song("Song 1", "Artist 1", "url1"),
                 new Song("Song 2", "Artist 2", "url2")
         ));

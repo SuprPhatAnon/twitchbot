@@ -38,7 +38,7 @@ public class SongController {
     @GetMapping
     @Operation(summary = "Get all songs")
     public List<Song> getAllSongs() {
-        return songRepository.findAll();
+        return songRepository.findAllByOrderBySortNameAsc();
     }
 
     /**
