@@ -1,20 +1,18 @@
-version: '3.8'
-
 services:
   mariadb:
     image: mariadb:10.11
     container_name: twitchbot-db
     environment:
-      MARIADB_DATABASE: twitchdb
-      MARIADB_USER: twitchuser
-      MARIADB_PASSWORD: twitchpass
-      MARIADB_ROOT_PASSWORD: rootpass
+      MARIADB_DATABASE: mariadb
+      MARIADB_USER: mariadb
+      MARIADB_PASSWORD: mariadb
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:-mariadb}
     ports:
       - "3306:3306"
     volumes:
       - mariadb_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mariadb-admin", "ping", "-h", "localhost", "-u", "root", "-p$MARIADB_ROOT_PASSWORD"]
+      test: ["CMD-SHELL", "mariadb-admin ping -h localhost -u root -pmariadb"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -28,16 +26,16 @@ services:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
       DB_HOST: mariadb
       DB_PORT: 3306
-      DB_NAME: twitchdb
-      DB_USER: twitchuser
-      DB_PASSWORD: twitchpass
-      TWITCH_CLIENT_ID: ${TWITCH_CLIENT_ID}
-      TWITCH_CLIENT_SECRET: ${TWITCH_CLIENT_SECRET}
-      TWITCH_ACCESS_TOKEN: ${TWITCH_ACCESS_TOKEN}
-      TWITCH_CHANNEL_NAME: ${TWITCH_CHANNEL_NAME}
+      DB_NAME: mariadb
+      DB_USER: mariadb
+      DB_PASSWORD: mariadb
+      TWITCH_CLIENT_ID: ${TWITCH_CLIENT_ID:-your_client_id}
+      TWITCH_CLIENT_SECRET: ${TWITCH_CLIENT_SECRET:-your_client_secret}
+      TWITCH_ACCESS_TOKEN: ${TWITCH_ACCESS_TOKEN:-test-token}
+      TWITCH_CHANNEL_NAME: ${TWITCH_CHANNEL_NAME:-your_channel_name}
       TWITCH_REDEEM_TITLE: ${TWITCH_REDEEM_TITLE:-Play Random Song}
       API_KEY: ${API_KEY:-default_secret_key}
-      TWITCH_USE_LOCAL_CLI: ${TWITCH_USE_LOCAL_CLI:-false}
+      TWITCH_USE_LOCAL_CLI: ${TWITCH_USE_LOCAL_CLI:-true}
       TWITCH_LOCAL_CLI_URL: http://twitch-cli:8080
     depends_on:
       mariadb:

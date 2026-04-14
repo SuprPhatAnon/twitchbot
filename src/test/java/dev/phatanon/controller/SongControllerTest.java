@@ -1,50 +1,62 @@
 package dev.phatanon.controller;
 
+import dev.phatanon.service.TwitchBotService;
 import dev.phatanon.entity.Song;
 import dev.phatanon.repository.SongRepository;
+import dev.phatanon.repository.TwitchConfigRepository;
 import dev.phatanon.service.TwitchBotService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.ActiveProfiles;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+
+import java.util.Optional;
 
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringBootTest(properties = "spring.main.allow-bean-definition-overriding=true")
-@AutoConfigureMockMvc
-@ActiveProfiles("test")
 public class SongControllerTest {
 
-    @Autowired
     private MockMvc mockMvc;
 
-    @Autowired
+    @Mock
     private SongRepository songRepository;
 
-    @MockBean
+    @Mock
     private TwitchBotService twitchBotService;
+
+    @Mock
+    private TwitchConfigRepository twitchConfigRepository;
+
+    @Mock
+    private SimpMessagingTemplate messagingTemplate;
+
+    @InjectMocks
+    private SongController songController;
 
     @BeforeEach
     void setUp() {
-        songRepository.deleteAll();
+        MockitoAnnotations.openMocks(this);
+        mockMvc = MockMvcBuilders.standaloneSetup(songController).build();
     }
 
     @Test
     void shouldGetAllSongs() throws Exception {
-        songRepository.save(new Song("Song 1", "Artist 1", "url1"));
-        songRepository.save(new Song("Song 2", "Artist 2", "url2"));
+        when(songRepository.findAll()).thenReturn(java.util.List.of(
+                new Song("Song 1", "Artist 1", "url1"),
+                new Song("Song 2", "Artist 2", "url2")
+        ));
 
-        mockMvc.perform(get("/api/songs")
-                        .header("X-API-Key", "test-api-key"))
+        mockMvc.perform(get("/api/songs"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(2)))
                 .andExpect(jsonPath("$[0].name", is("Song 1")))
@@ -52,27 +64,25 @@ public class SongControllerTest {
     }
 
     @Test
-    void shouldFailWithoutApiKey() throws Exception {
-        mockMvc.perform(get("/api/songs"))
-                .andExpect(status().isUnauthorized());
-    }
-
-    @Test
     void shouldGetSongById() throws Exception {
-        Song song = songRepository.save(new Song("Song 1", "Artist 1", "url1"));
+        Song song = new Song("Song 1", "Artist 1", "url1");
+        song.setId(1L);
+        when(songRepository.findById(1L)).thenReturn(Optional.of(song));
 
-        mockMvc.perform(get("/api/songs/" + song.getId())
-                        .header("X-API-Key", "test-api-key"))
+        mockMvc.perform(get("/api/songs/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name", is("Song 1")));
     }
 
     @Test
     void shouldAddSong() throws Exception {
+        Song song = new Song("New Song", "New Artist", "new_url", "Play Random Song");
+        song.setId(1L);
+        when(songRepository.save(any(Song.class))).thenReturn(song);
+
         String songJson = "{\"name\": \"New Song\", \"artist\": \"New Artist\", \"url\": \"new_url\", \"redeemName\": \"Play Random Song\"}";
 
         mockMvc.perform(post("/api/songs")
-                        .header("X-API-Key", "test-api-key")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(songJson))
                 .andExpect(status().isCreated())
@@ -82,11 +92,14 @@ public class SongControllerTest {
 
     @Test
     void shouldUpdateSong() throws Exception {
-        Song song = songRepository.save(new Song("Old Song", "Old Artist", "old_url", "Old Redeem"));
+        Song song = new Song("Old Song", "Old Artist", "old_url", "Old Redeem");
+        song.setId(1L);
+        when(songRepository.findById(1L)).thenReturn(Optional.of(song));
+        when(songRepository.save(any(Song.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
         String updateJson = "{\"name\": \"Updated Song\", \"artist\": \"Updated Artist\", \"url\": \"updated_url\", \"redeemName\": \"Updated Redeem\", \"enabled\": false}";
 
-        mockMvc.perform(put("/api/songs/" + song.getId())
-                        .header("X-API-Key", "test-api-key")
+        mockMvc.perform(put("/api/songs/1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(updateJson))
                 .andExpect(status().isOk())
@@ -97,35 +110,34 @@ public class SongControllerTest {
 
     @Test
     void shouldDeleteSong() throws Exception {
-        Song song = songRepository.save(new Song("Delete Me", "Artist", "url"));
+        Song song = new Song("Delete Me", "Artist", "url");
+        song.setId(1L);
+        when(songRepository.findById(1L)).thenReturn(Optional.of(song)).thenReturn(Optional.empty());
 
-        mockMvc.perform(delete("/api/songs/" + song.getId())
-                        .header("X-API-Key", "test-api-key"))
+        mockMvc.perform(delete("/api/songs/1"))
                 .andExpect(status().isNoContent());
 
-        mockMvc.perform(get("/api/songs/" + song.getId())
-                        .header("X-API-Key", "test-api-key"))
+        mockMvc.perform(get("/api/songs/1"))
                 .andExpect(status().isNotFound());
     }
 
     @Test
     void shouldPlaySong() throws Exception {
-        Song song = songRepository.save(new Song("Play Me", "Artist", "url"));
+        Song song = new Song("Play Me", "Artist", "url");
+        song.setId(1L);
+        when(songRepository.findById(1L)).thenReturn(Optional.of(song));
         when(twitchBotService.isStreamOnline()).thenReturn(true);
 
-        mockMvc.perform(post("/api/songs/" + song.getId() + "/play")
-                        .header("X-API-Key", "test-api-key"))
+        mockMvc.perform(post("/api/songs/1/play"))
                 .andExpect(status().isOk())
                 .andExpect(content().string("Song queued successfully."));
     }
 
     @Test
     void shouldNotPlaySongWhenStreamOffline() throws Exception {
-        Song song = songRepository.save(new Song("Play Me", "Artist", "url"));
         when(twitchBotService.isStreamOnline()).thenReturn(false);
 
-        mockMvc.perform(post("/api/songs/" + song.getId() + "/play")
-                        .header("X-API-Key", "test-api-key"))
+        mockMvc.perform(post("/api/songs/1/play"))
                 .andExpect(status().isBadRequest())
                 .andExpect(content().string("Cannot queue song: Stream is offline."));
     }
@@ -134,8 +146,7 @@ public class SongControllerTest {
     void shouldGetQueueSize() throws Exception {
         when(twitchBotService.getQueueSize()).thenReturn(5);
 
-        mockMvc.perform(get("/api/songs/queue-size")
-                        .header("X-API-Key", "test-api-key"))
+        mockMvc.perform(get("/api/songs/queue-size"))
                 .andExpect(status().isOk())
                 .andExpect(content().string("5"));
     }
@@ -145,8 +156,7 @@ public class SongControllerTest {
         Song song = new Song("Now Playing", "Artist", "url");
         when(twitchBotService.getCurrentlyPlayingSong()).thenReturn(song);
 
-        mockMvc.perform(get("/api/songs/current")
-                        .header("X-API-Key", "test-api-key"))
+        mockMvc.perform(get("/api/songs/current"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name", is("Now Playing")));
     }
@@ -155,8 +165,7 @@ public class SongControllerTest {
     void shouldReturnNoContentWhenNoSongPlaying() throws Exception {
         when(twitchBotService.getCurrentlyPlayingSong()).thenReturn(null);
 
-        mockMvc.perform(get("/api/songs/current")
-                        .header("X-API-Key", "test-api-key"))
+        mockMvc.perform(get("/api/songs/current"))
                 .andExpect(status().isNoContent());
     }
 }

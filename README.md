@@ -32,9 +32,9 @@ The application is configured using environment variables. You can create a `.en
 | `SONG_DELAY_SECONDS` | Delay between songs in seconds (Default: `5`) |
 | `DB_HOST` | MariaDB host (Default: `localhost`) |
 | `DB_PORT` | MariaDB port (Default: `3306`) |
-| `DB_NAME` | MariaDB database name (Default: `twitchdb`) |
-| `DB_USER` | MariaDB username (Default: `twitchuser`) |
-| `DB_PASSWORD` | MariaDB password (Default: `twitchpass`) |
+| `DB_NAME` | MariaDB database name (Default: `mariadb`) |
+| `DB_USER` | MariaDB username (Default: `mariadb`) |
+| `DB_PASSWORD` | MariaDB password (Default: `mariadb`) |
 
 ## Running with Docker Compose
 
@@ -57,7 +57,7 @@ The application is configured using environment variables. You can create a `.en
 4. **Add songs to the database:**
    The application uses a `songs` table. You can add songs by connecting to the MariaDB container:
    ```bash
-   docker exec -it twitchbot-db mariadb -u twitchuser -ptwitchpass twitchdb
+   docker exec -it twitchbot-db mariadb -u mariadb -pmariadb mariadb
    ```
    Then run an insert command:
    ```sql

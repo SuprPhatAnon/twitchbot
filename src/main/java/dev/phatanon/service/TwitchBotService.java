@@ -131,23 +131,28 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
      */
     @PostConstruct
     public void init() {
-        if ("test-token".equals(accessToken) && !useLocalCli) {
-            log.info("Skipping Twitch client initialization in test environment without local CLI");
+        if ("test-token".equals(accessToken) || "your_access_token".equals(accessToken)) {
+            log.info("Skipping Twitch client initialization in test or default environment");
             return;
         }
 
         try {
-            TwitchConfig config = twitchConfigRepository.findAll().stream().findFirst().orElseGet(() -> {
-            log.info("No Twitch configuration found in database. Creating initial configuration from properties.");
-            TwitchConfig newConfig = new TwitchConfig();
-            newConfig.setClientId(clientId);
-            newConfig.setClientSecret(clientSecret);
-            newConfig.setAccessToken(accessToken);
-            newConfig.setChannelName(channelName);
-            newConfig.setRedeemTitle(redeemTitle);
-            newConfig.setSongDelaySeconds(defaultSongDelaySeconds);
-            return twitchConfigRepository.save(newConfig);
-        });
+            log.info("Checking for existing Twitch configuration...");
+            List<TwitchConfig> configs = twitchConfigRepository.findAll();
+            TwitchConfig config;
+            if (configs.isEmpty()) {
+                log.info("No Twitch configuration found in database. Creating initial configuration from properties.");
+                TwitchConfig newConfig = new TwitchConfig();
+                newConfig.setClientId(clientId);
+                newConfig.setClientSecret(clientSecret);
+                newConfig.setAccessToken(accessToken);
+                newConfig.setChannelName(channelName);
+                newConfig.setRedeemTitle(redeemTitle);
+                newConfig.setSongDelaySeconds(defaultSongDelaySeconds);
+                config = twitchConfigRepository.save(newConfig);
+            } else {
+                config = configs.get(0);
+            }
 
         currentAccessToken = config.getAccessToken();
         currentChannelName = config.getChannelName();

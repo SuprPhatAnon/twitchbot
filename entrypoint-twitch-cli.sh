@@ -1,4 +1,7 @@
-#!/bin/sh
+#!/bin/bash
+
+# Pre-configure twitch-cli with dummy data
+twitch configure --client-id 12345 --client-secret 12345
 
 # Start mock API in background
 twitch mock-api start --host 0.0.0.0 --port 8080 &

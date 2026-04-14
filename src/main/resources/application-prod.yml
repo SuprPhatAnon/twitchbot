@@ -3,5 +3,5 @@ spring:
     activate:
       on-profile: prod
 twitch:
-  use-local-cli: ${TWITCH_USE_LOCAL_CLI:false}
-  local-cli-url: ${TWITCH_LOCAL_CLI_URL:http://localhost:8080}
+  use-local-cli: ${TWITCH_USE_LOCAL_CLI:true}
+  local-cli-url: ${TWITCH_LOCAL_CLI_URL:http://twitch-cli:8080}
