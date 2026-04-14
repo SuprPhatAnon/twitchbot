@@ -94,6 +94,7 @@
                 <span class="status-label">Playing:</span>
                 <span id="stat-playing" class="status-value text-info">None</span>
             </div>
+            <button class="btn btn-danger btn-sm ms-2" onclick="clearQueue()" title="Stop all songs and clear queue">Clear Queue</button>
         </div>
         <div>
             <a href="/statistics.html" class="btn btn-outline-light btn-sm me-2">Statistics</a>
@@ -179,6 +180,46 @@
                 </div>
             </div>
 
+            <!-- Edit Song Modal -->
+            <div class="modal fade" id="editSongModal" tabindex="-1" aria-labelledby="editSongModalLabel" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="editSongModalLabel">Edit Song</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <form id="edit-song-form">
+                            <div class="modal-body">
+                                <input type="hidden" id="edit-song-id">
+                                <div class="mb-3">
+                                    <label for="edit-song-name" class="form-label">Song Name</label>
+                                    <input type="text" class="form-control" id="edit-song-name" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="edit-song-artist" class="form-label">Artist</label>
+                                    <input type="text" class="form-control" id="edit-song-artist" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="edit-song-redeems" class="form-label">Redeems</label>
+                                    <select class="form-select" id="edit-song-redeems" multiple required>
+                                        <!-- Options loaded from redeems -->
+                                    </select>
+                                    <div class="form-text">Hold Ctrl/Cmd to select multiple</div>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="edit-song-url" class="form-label">Audio URL</label>
+                                    <input type="url" class="form-control" id="edit-song-url" required>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary">Save Changes</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
             <div class="card">
                 <div class="card-header">Twitch Configuration</div>
                 <div class="card-body">
@@ -257,6 +298,7 @@
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
     <script>
@@ -358,7 +400,7 @@
 
         function updateCurrentSongDisplay(song) {
             const el = document.getElementById('stat-playing');
-            if (song) {
+            if (song && song !== 'null') {
                 el.innerText = `${song.name} - ${song.artist}`;
                 el.classList.add('text-info');
             } else {
@@ -411,6 +453,7 @@
                         <td>${redeemTitles}</td>
                         <td>
                             <button class="btn btn-sm btn-success me-1" onclick="playSong(${song.id})">Play</button>
+                            <button class="btn btn-sm btn-warning me-1" onclick="openEditModal(${song.id})">Edit</button>
                             <button class="btn btn-sm btn-danger" onclick="deleteSong(${song.id})">Delete</button>
                         </td>
                     `;
@@ -422,10 +465,23 @@
             } catch (error) { console.error('Error fetching songs:', error); }
         }
 
+        async function clearQueue() {
+            if (!confirm('Are you sure you want to clear the queue and stop all playback?')) return;
+            const key = getApiKey();
+            try {
+                const response = await fetch('/api/songs/clear', { method: 'POST', headers: { 'X-API-Key': key } });
+                if (response.ok) {
+                    console.log('Queue cleared');
+                } else {
+                    alert('Failed to clear queue');
+                }
+            } catch (error) { console.error('Error clearing queue:', error); }
+        }
+
         async function fetchRecentPlays() {
             const key = getApiKey();
             try {
-                const response = await fetch('/api/songs/plays/recent?limit=10', { headers: { 'X-API-Key': key } });
+                const response = await fetch('/api/songs/plays/recent?limit=5', { headers: { 'X-API-Key': key } });
                 if (!response.ok) return;
                 const plays = await response.json();
                 const container = document.getElementById('recent-plays-log');
@@ -478,14 +534,23 @@
 
                 // Update song form dropdown
                 const selectEl = document.getElementById('song-redeems');
+                const editSelectEl = document.getElementById('edit-song-redeems');
                 const selectedValues = Array.from(selectEl.selectedOptions).map(o => o.value);
+                const editSelectedValues = Array.from(editSelectEl.selectedOptions).map(o => o.value);
+                
                 selectEl.innerHTML = '';
+                editSelectEl.innerHTML = '';
+                
                 allRedeems.forEach(redeem => {
                     const option = document.createElement('option');
                     option.value = redeem.id;
                     option.text = redeem.title;
                     if (selectedValues.includes(redeem.id.toString())) option.selected = true;
                     selectEl.appendChild(option);
+                    
+                    const editOption = option.cloneNode(true);
+                    if (editSelectedValues.includes(redeem.id.toString())) editOption.selected = true;
+                    editSelectEl.appendChild(editOption);
                 });
             } catch (error) { console.error('Error fetching redeems:', error); }
         }
@@ -621,6 +686,59 @@
                 if (response.ok) fetchSongs();
             } catch (error) { console.error('Error deleting song:', error); }
         }
+
+        let editModal = null;
+        async function openEditModal(id) {
+            const key = getApiKey();
+            try {
+                const response = await fetch(`/api/songs/${id}`, { headers: { 'X-API-Key': key } });
+                if (!response.ok) return;
+                const song = await response.json();
+                
+                document.getElementById('edit-song-id').value = song.id;
+                document.getElementById('edit-song-name').value = song.name;
+                document.getElementById('edit-song-artist').value = song.artist;
+                document.getElementById('edit-song-url').value = song.url;
+                
+                // Set selected redeems
+                const selectEl = document.getElementById('edit-song-redeems');
+                const selectedIds = song.redeems.map(r => r.id.toString());
+                Array.from(selectEl.options).forEach(option => {
+                    option.selected = selectedIds.includes(option.value);
+                });
+                
+                if (!editModal) {
+                    editModal = new bootstrap.Modal(document.getElementById('editSongModal'));
+                }
+                editModal.show();
+            } catch (error) { console.error('Error fetching song for edit:', error); }
+        }
+
+        document.getElementById('edit-song-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const key = getApiKey();
+            const id = document.getElementById('edit-song-id').value;
+            const selectedRedeemIds = Array.from(document.getElementById('edit-song-redeems').selectedOptions).map(o => parseInt(o.value));
+            const song = {
+                name: document.getElementById('edit-song-name').value,
+                artist: document.getElementById('edit-song-artist').value,
+                url: document.getElementById('edit-song-url').value,
+                redeems: selectedRedeemIds.map(id => ({ id: id }))
+            };
+            try {
+                const response = await fetch(`/api/songs/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'X-API-Key': key },
+                    body: JSON.stringify(song)
+                });
+                if (response.ok) {
+                    editModal.hide();
+                    fetchSongs();
+                } else {
+                    alert('Failed to update song');
+                }
+            } catch (error) { console.error('Error updating song:', error); }
+        };
 
         document.getElementById('add-song-form').onsubmit = async (e) => {
             e.preventDefault();

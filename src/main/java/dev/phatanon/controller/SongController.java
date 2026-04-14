@@ -109,15 +109,29 @@ public class SongController {
     @PostMapping("/{id}/play")
     @Operation(summary = "Play a song by ID", security = @SecurityRequirement(name = "X-API-Key"))
     public ResponseEntity<String> playSong(@PathVariable Long id, @RequestParam(required = false, defaultValue = "false") boolean incrementStats) {
+        /*
         if (!twitchBotService.isStreamOnline()) {
             return ResponseEntity.badRequest().body("Cannot queue song: Stream is offline.");
         }
+        */
         return songRepository.findById(id)
                 .map(song -> {
                     twitchBotService.playSongById(id, incrementStats);
                     return ResponseEntity.ok().body("Song queued successfully.");
                 })
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    /**
+     * Clears the song queue and stops the currently playing song.
+     * Requires an API key for authorization.
+     * @return A {@link ResponseEntity} indicating that the queue was cleared.
+     */
+    @PostMapping("/clear")
+    @Operation(summary = "Clear song queue and stop playback", security = @SecurityRequirement(name = "X-API-Key"))
+    public ResponseEntity<String> clearQueue() {
+        twitchBotService.clearQueue();
+        return ResponseEntity.ok().body("Song queue cleared and playback stopped.");
     }
 
     /**
@@ -163,12 +177,12 @@ public class SongController {
 
     /**
      * Retrieves recent song plays from the {@link SongPlayRepository}.
-     * @param limit The maximum number of plays to retrieve (default is 10).
+     * @param limit The maximum number of plays to retrieve (default is 5).
      * @return A list of the most recent {@link SongPlay} entities.
      */
     @GetMapping("/plays/recent")
     @Operation(summary = "Get recent song plays")
-    public List<SongPlay> getRecentPlays(@RequestParam(defaultValue = "10") int limit) {
+    public List<SongPlay> getRecentPlays(@RequestParam(defaultValue = "5") int limit) {
         return songPlayRepository.findAllByOrderByTimestampDesc(org.springframework.data.domain.PageRequest.of(0, limit));
     }
 

@@ -2,6 +2,7 @@ package dev.phatanon.controller;
 
 import dev.phatanon.service.TwitchBotService;
 import org.springframework.messaging.handler.annotation.MessageMapping;
+import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Controller;
 
 /**
@@ -21,7 +22,7 @@ public class WebSocketController {
      * Triggers the next song in the queue.
      */
     @MessageMapping("/song-finished")
-    public void songFinished() {
+    public void songFinished(@Payload(required = false) String payload) {
         twitchBotService.handleSongFinished();
     }
 }

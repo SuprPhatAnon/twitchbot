@@ -1,6 +1,7 @@
 spring:
   application:
     name: twitchbot
+    build-id: @build.id@
   datasource:
     url: jdbc:mariadb://${DB_HOST:localhost}:3306/mariadb
     username: ${DB_USER:mariadb}

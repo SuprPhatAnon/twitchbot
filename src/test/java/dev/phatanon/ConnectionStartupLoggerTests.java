@@ -9,6 +9,7 @@ import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.test.context.ActiveProfiles;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.jdbc.core.JdbcOperations;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -20,11 +21,12 @@ import static org.mockito.Mockito.when;
 class ConnectionStartupLoggerTests {
 
     @Nested
-    @SpringBootTest
+    @SpringBootTest(properties = "spring.application.build-id=test-build-id")
     @ExtendWith(OutputCaptureExtension.class)
     class SuccessTests {
         @Test
         void testConnectionLogging(CapturedOutput output) {
+            assertThat(output.getOut()).contains("Application Build ID: test-build-id");
             assertThat(output.getOut()).contains("Starting connection acquisition checks...");
             assertThat(output.getOut()).contains("✅ Successfully connected to MariaDB.");
             assertThat(output.getOut()).contains("Verifying Twitch connection status...");
@@ -47,9 +49,11 @@ class ConnectionStartupLoggerTests {
             
             // Act
             ConnectionStartupLogger logger = new ConnectionStartupLogger(jdbcTemplate, twitchBotService);
+            ReflectionTestUtils.setField(logger, "buildId", "test-build-id");
             logger.run();
 
             // Assert
+            assertThat(output.getOut()).contains("Application Build ID: test-build-id");
             assertThat(output.getOut()).contains("❌ Error acquiring MariaDB connection: Connection refused");
         }
     }

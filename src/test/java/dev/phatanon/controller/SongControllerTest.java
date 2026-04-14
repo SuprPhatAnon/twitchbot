@@ -162,12 +162,27 @@ public class SongControllerTest {
     }
 
     @Test
-    void shouldNotPlaySongWhenStreamOffline() throws Exception {
+    void shouldPlaySongWhenStreamOffline() throws Exception {
+        Song song = new Song("Play Me", "Artist", "url");
+        song.setId(1L);
+        when(songRepository.findById(1L)).thenReturn(Optional.of(song));
         when(twitchBotService.isStreamOnline()).thenReturn(false);
 
         mockMvc.perform(post("/api/songs/1/play"))
-                .andExpect(status().isBadRequest())
-                .andExpect(content().string("Cannot queue song: Stream is offline."));
+                .andExpect(status().isOk())
+                .andExpect(content().string("Song queued successfully."));
+        
+        org.mockito.Mockito.verify(twitchBotService).playSongById(1L, false);
+    }
+
+    @Test
+    void shouldClearQueue() throws Exception {
+        mockMvc.perform(post("/api/songs/clear")
+                .header("X-API-Key", "test_key"))
+                .andExpect(status().isOk())
+                .andExpect(content().string("Song queue cleared and playback stopped."));
+
+        org.mockito.Mockito.verify(twitchBotService).clearQueue();
     }
 
     @Test

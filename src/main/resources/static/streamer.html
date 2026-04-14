@@ -99,10 +99,12 @@
             <div class="status-item">
                 <span class="status-label">Queue:</span>
                 <span id="stat-queue" class="status-value">0</span>
+                <span id="stat-queue-count" style="display: none;">0</span>
             </div>
             <div class="status-item">
                 <span class="status-label">Playing:</span>
                 <span id="stat-playing" class="status-value text-info">None</span>
+                <span id="stat-play-status" style="display: none;">Idle</span>
             </div>
         </div>
         <div>
@@ -113,18 +115,6 @@
 
     <div class="main-container">
         <div class="left-panel">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    Redeems
-                    <button class="btn btn-sm btn-outline-secondary" onclick="fetchRedeems()">Refresh</button>
-                </div>
-                <div class="card-body">
-                    <div id="redeems-list" class="d-flex flex-wrap gap-2">
-                        <!-- Redeems will be loaded here as badges -->
-                    </div>
-                </div>
-            </div>
-
             <div class="row">
                 <div class="col-md-6">
                     <div class="card">
@@ -203,13 +193,10 @@
                     updateConnectionStatusDisplay(JSON.parse(response.body));
                 });
                 stompClient.subscribe('/topic/current-song', function (response) {
-                    updateCurrentSongDisplay(JSON.parse(response.body));
+                    updateCurrentSongDisplay(JSON.parse(response.body || 'null'));
                 });
                 stompClient.subscribe('/topic/songs', function (response) {
                     fetchSongs();
-                });
-                stompClient.subscribe('/topic/redeems-list', function (response) {
-                    fetchRedeems();
                 });
             }, function (error) {
                 console.error('WebSocket Error: ' + error);
@@ -317,6 +304,10 @@
                 res = await fetch('/api/songs/current', { headers: { 'X-API-Key': key } });
                 if (res.status === 200) updateCurrentSongDisplay(await res.json());
                 else updateCurrentSongDisplay(null);
+
+                // Initial songs and stats
+                fetchSongs();
+                fetchRecentPlays();
 
             } catch (e) { console.error('Error refreshing status:', e); }
         }
@@ -442,8 +433,6 @@
         checkAuth();
         if (getApiKey()) {
             refreshInitialStatus();
-            fetchRedeems();
-            fetchSongs();
             fetchRecentRedeems();
             connectWebSocket();
         }

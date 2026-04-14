@@ -3,6 +3,7 @@ package dev.phatanon;
 import dev.phatanon.service.TwitchBotService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.jdbc.core.JdbcOperations;
 import org.springframework.stereotype.Component;
@@ -30,6 +31,9 @@ public class ConnectionStartupLogger implements CommandLineRunner {
     private final JdbcOperations jdbcTemplate;
     private final ITwitchBotService twitchBotService;
 
+    @Value("${spring.application.build-id:unknown}")
+    private String buildId;
+
     public ConnectionStartupLogger(JdbcOperations jdbcTemplate, ITwitchBotService twitchBotService) {
         this.jdbcTemplate = jdbcTemplate;
         this.twitchBotService = twitchBotService;
@@ -37,6 +41,7 @@ public class ConnectionStartupLogger implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
+        logger.info("Application Build ID: {}", buildId);
         logger.info("Starting connection acquisition checks...");
 
         checkDatabaseConnection();

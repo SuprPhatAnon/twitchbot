@@ -60,6 +60,11 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
     public record RedeemLog(String user, String rewardTitle, LocalDateTime timestamp) {}
 
     /**
+     * Represents a song in the queue with its trigger source.
+     */
+    public record QueuedSong(Song song, String source, boolean incrementStats) {}
+
+    /**
      * Recent channel point redeems stored in-memory.
      */
     private final List<RedeemLog> recentRedeems = new LinkedList<>();
@@ -85,7 +90,7 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
     private String botUserId;
     private int currentSongDelaySeconds;
 
-    private final java.util.Queue<Song> songQueue = new java.util.concurrent.LinkedBlockingQueue<>();
+    private final java.util.Queue<QueuedSong> songQueue = new java.util.concurrent.LinkedBlockingQueue<>();
     private boolean isSongPlaying = false;
     private Song currentlyPlayingSong = null;
 
@@ -108,7 +113,18 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
      * Broadcasts the currently playing song to WebSocket subscribers on /topic/current-song.
      */
     private void broadcastCurrentSong() {
-        messagingTemplate.convertAndSend("/topic/current-song", currentlyPlayingSong);
+        if (currentlyPlayingSong != null) {
+            messagingTemplate.convertAndSend("/topic/current-song", currentlyPlayingSong);
+        } else {
+            messagingTemplate.convertAndSend("/topic/current-song", "null");
+        }
+    }
+
+    /**
+     * Broadcasts a message to refresh the songs list on the UI.
+     */
+    private void broadcastSongsRefresh() {
+        messagingTemplate.convertAndSend("/topic/songs", "refresh");
     }
     private boolean isStreamOnline = false;
     private final AtomicBoolean greetingSentThisSession = new AtomicBoolean(false);
@@ -185,11 +201,11 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
             log.info("Attempting to initialize Twitch bot for channel: {}", currentChannelName);
             
             CredentialManager credentialManager = CredentialManagerBuilder.builder().build();
-            TwitchIdentityProvider twitchIdentityProvider = new TwitchIdentityProvider(config.getClientId(), config.getClientSecret(), null);
-            credentialManager.registerIdentityProvider(twitchIdentityProvider);
-
+            TwitchIdentityProvider identityProvider = new TwitchIdentityProvider(config.getClientId(), config.getClientSecret(), null);
+            credentialManager.registerIdentityProvider(identityProvider);
+            
             OAuth2Credential streamerCredential = new OAuth2Credential(
-                    "twitch",
+                    TwitchIdentityProvider.PROVIDER_NAME,
                     config.getAccessToken(),
                     config.getRefreshToken(),
                     null,
@@ -197,11 +213,10 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
                     null,
                     null
             );
-            credentialManager.addCredential("streamer", streamerCredential);
             
             OAuth2Credential botCredential = (config.getBotAccessToken() != null && !config.getBotAccessToken().isBlank())
                     ? new OAuth2Credential(
-                            "twitch",
+                            TwitchIdentityProvider.PROVIDER_NAME,
                             config.getBotAccessToken(),
                             config.getBotRefreshToken(),
                             null,
@@ -211,15 +226,12 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
                     )
                     : streamerCredential;
             
-            if (botCredential != streamerCredential) {
-                credentialManager.addCredential("bot", botCredential);
-            }
-
             log.info("Building TwitchClient...");
             TwitchClientBuilder builder = TwitchClientBuilder.builder()
                     .withClientId(config.getClientId())
                     .withClientSecret(config.getClientSecret())
                     .withCredentialManager(credentialManager)
+                    .withEnableChat(true)
                     .withEnableEventSocket(true)
                     .withEnableHelix(true)
                     .withDefaultAuthToken(streamerCredential)
@@ -455,10 +467,12 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
      * @param redeemName The name of the redeem that triggered this call.
      */
     public synchronized void playRandomSong(String redeemName) {
+        /*
         if (!isStreamOnline) {
             log.info("Stream is offline. Ignoring playRandomSong request for redeem: {}", redeemName);
             return;
         }
+        */
         List<Song> songs = songRepository.findByRedeemTitle(redeemName).stream()
                 .filter(Song::isEnabled)
                 .toList();
@@ -467,24 +481,42 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
             return;
         }
         Song song = songs.get(random.nextInt(songs.size()));
-        song.incrementPlayCount();
-        songRepository.save(song);
-        songPlayRepository.save(new SongPlay(song, LocalDateTime.now(), redeemName));
         log.info("Queueing song: {} by {} for redeem: {}", song.getName(), song.getArtist(), redeemName);
 
         if (!isSongPlaying) {
-            playSong(song);
+            playSong(song, redeemName, true);
         } else {
-            songQueue.add(song);
+            songQueue.add(new QueuedSong(song, redeemName, true));
             log.info("Song added to queue. Queue size: {}", songQueue.size());
             broadcastQueueSize();
         }
     }
 
-    private void playSong(Song song) {
+    /**
+     * Clears the song queue and stops the currently playing song.
+     * Broadcasts the updated state to all clients.
+     */
+    public synchronized void clearQueue() {
+        log.info("Clearing song queue and stopping current playback.");
+        songQueue.clear();
+        isSongPlaying = false;
+        currentlyPlayingSong = null;
+        broadcastQueueSize();
+        broadcastCurrentSong();
+    }
+
+    private void playSong(Song song, String source, boolean incrementStats) {
         isSongPlaying = true;
         currentlyPlayingSong = song;
-        log.info("Playing song: {} by {}", song.getName(), song.getArtist());
+        log.info("Playing song: {} by {} (source: {}, incrementStats: {})", song.getName(), song.getArtist(), source, incrementStats);
+
+        if (incrementStats) {
+            song.incrementPlayCount();
+            songRepository.save(song);
+            songPlayRepository.save(new SongPlay(song, LocalDateTime.now(), source));
+            broadcastSongsRefresh();
+        }
+
         messagingTemplate.convertAndSend("/topic/play", song);
         broadcastCurrentSong();
     }
@@ -494,32 +526,23 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
      * Triggers the playback of the next song in the queue after a configured delay.
      */
     public synchronized void handleSongFinished() {
-        if (!isStreamOnline) {
-            log.info("Song finished, but stream is offline. Stopping playback and clearing queue.");
-            isSongPlaying = false;
-            currentlyPlayingSong = null;
-            songQueue.clear();
-            broadcastQueueSize();
-            broadcastCurrentSong();
-            return;
-        }
         log.info("Song finished. Waiting {} seconds before next song...", currentSongDelaySeconds);
         isSongPlaying = false;
-
-        if (songQueue.isEmpty()) {
-            currentlyPlayingSong = null;
-            broadcastCurrentSong();
-        }
+        currentlyPlayingSong = null;
+        broadcastCurrentSong();
 
         scheduler.schedule(() -> {
             synchronized (this) {
-                if (!songQueue.isEmpty()) {
-                    playSong(songQueue.poll());
+                if (isSongPlaying) {
+                    log.info("Another song started during delay. Skipping queue poll.");
+                    return;
+                }
+        if (!songQueue.isEmpty()) {
+                    QueuedSong next = songQueue.poll();
+                    playSong(next.song(), next.source(), next.incrementStats());
                     broadcastQueueSize();
                 } else {
                     log.info("Queue is empty, no more songs to play.");
-                    currentlyPlayingSong = null;
-                    broadcastCurrentSong();
                 }
             }
         }, currentSongDelaySeconds, java.util.concurrent.TimeUnit.SECONDS);
@@ -532,21 +555,18 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
      * @param incrementStats Whether to increment the play count for this song.
      */
     public synchronized void playSongById(Long id, boolean incrementStats) {
+        /*
         if (!isStreamOnline) {
             log.info("Stream is offline. Ignoring playSongById request for song ID: {}", id);
             return;
         }
+        */
         songRepository.findById(id).ifPresent(song -> {
             log.info("Manually queueing song: {} by {} (incrementStats: {})", song.getName(), song.getArtist(), incrementStats);
-            if (incrementStats) {
-                song.incrementPlayCount();
-                songRepository.save(song);
-                songPlayRepository.save(new SongPlay(song, LocalDateTime.now(), "manual"));
-            }
             if (!isSongPlaying) {
-                playSong(song);
+                playSong(song, "manual", incrementStats);
             } else {
-                songQueue.add(song);
+                songQueue.add(new QueuedSong(song, "manual", incrementStats));
                 log.info("Song added to queue. Queue size: {}", songQueue.size());
                 broadcastQueueSize();
             }
@@ -576,25 +596,24 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
      * Queues a random song from all available songs in the repository.
      */
     public synchronized void playRandomSong() {
+        /*
         if (!isStreamOnline) {
             log.info("Stream is offline. Ignoring playRandomSong request.");
             return;
         }
+        */
         List<Song> songs = songRepository.findByEnabled(true);
         if (songs.isEmpty()) {
             log.warn("No enabled songs found in the database");
             return;
         }
         Song song = songs.get(random.nextInt(songs.size()));
-        song.incrementPlayCount();
-        songRepository.save(song);
-        songPlayRepository.save(new SongPlay(song, LocalDateTime.now(), "random"));
         log.info("Queueing song: {} by {}", song.getName(), song.getArtist());
 
         if (!isSongPlaying) {
-            playSong(song);
+            playSong(song, "random", true);
         } else {
-            songQueue.add(song);
+            songQueue.add(new QueuedSong(song, "random", true));
             log.info("Song added to queue. Queue size: {}", songQueue.size());
             broadcastQueueSize();
         }
