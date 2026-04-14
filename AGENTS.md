@@ -17,8 +17,9 @@ This is a Spring Boot application that integrates with Twitch to play songs on a
 ## Key Components
 
 ### Core Logic
-- `dev.phatanon.service.TwitchBotService`: Main service handling Twitch events, song queue management, and redemption processing.
-- `dev.phatanon.controller.WebSocketController`: Handles WebSocket communication with the overlay.
+- `dev.phatanon.service.TwitchBotService`: Main service handling Twitch events (EventSub, IRC), song queue management, and redemption processing.
+- `dev.phatanon.controller.WebSocketController`: Handles incoming WebSocket messages from the overlay (e.g., song completion).
+- `dev.phatanon.ConnectionStartupLogger`: Helper for logging startup status.
 
 ### Controllers
 - `SongController`: Manages song database, statistics, and manual playback.
@@ -37,6 +38,11 @@ This is a Spring Boot application that integrates with Twitch to play songs on a
 1. The overlay (`index.html`) connects to `/ws` using SockJS and STOMP.
 2. It subscribes to `/topic/play` to receive song play events.
 3. When a song finishes, the overlay sends a message to `/app/song-finished`.
+4. It also subscribes to:
+   - `/topic/queue-size`: Receives the current number of songs in the queue.
+   - `/topic/current-song`: Receives the currently playing song details.
+   - `/topic/songs`: Receives "refresh" messages when the song list changes.
+   - `/topic/redeems-list`: Receives "refresh" messages when the redeems list changes.
 
 ### Authentication
 - Some API endpoints (`/api/**`) require an `X-API-Key` header.
@@ -46,12 +52,18 @@ This is a Spring Boot application that integrates with Twitch to play songs on a
 
 ### Database Schema
 The database is managed by Hibernate/JPA. Key tables:
-- `songs`: `id`, `name`, `artist`, `url`.
-- `song_plays`: `id`, `song_id`, `played_at`.
-- `twitch_configs`: `id`, `client_id`, `client_secret`, `access_token`, etc.
+- `songs`: `id`, `name`, `artist`, `url`, `sort_name`, `enabled`, `play_count`.
+- `song_plays`: `id`, `song_id`, `timestamp`, `source`.
+- `twitch_config`: `id`, `client_id`, `client_secret`, `access_token`, `refresh_token`, `bot_access_token`, `bot_refresh_token`, `channel_name`, `redeem_title`, `song_delay_seconds`.
 - `redeems`: `id`, `title`.
+- `song_redeem_link`: (Join table for `songs` and `redeems`).
 
 ## Common Development Tasks
+
+### General Requirements
+- **Always keep documentation updated**: If you change functionality, update `README.md`, `AGENTS.md`, and any relevant K8s/Docker documentation.
+- **Maintain OpenAPI documentation**: Ensure SpringDoc/OpenAPI annotations in controllers are accurate and up-to-date.
+- **Update Javadocs**: Provide or update Javadocs for new or modified public classes and methods.
 
 ### Adding a New Endpoint
 1. Create or update a controller in `src/main/java/dev/phatanon/controller/`.
@@ -63,8 +75,13 @@ The database is managed by Hibernate/JPA. Key tables:
 - If adding new event listeners, look at how `registerEventListeners()` is implemented.
 
 ### Modifying the Overlay
-- Edit `src/main/resources/static/index.html`.
-- It uses basic CSS for styling and SockJS/STOMP for communication.
+- The main player overlay is `src/main/resources/static/index.html`.
+- Other UIs:
+  - `admin.html`: Full management dashboard.
+  - `streamer.html`: Read-only/operational dashboard.
+  - `player.html`: Public player for manual playback.
+  - `statistics.html`: Song play statistics dashboard.
+- UIs use basic CSS, SockJS/STOMP, and often include an API key for write operations.
 
 ## Testing Procedures
 

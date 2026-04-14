@@ -124,13 +124,14 @@ Interactive documentation is available at `/swagger-ui.html`.
 - **PUT `/api/songs/{id}`**: Update an existing song.
 - **DELETE `/api/songs/{id}`**: Remove a song from the database.
 - **POST `/api/songs/{id}/play`**: Manually queue a song for playback.
-  - Query parameter: `incrementStats` (boolean, default: `true`).
+  - Query parameter: `incrementStats` (boolean, default: `false`).
+- **POST `/api/songs/clear`**: Clear the song queue and stop playback.
 - **GET `/api/songs/queue-size`**: Get the current number of songs in the queue.
 - **GET `/api/songs/current`**: Get the currently playing song.
-- **GET `/api/songs/recent`**: Get the most recent song plays.
-  - Query parameter: `limit` (int, default: `10`).
+- **GET `/api/songs/plays/recent`**: Get the most recent song plays.
+  - Query parameter: `limit` (int, default: `5`).
 - **GET `/api/songs/statistics`**: Get song play statistics.
-  - Query parameters: `range` (e.g., `7d`, `30d`), `groupBy` (e.g., `day`, `month`).
+  - Query parameters: `range` (e.g., `daily`, `weekly`, `monthly`, `yearly`, `alltime`), `groupBy` (e.g., `song`, `artist`).
 
 #### Redeem Management (`/api/redeems`)
 - **GET `/api/redeems`**: List all defined Twitch channel point redeems.
@@ -144,6 +145,7 @@ Interactive documentation is available at `/swagger-ui.html`.
 - **GET `/api/twitch-config/connection`**: Check Twitch EventSub connection status.
 - **GET `/api/twitch-config/redeems`**: Get a log of recent channel point redemption events.
 - **GET `/api/twitch-config/profiles`**: Get active Spring profiles.
+- **GET `/api/twitch-config/redirect-uri-host`**: Get the configured redirect URI host.
 
 #### Test Endpoints (`/api/test`)
 - **GET `/api/test/play`**: Trigger a random song to play (for testing the overlay).

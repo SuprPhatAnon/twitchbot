@@ -25,7 +25,7 @@ public class TestController {
      * @return A success message.
      */
     @GetMapping("/play")
-    @Operation(summary = "Trigger a random song to play")
+    @Operation(summary = "Trigger a random song to play", security = @SecurityRequirement(name = "X-API-Key"))
     public String triggerPlay() {
         twitchBotService.playRandomSong();
         return "Song triggered!";
@@ -37,7 +37,7 @@ public class TestController {
      * @return A success message.
      */
     @GetMapping("/finish")
-    @Operation(summary = "Trigger song finished (simulates frontend callback)")
+    @Operation(summary = "Trigger song finished (simulates frontend callback)", security = @SecurityRequirement(name = "X-API-Key"))
     public String triggerFinish() {
         twitchBotService.handleSongFinished();
         return "Song finish triggered!";
