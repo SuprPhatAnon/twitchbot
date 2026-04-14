@@ -114,8 +114,13 @@ Interactive documentation is available at `/swagger-ui.html`.
 - **PUT `/api/songs/{id}`**: Update an existing song.
 - **DELETE `/api/songs/{id}`**: Remove a song from the database.
 - **POST `/api/songs/{id}/play`**: Manually queue a song for playback.
+  - Query parameter: `incrementStats` (boolean, default: `true`).
 - **GET `/api/songs/queue-size`**: Get the current number of songs in the queue.
 - **GET `/api/songs/current`**: Get the currently playing song.
+- **GET `/api/songs/recent`**: Get the most recent song plays.
+  - Query parameter: `limit` (int, default: `10`).
+- **GET `/api/songs/statistics`**: Get song play statistics.
+  - Query parameters: `range` (e.g., `7d`, `30d`), `groupBy` (e.g., `day`, `month`).
 
 #### Redeem Management (`/api/redeems`)
 - **GET `/api/redeems`**: List all defined Twitch channel point redeems.
@@ -128,10 +133,13 @@ Interactive documentation is available at `/swagger-ui.html`.
 - **GET `/api/twitch-config/status`**: Check if the stream is currently online.
 - **GET `/api/twitch-config/connection`**: Check Twitch IRC connection status.
 - **GET `/api/twitch-config/redeems`**: Get a log of recent channel point redemption events.
+- **GET `/api/twitch-config/profiles`**: Get active Spring profiles.
 
-#### Test Endpoints (`/api/test`)
+#### Test and QA Endpoints (`/api/test` and `/api/qa`)
 - **GET `/api/test/play`**: Trigger a random song to play (for testing the overlay).
 - **GET `/api/test/finish`**: Simulate a song finished event.
+- **GET `/api/qa/trigger`**: Trigger a Twitch event via a mock server (available only in `test` profile).
+  - Query parameters: `event` (event name), and any other parameters for the event.
 
 ## Development
 
