@@ -8,7 +8,8 @@ This package contains Kubernetes manifests for the Twitch Bot application, based
 k8s/
 └── base/
     ├── app/
-    │   └── app.yaml             # Deployment and Service for the Spring Boot app
+    │   ├── app.yaml             # Deployment and Service for the Spring Boot app
+    │   └── ingress.yaml         # Ingress resource for the app
     ├── mariadb/
     │   └── mariadb.yaml         # Deployment, Service, and PVC for MariaDB
     └── kustomization.yaml       # Kustomize base configuration (ConfigMaps & Secrets)
@@ -39,4 +40,4 @@ To deploy the application to your Kubernetes cluster:
 
 - **Docker Images:** The deployment manifests use placeholder image tags (e.g., `twitchbot-app:latest`). Ensure you build and push these images to your registry and update the image names in the YAML files or via Kustomize overlays.
 - **Resources:** Default resource requests/limits are not set; consider adding them based on your cluster's capacity.
-- **Ingress:** This package does not include an Ingress controller; you may need to add one if you want to expose the application to the internet.
+- **Ingress:** This package includes an Ingress resource configured for `stream.phat.wtf`. Ensure you have an Ingress controller (e.g., NGINX) and `cert-manager` installed for TLS.
