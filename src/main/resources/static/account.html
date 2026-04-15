@@ -10,6 +10,19 @@
         [data-bs-theme="dark"] body { background-color: #212529; color: #f8f9fa; }
         .container { max-width: 600px; }
         .card { margin-bottom: 20px; }
+        .api-key-container {
+            background-color: #f1f3f5;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            word-break: break-all;
+            margin-bottom: 10px;
+            border: 1px solid #dee2e6;
+        }
+        [data-bs-theme="dark"] .api-key-container {
+            background-color: #2b3035;
+            border-color: #495057;
+        }
     </style>
 </head>
 <body>
@@ -29,6 +42,19 @@
                 <div class="mb-3">
                     <label class="form-label text-muted small uppercase">Roles</label>
                     <div id="display-roles" class="h5">-</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">API Key</div>
+            <div class="card-body">
+                <p class="text-muted small">Use this key in the <code>X-API-KEY</code> header to authenticate API requests without a password.</p>
+                <div id="api-key-display" class="api-key-container">••••••••••••••••••••••••••••••••••••</div>
+                <div class="btn-group w-100">
+                    <button class="btn btn-sm btn-outline-primary" onclick="toggleApiKey()">Show/Hide Key</button>
+                    <button class="btn btn-sm btn-outline-warning" onclick="rotateApiKey()">Rotate Key</button>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="copyApiKey()">Copy Key</button>
                 </div>
             </div>
         </div>
@@ -58,6 +84,48 @@
             document.documentElement.setAttribute('data-bs-theme', 'dark');
         }
 
+        let currentApiKey = '';
+        let isKeyVisible = false;
+
+        function updateApiKeyDisplay() {
+            const display = document.getElementById('api-key-display');
+            display.textContent = isKeyVisible ? currentApiKey : '••••••••••••••••••••••••••••••••••••';
+        }
+
+        function toggleApiKey() {
+            isKeyVisible = !isKeyVisible;
+            updateApiKeyDisplay();
+        }
+
+        async function rotateApiKey() {
+            if (!confirm('Are you sure you want to rotate your API key? The old key will stop working immediately.')) {
+                return;
+            }
+            try {
+                const response = await fetch('/api/users/me/rotate-api-key', { method: 'POST' });
+                if (response.ok) {
+                    const user = await response.json();
+                    currentApiKey = user.apiKey;
+                    isKeyVisible = true;
+                    updateApiKeyDisplay();
+                    alert('API Key rotated successfully!');
+                } else {
+                    alert('Failed to rotate API key.');
+                }
+            } catch (error) {
+                console.error('Error rotating API key:', error);
+            }
+        }
+
+        function copyApiKey() {
+            if (!currentApiKey || currentApiKey === 'No API key generated') return;
+            navigator.clipboard.writeText(currentApiKey).then(() => {
+                alert('API Key copied to clipboard!');
+            }).catch(err => {
+                console.error('Failed to copy API key:', err);
+            });
+        }
+
         async function fetchAccountInfo() {
             try {
                 const res = await fetch('/api/users/me');
@@ -68,6 +136,8 @@
                 const user = await res.json();
                 document.getElementById('display-username').innerText = user.username;
                 document.getElementById('display-roles').innerText = user.roles.join(', ');
+                currentApiKey = user.apiKey || 'No API key generated';
+                updateApiKeyDisplay();
             } catch (err) {
                 console.error('Failed to fetch account info', err);
             }

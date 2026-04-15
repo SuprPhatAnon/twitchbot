@@ -108,6 +108,18 @@ The application uses a user-based authentication system with three groups:
 
 Access the Admin UI to manage users and their roles.
 
+### API Key Authentication
+
+In addition to username/password authentication, the application supports **API Key authentication**. This is useful for scripts and automated tools.
+
+1.  Log in to the Admin or Streamer UI.
+2.  Go to the **Account** page.
+3.  You can view, copy, or rotate your **API Key**.
+4.  To use the API key, include it in the `X-API-KEY` header of your requests:
+    ```bash
+    curl -H "X-API-KEY: your_api_key" http://localhost:8080/api/songs
+    ```
+
 ## OpenAPI Documentation
 
 Interactive API documentation is available via Swagger UI:
@@ -134,7 +146,7 @@ curl -X POST http://localhost:8080/api/songs/1/play
 ```
 
 ### REST API
-You can manage the application using the following REST API endpoints. Write requests (**POST, PUT, DELETE**) to `/api/**` require authentication. Read-only requests (**GET**) are public.
+You can manage the application using the following REST API endpoints. Write requests (**POST, PUT, DELETE**) and protected **GET** requests require authentication. The API supports both **API Key** (`X-API-KEY` header) and **Basic Authentication**.
 Interactive documentation is available at `/swagger-ui.html`.
 
 #### Song Management (`/api/songs`)
@@ -179,6 +191,32 @@ Interactive documentation is available at `/swagger-ui.html`.
 #### Test Endpoints (`/api/test`)
 - **GET `/api/test/play`**: Trigger a random song to play (for testing the overlay).
 - **GET `/api/test/finish`**: Simulate a song finished event.
+
+### Bulk Upload / Single Song Upload Script
+
+A Python script `scripts/upload_songs.py` is provided to upload MP3 files from a directory or a single MP3 file. It automatically generates song titles from filenames by replacing separators (`_`, `-`) with spaces and applying proper capitalization.
+
+**Prerequisites:**
+- Python 3.x
+- `requests` library: `pip install requests`
+
+**Usage:**
+
+**Upload a directory of songs:**
+```bash
+python3 scripts/upload_songs.py /path/to/mp3/directory --artist "Default Artist" --url http://localhost:8080/api/songs/upload --api-key your_api_key
+```
+
+**Upload a single song:**
+```bash
+python3 scripts/upload_songs.py /path/to/song.mp3 --artist "Artist Name" --url http://localhost:8080/api/songs/upload --api-key your_api_key
+```
+
+**Arguments:**
+- `path`: Path to an MP3 file or a directory containing MP3 files.
+- `--artist`: Default artist for the songs (default: `Unknown Artist`).
+- `--url`: The API upload endpoint URL (default: `http://localhost:8080/api/songs/upload`).
+- `--api-key`: API Key for authentication (Required).
 
 ## Development
 

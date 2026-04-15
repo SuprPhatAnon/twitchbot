@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Arrays;
@@ -21,6 +22,7 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/twitch-config")
 @Tag(name = "Twitch Configuration", description = "Endpoints for managing Twitch bot credentials and settings")
+@SecurityRequirement(name = "apiKey")
 @SecurityRequirement(name = "basicAuth")
 public class TwitchConfigController {
 
@@ -90,6 +92,7 @@ public class TwitchConfigController {
      * @return The saved {@link TwitchConfig} object.
      */
     @PutMapping
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Update Twitch configuration")
     public TwitchConfig updateConfig(@RequestBody TwitchConfig config) {
         // We only ever want one configuration row

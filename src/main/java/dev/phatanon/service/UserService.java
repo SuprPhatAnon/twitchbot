@@ -11,6 +11,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.UUID;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -77,6 +78,7 @@ public class UserService implements UserDetailsService {
     @Transactional
     public User createUser(String username, String password, Set<Role> roles) {
         User user = new User(username, passwordEncoder.encode(password), roles);
+        user.setApiKey(UUID.randomUUID().toString());
         return userRepository.save(user);
     }
 
@@ -129,6 +131,28 @@ public class UserService implements UserDetailsService {
     @Transactional
     public void deleteUser(Long id) {
         userRepository.deleteById(id);
+    }
+
+    /**
+     * Finds a user by their API key.
+     * @param apiKey The API key.
+     * @return Optional containing the user if found.
+     */
+    public Optional<User> findByApiKey(String apiKey) {
+        return userRepository.findByApiKey(apiKey);
+    }
+
+    /**
+     * Rotates (regenerates) the API key for a user.
+     * @param username The username.
+     * @return The updated User entity with a new API key.
+     */
+    @Transactional
+    public User rotateApiKey(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        user.setApiKey(UUID.randomUUID().toString());
+        return userRepository.save(user);
     }
 
     /**

@@ -13,6 +13,7 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 /**
  * Configuration class for Spring Security.
@@ -39,12 +40,14 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
             .csrf(AbstractHttpConfigurer::disable)
+            .httpBasic(AbstractHttpConfigurer::disable)
+            .addFilterBefore(new ApiKeyAuthenticationFilter(userService), UsernamePasswordAuthenticationFilter.class)
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/", "/index.html", "/player.html", "/statistics.html", "/css/**", "/js/**", "/ws/**").permitAll()
                 .requestMatchers("/login.html", "/api/login").permitAll()
                 .requestMatchers("/api/songs/upload/**", "/upload.html").hasAnyRole("UPLOAD", "STREAMER", "ADMIN")
                 .requestMatchers("/streamer.html", "/api/songs/play/**", "/api/songs/queue/**").hasAnyRole("STREAMER", "ADMIN")
-                .requestMatchers("/admin.html", "/api/users/**", "/api/config/**", "/api/redeems/**").hasRole("ADMIN")
+                .requestMatchers("/admin.html", "/api/users/**", "/api/twitch-config/**", "/api/redeems/**").hasRole("ADMIN")
                 .anyRequest().authenticated()
             )
             .formLogin(form -> form

@@ -4,6 +4,7 @@ import dev.phatanon.service.TwitchBotService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -11,6 +12,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/test")
 @Tag(name = "Test Endpoints", description = "Endpoints for manual testing")
+@SecurityRequirement(name = "apiKey")
+@SecurityRequirement(name = "basicAuth")
 public class TestController {
 
     private final TwitchBotService twitchBotService;
@@ -25,6 +28,7 @@ public class TestController {
      * @return A success message.
      */
     @GetMapping("/play")
+    @PreAuthorize("hasAnyRole('STREAMER', 'ADMIN')")
     @Operation(summary = "Trigger a random song to play")
     public String triggerPlay() {
         twitchBotService.playRandomSong();
@@ -37,6 +41,7 @@ public class TestController {
      * @return A success message.
      */
     @GetMapping("/finish")
+    @PreAuthorize("hasAnyRole('STREAMER', 'ADMIN')")
     @Operation(summary = "Trigger song finished (simulates frontend callback)")
     public String triggerFinish() {
         twitchBotService.handleSongFinished();

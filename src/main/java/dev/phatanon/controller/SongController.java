@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -23,6 +24,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/songs")
 @Tag(name = "Song Management", description = "Endpoints for managing songs")
+@SecurityRequirement(name = "apiKey")
 @SecurityRequirement(name = "basicAuth")
 public class SongController {
 
@@ -70,6 +72,7 @@ public class SongController {
      * @return The newly created {@link Song} entity with its assigned ID.
      */
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Add a new song")
     public Song addSong(@RequestBody Song song) {
@@ -88,6 +91,7 @@ public class SongController {
      * @return A {@link ResponseEntity} containing the updated {@link Song} if successful, or 404 Not Found if not.
      */
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Update an existing song")
     public ResponseEntity<Song> updateSong(@PathVariable Long id, @RequestBody Song songDetails) {
         return songRepository.findById(id)
@@ -115,6 +119,7 @@ public class SongController {
      * @return A {@link ResponseEntity} indicating whether the song was successfully queued.
      */
     @PostMapping("/{id}/play")
+    @PreAuthorize("hasAnyRole('STREAMER', 'ADMIN')")
     @Operation(summary = "Play a song by ID")
     public ResponseEntity<String> playSong(@PathVariable Long id, @RequestParam(required = false, defaultValue = "false") boolean incrementStats) {
         /*
@@ -136,6 +141,7 @@ public class SongController {
      * @return A {@link ResponseEntity} indicating that the queue was cleared.
      */
     @PostMapping("/clear")
+    @PreAuthorize("hasAnyRole('STREAMER', 'ADMIN')")
     @Operation(summary = "Clear song queue and stop playback")
     public ResponseEntity<String> clearQueue() {
         twitchBotService.clearQueue();
@@ -173,6 +179,7 @@ public class SongController {
      * @return 204 No Content if successful, or 404 Not Found if the ID does not exist.
      */
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Delete a song")
     public ResponseEntity<Void> deleteSong(@PathVariable Long id) {
         return songRepository.findById(id)

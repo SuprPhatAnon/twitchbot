@@ -61,9 +61,9 @@ class SongServiceTest {
         assertEquals(5, lines.size());
         assertEquals("#EXTM3U", lines.get(0));
         assertEquals("#EXTINF:-1,Artist 1 - Song 1", lines.get(1));
-        assertEquals("/path/to/song1.mp3", lines.get(2));
+        assertEquals("path/to/song1.mp3", lines.get(2));
         assertEquals("#EXTINF:-1,Artist 2 - Song 2", lines.get(3));
-        assertEquals("/path/to/song2.mp3", lines.get(4));
+        assertEquals("path/to/song2.mp3", lines.get(4));
     }
 
     @Test
@@ -98,27 +98,20 @@ class SongServiceTest {
     }
 
     @Test
-    void shouldExtractCoverArtFromMp3() throws IOException {
-        // Prepare a dummy MP3 file with cover art
-        Path mp3Path = tempDir.resolve("test.mp3");
-        try (InputStream is = getClass().getResourceAsStream("/test-with-cover.mp3")) {
-            if (is != null) {
-                Files.copy(is, mp3Path);
-            } else {
-                // If we don't have a resource, we can't really test the successful extraction easily
-                // without adding a binary file to the repo. 
-                // Let's at least test the "no tag" case by creating an empty file.
-                Files.createFile(mp3Path);
-            }
-        }
+    void shouldExtractCoverArtFromMp3UsingRelativeUrl() throws IOException {
+        // Prepare a dummy MP3 file
+        String filename = "test-relative.mp3";
+        Path mp3Path = tempDir.resolve(filename);
+        Files.createFile(mp3Path);
 
         Song song = new Song();
-        song.setUrl(mp3Path.toString());
-        song.setName("Test Song");
+        song.setUrl("/" + filename);
+        song.setName("Test Relative Song");
 
         songService.updateCoverArt(song);
-        
-        // If it was an empty file, cover art should be null
+
+        // It should look in tempDir and find the file (but no cover art since it's empty)
         assertNull(song.getCoverArt());
+        // If it failed to find the file, it would log a warning, but here it should find it.
     }
 }

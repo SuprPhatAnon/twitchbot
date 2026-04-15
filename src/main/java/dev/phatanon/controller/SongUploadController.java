@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -30,6 +31,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/songs/upload")
 @Tag(name = "Song Upload", description = "Endpoints for uploading song files")
+@SecurityRequirement(name = "apiKey")
 @SecurityRequirement(name = "basicAuth")
 public class SongUploadController {
 
@@ -55,6 +57,7 @@ public class SongUploadController {
      */
     @Operation(summary = "Upload a new song file")
     @PostMapping
+    @PreAuthorize("hasAnyRole('UPLOAD', 'STREAMER', 'ADMIN')")
     public ResponseEntity<?> uploadSong(
             @RequestParam("file") MultipartFile file,
             @RequestParam("name") String name,
@@ -87,7 +90,7 @@ public class SongUploadController {
             Song song = new Song();
             song.setName(name);
             song.setArtist(artist);
-            song.setUrl(destinationFile.toAbsolutePath().toString());
+            song.setUrl("/" + filename);
             song.setEnabled(true);
 
             // Extract cover art if possible

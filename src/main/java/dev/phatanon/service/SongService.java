@@ -49,6 +49,11 @@ public class SongService {
                 file = Paths.get(url).toFile();
             }
 
+            // If still not exists and starts with /, try relative to uploadPath
+            if (!file.exists() && url.startsWith("/")) {
+                file = Paths.get(uploadPath, url.substring(1)).toFile();
+            }
+
             if (file.exists() && file.isFile()) {
                 Mp3File mp3file = new Mp3File(file);
                 if (mp3file.hasId3v2Tag()) {
@@ -89,7 +94,13 @@ public class SongService {
                 writer.write("#EXTM3U\n");
                 for (Song song : enabledSongs) {
                     writer.write("#EXTINF:-1," + song.getArtist() + " - " + song.getName() + "\n");
-                    writer.write(song.getUrl() + "\n");
+                    String songUrl = song.getUrl();
+                    if (songUrl != null && songUrl.startsWith("/")) {
+                        // For M3U in the same directory, use relative path without leading slash
+                        writer.write(songUrl.substring(1) + "\n");
+                    } else {
+                        writer.write(songUrl + "\n");
+                    }
                 }
             }
             logger.info("Updated playlist.m3u with {} songs at {}", enabledSongs.size(), m3uPath.toAbsolutePath());

@@ -105,6 +105,22 @@ public class SongControllerTest {
     }
 
     @Test
+    void shouldAddSongWithoutRedeems() throws Exception {
+        Song song = new Song("New Song", "New Artist", "new_url");
+        song.setId(1L);
+        when(songRepository.save(any(Song.class))).thenReturn(song);
+
+        String songJson = "{\"name\": \"New Song\", \"artist\": \"New Artist\", \"url\": \"new_url\", \"redeems\": []}";
+
+        mockMvc.perform(post("/api/songs")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(songJson))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.name", is("New Song")))
+                .andExpect(jsonPath("$.redeems", hasSize(0)));
+    }
+
+    @Test
     void shouldUpdateSong() throws Exception {
         Redeem oldRedeem = new Redeem("Old Redeem");
         oldRedeem.setId(1L);

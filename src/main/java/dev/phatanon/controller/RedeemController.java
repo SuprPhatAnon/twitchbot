@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -18,6 +19,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/redeems")
 @Tag(name = "Redeem Management", description = "Endpoints for managing Twitch channel point redeems")
+@SecurityRequirement(name = "apiKey")
 @SecurityRequirement(name = "basicAuth")
 public class RedeemController {
 
@@ -46,6 +48,7 @@ public class RedeemController {
      * @return The saved {@link Redeem} entity.
      */
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Add a new redeem")
     public Redeem addRedeem(@RequestBody Redeem redeem) {
@@ -61,6 +64,7 @@ public class RedeemController {
      * @return 204 No Content if successful, or 404 Not Found if the ID does not exist.
      */
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Delete a redeem")
     public ResponseEntity<Void> deleteRedeem(@PathVariable Long id) {
         return redeemRepository.findById(id)

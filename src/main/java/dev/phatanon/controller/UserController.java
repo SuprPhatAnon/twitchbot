@@ -18,6 +18,7 @@ import java.util.Set;
 @RestController
 @RequestMapping("/api/users")
 @Tag(name = "User Management", description = "Endpoints for managing users and their profiles")
+@SecurityRequirement(name = "apiKey")
 @SecurityRequirement(name = "basicAuth")
 public class UserController {
 
@@ -51,6 +52,18 @@ public class UserController {
     public ResponseEntity<?> changePassword(@AuthenticationPrincipal UserDetails userDetails, @RequestBody ChangePasswordRequest request) {
         userService.changePassword(userDetails.getUsername(), request.newPassword());
         return ResponseEntity.ok().build();
+    }
+
+    /**
+     * Rotates (regenerates) the API key of the currently authenticated user.
+     * @param userDetails The details of the authenticated user.
+     * @return The updated User entity with a new API key.
+     */
+    @PostMapping("/me/rotate-api-key")
+    @Operation(summary = "Rotate current user's API key")
+    public ResponseEntity<User> rotateApiKey(@AuthenticationPrincipal UserDetails userDetails) {
+        User user = userService.rotateApiKey(userDetails.getUsername());
+        return ResponseEntity.ok(user);
     }
 
     /**

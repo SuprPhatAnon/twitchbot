@@ -49,9 +49,9 @@ This is a Spring Boot application that integrates with Twitch to play songs on a
 - **M3U Playlist**: A `playlist.m3u` file is automatically generated and updated in the `SONG_UPLOAD_PATH` directory whenever songs are added, updated, or deleted. This file contains all enabled songs.
 
 ### Authentication
-- The application uses Spring Security with form-based login.
-- **Read-only requests (GET)** are generally public.
-- **Write requests (POST, PUT, DELETE)** require a logged-in user with appropriate roles.
+- The application uses Spring Security with form-based login for the Web UI.
+- **API Access**: All API write requests (POST, PUT, DELETE) and protected GET requests must use **API Key authentication** via the `X-API-KEY` header. Username and password (Basic Auth) are NOT supported for the API.
+- **Read-only requests (GET)**: Some are public, while others require authentication (API Key or Session).
 - **Roles**:
   - `ROLE_UPLOAD`: Allowed to upload songs.
   - `ROLE_STREAMER`: Allowed access to Streamer UI and song playback.
@@ -106,6 +106,9 @@ The database is managed by Hibernate/JPA. Key tables:
 
 - Use the `CODE` mode for most tasks.
 - When investigating issues, check `src/main/resources/application.yml` for default configurations.
+- **Python Scripts**: Some automation scripts (e.g., for uploading songs) are available in the `scripts/` directory.
+  - **Python Version**: Python 3.10+ is recommended.
+  - **Dependencies**: Install required libraries using `pip install requests`.
 - K8s configurations are available in the `k8s/` directory. You MUST keep these (including `base` and `overlays` for production, minikube, and k3s) updated with any infrastructure changes.
 - For detailed deployment instructions on specific Kubernetes distributions, refer to:
   - `k8s/K3S.md`: Guide for deploying to a k3s cluster.
