@@ -5,6 +5,7 @@ import dev.phatanon.entity.Song;
 import dev.phatanon.entity.SongPlay;
 import dev.phatanon.repository.SongPlayRepository;
 import dev.phatanon.repository.SongRepository;
+import dev.phatanon.service.SongService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -28,12 +29,14 @@ public class SongController {
     private final SongPlayRepository songPlayRepository;
     private final dev.phatanon.service.TwitchBotService twitchBotService;
     private final SimpMessagingTemplate messagingTemplate;
+    private final SongService songService;
 
-    public SongController(SongRepository songRepository, SongPlayRepository songPlayRepository, dev.phatanon.service.TwitchBotService twitchBotService, SimpMessagingTemplate messagingTemplate) {
+    public SongController(SongRepository songRepository, SongPlayRepository songPlayRepository, dev.phatanon.service.TwitchBotService twitchBotService, SimpMessagingTemplate messagingTemplate, SongService songService) {
         this.songRepository = songRepository;
         this.songPlayRepository = songPlayRepository;
         this.twitchBotService = twitchBotService;
         this.messagingTemplate = messagingTemplate;
+        this.songService = songService;
     }
 
     /**
@@ -69,6 +72,7 @@ public class SongController {
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Add a new song", security = @SecurityRequirement(name = "X-API-Key"))
     public Song addSong(@RequestBody Song song) {
+        songService.updateCoverArt(song);
         Song savedSong = songRepository.save(song);
         messagingTemplate.convertAndSend("/topic/songs", "refresh");
         return savedSong;
@@ -91,6 +95,7 @@ public class SongController {
                     song.setUrl(songDetails.getUrl());
                     song.setRedeems(songDetails.getRedeems());
                     song.setEnabled(songDetails.isEnabled());
+                    songService.updateCoverArt(song);
                     Song updatedSong = songRepository.save(song);
                     messagingTemplate.convertAndSend("/topic/songs", "refresh");
                     return ResponseEntity.ok(updatedSong);

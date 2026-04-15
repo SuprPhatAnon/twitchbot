@@ -1,5 +1,7 @@
 package dev.phatanon;
 
+import dev.phatanon.repository.SongRepository;
+import dev.phatanon.service.SongService;
 import dev.phatanon.service.TwitchBotService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -7,6 +9,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.jdbc.core.JdbcOperations;
 import org.springframework.stereotype.Component;
+
+import java.util.List;
 
 /**
  * A startup component that performs connectivity checks for database and Twitch services.
@@ -30,13 +34,17 @@ public class ConnectionStartupLogger implements CommandLineRunner {
 
     private final JdbcOperations jdbcTemplate;
     private final ITwitchBotService twitchBotService;
+    private final SongRepository songRepository;
+    private final SongService songService;
 
     @Value("${spring.application.build-id:unknown}")
     private String buildId;
 
-    public ConnectionStartupLogger(JdbcOperations jdbcTemplate, ITwitchBotService twitchBotService) {
+    public ConnectionStartupLogger(JdbcOperations jdbcTemplate, ITwitchBotService twitchBotService, SongRepository songRepository, SongService songService) {
         this.jdbcTemplate = jdbcTemplate;
         this.twitchBotService = twitchBotService;
+        this.songRepository = songRepository;
+        this.songService = songService;
     }
 
     @Override
@@ -46,8 +54,33 @@ public class ConnectionStartupLogger implements CommandLineRunner {
 
         checkDatabaseConnection();
         checkTwitchConnection();
+        backfillCoverArt();
 
         logger.info("Startup connection checks completed.");
+    }
+
+    private void backfillCoverArt() {
+        try {
+            logger.info("Checking for songs without cover art to backfill...");
+            List<dev.phatanon.entity.Song> songs = songRepository.findAll();
+            int backfilledCount = 0;
+            for (dev.phatanon.entity.Song song : songs) {
+                if (song.getCoverArt() == null) {
+                    songService.updateCoverArt(song);
+                    if (song.getCoverArt() != null) {
+                        songRepository.save(song);
+                        backfilledCount++;
+                    }
+                }
+            }
+            if (backfilledCount > 0) {
+                logger.info("✅ Backfilled cover art for {} songs.", backfilledCount);
+            } else {
+                logger.info("No cover art backfill needed.");
+            }
+        } catch (Exception e) {
+            logger.error("❌ Error backfilling cover art: {}", e.getMessage());
+        }
     }
 
     private void checkTwitchConnection() {

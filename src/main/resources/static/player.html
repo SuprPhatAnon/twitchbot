@@ -77,9 +77,12 @@
         <div class="container">
             <div class="row align-items-center">
                 <div class="col-md-4 d-none d-md-block">
-                    <div id="now-playing-info" style="display: none;">
-                        <strong id="current-song-name"></strong><br>
-                        <small id="current-song-artist" class="text-muted"></small>
+                    <div id="now-playing-info" style="display: none;" class="d-flex align-items-center">
+                        <img id="current-song-art" src="" alt="Art" style="width: 40px; height: 40px; object-fit: cover; border-radius: 4px; margin-right: 10px; display: none;">
+                        <div>
+                            <strong id="current-song-name"></strong><br>
+                            <small id="current-song-artist" class="text-muted"></small>
+                        </div>
                     </div>
                 </div>
                 <div class="col-md-8">
@@ -143,19 +146,25 @@
                 return;
             }
 
-            songsContainer.innerHTML = songs.map(song => `
+        songsContainer.innerHTML = songs.map(song => {
+            const artImg = song.coverArt ? `<img src="${song.coverArt}" alt="Art" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px; margin-right: 15px;">` : '<div style="width: 50px; height: 50px; background: #eee; border-radius: 4px; margin-right: 15px;"></div>';
+            return `
                 <div class="card song-card ${currentSongId === song.id ? 'border-primary' : ''}">
                     <div class="card-body d-flex justify-content-between align-items-center">
-                        <div>
-                            <h5 class="card-title mb-1">${escapeHtml(song.name)}</h5>
-                            <h6 class="card-subtitle text-muted">${escapeHtml(song.artist)}</h6>
+                        <div class="d-flex align-items-center">
+                            ${artImg}
+                            <div>
+                                <h5 class="card-title mb-1">${escapeHtml(song.name)}</h5>
+                                <h6 class="card-subtitle text-muted">${escapeHtml(song.artist)}</h6>
+                            </div>
                         </div>
                         <button class="btn ${currentSongId === song.id ? 'btn-outline-primary' : 'btn-primary'}" onclick="playSong(${song.id})">
                             ${currentSongId === song.id ? 'Playing...' : 'Play'}
                         </button>
                     </div>
                 </div>
-            `).join('');
+            `;
+        }).join('');
         }
 
         function filterSongs() {
@@ -184,7 +193,16 @@
 
             document.getElementById('current-song-name').textContent = song.name;
             document.getElementById('current-song-artist').textContent = song.artist;
-            document.getElementById('now-playing-info').style.display = 'block';
+            
+            const currentArt = document.getElementById('current-song-art');
+            if (song.coverArt) {
+                currentArt.src = song.coverArt;
+                currentArt.style.display = 'block';
+            } else {
+                currentArt.style.display = 'none';
+            }
+            
+            document.getElementById('now-playing-info').style.display = 'flex';
 
             audioPlayer.src = song.url;
             audioPlayer.play();

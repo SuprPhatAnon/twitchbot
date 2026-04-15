@@ -25,10 +25,10 @@ public interface SongPlayRepository extends JpaRepository<SongPlay, Long> {
      * @param since The start date/time for the statistics.
      * @return A list of {@link SongStatsDTO} with song names and their play counts.
      */
-    @Query("SELECT new dev.phatanon.dto.SongStatsDTO(s.name, s.artist, COUNT(sp)) " +
+    @Query("SELECT new dev.phatanon.dto.SongStatsDTO(s.name, s.artist, s.coverArt, COUNT(sp)) " +
            "FROM SongPlay sp JOIN sp.song s " +
            "WHERE sp.timestamp >= :since " +
-           "GROUP BY s.name, s.artist " +
+           "GROUP BY s.name, s.artist, s.coverArt " +
            "ORDER BY COUNT(sp) DESC")
     List<SongStatsDTO> getStatsBySong(@Param("since") LocalDateTime since);
 

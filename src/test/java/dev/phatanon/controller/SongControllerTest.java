@@ -7,6 +7,7 @@ import dev.phatanon.entity.SongPlay;
 import dev.phatanon.repository.SongPlayRepository;
 import dev.phatanon.repository.SongRepository;
 import dev.phatanon.repository.TwitchConfigRepository;
+import dev.phatanon.service.SongService;
 import dev.phatanon.service.TwitchBotService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,6 +48,9 @@ public class SongControllerTest {
 
     @Mock
     private SimpMessagingTemplate messagingTemplate;
+
+    @Mock
+    private SongService songService;
 
     @InjectMocks
     private SongController songController;

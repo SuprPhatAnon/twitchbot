@@ -25,18 +25,32 @@
             border-radius: 5px;
             display: none;
             border-left: 5px solid #6441a5; /* Twitch Purple */
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        #song-art {
+            width: 80px;
+            height: 80px;
+            object-fit: cover;
+            border-radius: 4px;
+            display: none;
         }
     </style>
 </head>
 <body>
     <div id="song-display">
-        Now Playing: <span id="song-title"></span>
+        <img id="song-art" src="" alt="Album Art">
+        <div>
+            Now Playing: <span id="song-title"></span>
+        </div>
     </div>
     <audio id="audio-player"></audio>
 
     <script>
         const songDisplay = document.getElementById('song-display');
         const songTitle = document.getElementById('song-title');
+        const songArt = document.getElementById('song-art');
         const audioPlayer = document.getElementById('audio-player');
 
         let stompClient = null;
@@ -57,6 +71,8 @@
                     if (!song) {
                         songDisplay.style.display = 'none';
                         songTitle.innerText = '';
+                        songArt.src = '';
+                        songArt.style.display = 'none';
                         audioPlayer.pause();
                         audioPlayer.src = '';
                     }
@@ -69,7 +85,14 @@
 
         function playSong(song) {
             songTitle.innerText = song.name + ' - ' + song.artist;
-            songDisplay.style.display = 'block';
+            if (song.coverArt) {
+                songArt.src = song.coverArt;
+                songArt.style.display = 'block';
+            } else {
+                songArt.src = '';
+                songArt.style.display = 'none';
+            }
+            songDisplay.style.display = 'flex';
             audioPlayer.src = song.url;
             audioPlayer.play();
 

@@ -19,30 +19,62 @@ minikube start
 minikube addons enable ingress
 ```
 
-### 2. Build the Docker Image
+### 2. Build and Manage the Docker Image
 
-You need to build the Docker image and make it available to the Minikube cluster. The easiest way is to use Minikube's built-in Docker daemon:
+Minikube has its own internal Docker repository. You must make the image available to the cluster.
+
+#### Option A: Build Directly in Minikube (Recommended)
+
+Point your shell's Docker CLI to Minikube's built-in Docker daemon. This builds the image directly into Minikube's repository:
 
 ```bash
 # Point your shell to use minikube's docker daemon
 eval $(minikube docker-env)
 
-# Build the image
+# Build the image directly into minikube
 docker build -t twitchbot-app:latest .
 ```
 
-Alternatively, if you build the image locally with your system's Docker, you can load it into Minikube:
+#### Option B: Load from Local Docker Repository
+
+If you built the image using your system's Docker daemon, you can "push" (load) it into Minikube's repository:
 
 ```bash
+# Build the image locally (on your host)
 docker build -t twitchbot-app:latest .
+
+# Load (push) the image into minikube's repository
 minikube image load twitchbot-app:latest
 ```
+
+You can verify the image is in the repository with:
+```bash
+minikube image ls | grep twitchbot-app
+```
+
+#### Using an External Registry (Docker Hub, etc.)
+
+Alternatively, you can push your image to a registry and update the deployment manifest.
+
+1.  **Push to a registry:**
+    ```bash
+    docker build -t your-username/twitchbot-app:latest .
+    docker push your-username/twitchbot-app:latest
+    ```
+2.  **Update Kustomize:**
+    In `base/kustomization.yaml`, add an image override:
+    ```yaml
+    images:
+      - name: twitchbot-app
+        newName: your-username/twitchbot-app
+        newTag: latest
+    ```
 
 ### 3. Configure Secrets
 
 The application requires some configuration for database passwords and API keys. These are managed via Kustomize in `k8s/base/kustomization.yaml`.
 
-Open `k8s/base/kustomization.yaml` and update the `secretGenerator` values as needed.
+Open `base/kustomization.yaml` and update the `secretGenerator` values as needed.
 
 ```yaml
 secretGenerator:
@@ -56,10 +88,10 @@ secretGenerator:
 
 ### 4. Deploy to Kubernetes
 
-Apply the Kustomize manifests to your cluster:
+Apply the Kustomize manifests using the `minikube` overlay:
 
 ```bash
-kubectl apply -k k8s/base/
+kubectl apply -k overlays/minikube/
 ```
 
 This will create a `streaming` namespace and deploy MariaDB and the Twitch Bot application.

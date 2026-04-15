@@ -6,13 +6,18 @@ This package contains Kubernetes manifests for the Twitch Bot application, based
 
 ```text
 k8s/
-└── base/
-    ├── app/
-    │   ├── app.yaml             # Deployment and Service for the Spring Boot app
-    │   └── ingress.yaml         # Ingress resource for the app
-    ├── mariadb/
-    │   └── mariadb.yaml         # Deployment, Service, and PVC for MariaDB
-    └── kustomization.yaml       # Kustomize base configuration (ConfigMaps & Secrets)
+├── base/
+│   ├── app/
+│   │   ├── app.yaml             # Deployment and Service for the Spring Boot app
+│   │   └── ingress.yaml         # Ingress resource for the app
+│   ├── mariadb/
+│   │   └── mariadb.yaml         # Deployment, Service, and PVC for MariaDB
+│   ├── kustomization.yaml       # Kustomize base configuration
+│   └── namespace.yaml           # Namespace definition
+└── overlays/
+    ├── production/              # Base configuration for standard Kubernetes
+    ├── minikube/                # Overlays for local Minikube development
+    └── k3s/                     # Overlays for k3s clusters (Traefik ingress)
 ```
 
 ## Deployment
@@ -23,10 +28,21 @@ To deploy the application to your Kubernetes cluster:
     Open `k8s/base/kustomization.yaml` and update the `secretGenerator` literals with your actual Twitch API credentials and desired database password.
 
 2.  **Apply Manifests:**
-    Using `kubectl`, apply the kustomization:
+    Choose the overlay that matches your environment and use `kubectl` to apply it.
 
+    **For standard Kubernetes (Production):**
     ```bash
-    kubectl apply -k k8s/base/
+    kubectl apply -k k8s/overlays/production/
+    ```
+
+    **For Minikube:**
+    ```bash
+    kubectl apply -k k8s/overlays/minikube/
+    ```
+
+    **For k3s:**
+    ```bash
+    kubectl apply -k k8s/overlays/k3s/
     ```
 
 ## Key Features
@@ -41,4 +57,9 @@ To deploy the application to your Kubernetes cluster:
 - **Docker Images:** The deployment manifests use placeholder image tags (e.g., `twitchbot-app:latest`). Ensure you build and push these images to your registry and update the image names in the YAML files or via Kustomize overlays.
 - **Resources:** Default resource requests/limits are not set; consider adding them based on your cluster's capacity.
 - **Ingress:** This package includes an Ingress resource configured for `stream.phat.wtf`. Ensure you have an Ingress controller (e.g., NGINX) installed.
-- **Minikube:** For local testing with Minikube, see the [Minikube Deployment Guide](../MINIKUBE.md).
+- **Minikube:** For local testing with Minikube, see the [Minikube Deployment Guide](MINIKUBE.md).
+
+## Specific Guides
+
+- [Minikube Deployment Guide](MINIKUBE.md)
+- [k3s Deployment Guide](K3S.md)

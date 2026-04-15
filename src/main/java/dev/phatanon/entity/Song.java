@@ -21,6 +21,7 @@ public class Song {
     private String sortName;
     private String artist;
     private String url;
+    private String coverArt;
 
     @jakarta.persistence.PrePersist
     @jakarta.persistence.PreUpdate
@@ -118,6 +119,14 @@ public class Song {
 
     public void setUrl(String url) {
         this.url = url;
+    }
+
+    public String getCoverArt() {
+        return coverArt;
+    }
+
+    public void setCoverArt(String coverArt) {
+        this.coverArt = coverArt;
     }
 
     public java.util.Set<Redeem> getRedeems() {

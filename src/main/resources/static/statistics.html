@@ -175,7 +175,7 @@
             // Set Headers
             headerRow.innerHTML = '';
             if (groupBy === 'song') {
-                headerRow.innerHTML = '<th>Song</th><th>Artist</th><th>Plays</th>';
+                headerRow.innerHTML = '<th>Art</th><th>Song</th><th>Artist</th><th>Plays</th>';
             } else {
                 headerRow.innerHTML = '<th>Artist</th><th>Plays</th>';
             }
@@ -188,7 +188,8 @@
                 stats.forEach(item => {
                     const tr = document.createElement('tr');
                     if (groupBy === 'song') {
-                        tr.innerHTML = `<td>${item.name}</td><td>${item.artist}</td><td>${item.playCount}</td>`;
+                        const artImg = item.coverArt ? `<img src="${item.coverArt}" alt="Art" style="width: 30px; height: 30px; object-fit: cover; border-radius: 2px;">` : '';
+                        tr.innerHTML = `<td>${artImg}</td><td>${item.name}</td><td>${item.artist}</td><td>${item.playCount}</td>`;
                     } else {
                         tr.innerHTML = `<td>${item.artist}</td><td>${item.playCount}</td>`;
                     }

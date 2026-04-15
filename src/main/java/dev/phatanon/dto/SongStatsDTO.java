@@ -7,12 +7,18 @@ package dev.phatanon.dto;
 public class SongStatsDTO {
     private String name;
     private String artist;
+    private String coverArt;
     private long playCount;
 
-    public SongStatsDTO(String name, String artist, long playCount) {
+    public SongStatsDTO(String name, String artist, String coverArt, long playCount) {
         this.name = name;
         this.artist = artist;
+        this.coverArt = coverArt;
         this.playCount = playCount;
+    }
+
+    public SongStatsDTO(String name, String artist, long playCount) {
+        this(name, artist, null, playCount);
     }
 
     public String getName() {
@@ -29,6 +35,14 @@ public class SongStatsDTO {
 
     public void setArtist(String artist) {
         this.artist = artist;
+    }
+
+    public String getCoverArt() {
+        return coverArt;
+    }
+
+    public void setCoverArt(String coverArt) {
+        this.coverArt = coverArt;
     }
 
     public long getPlayCount() {

@@ -61,7 +61,8 @@ The database is managed by Hibernate/JPA. Key tables:
 ## Common Development Tasks
 
 ### General Requirements
-- **Always keep documentation updated**: If you change functionality, update `README.md`, `AGENTS.md`, and any relevant K8s/Docker documentation.
+- **Always keep documentation updated**: If you change functionality, update `README.md`, `AGENTS.md`, and any relevant K8s/Docker documentation (including `k8s/K3S.md` and `k8s/MINIKUBE.md`).
+- **Maintain Kubernetes Configurations**: Keep all Kubernetes deployment files in the `k8s/` directory (including `base` and `overlays` for production, minikube, and k3s) up-to-date with any changes in the application's infrastructure or configuration requirements.
 - **Maintain OpenAPI documentation**: Ensure SpringDoc/OpenAPI annotations in controllers are accurate and up-to-date.
 - **Update Javadocs**: Provide or update Javadocs for new or modified public classes and methods.
 
@@ -93,4 +94,7 @@ The database is managed by Hibernate/JPA. Key tables:
 
 - Use the `CODE` mode for most tasks.
 - When investigating issues, check `src/main/resources/application.yml` for default configurations.
-- K8s configurations are available in the `k8s/` directory for deployment-related tasks.
+- K8s configurations are available in the `k8s/` directory. You MUST keep these (including `base` and `overlays` for production, minikube, and k3s) updated with any infrastructure changes.
+- For detailed deployment instructions on specific Kubernetes distributions, refer to:
+  - `k8s/K3S.md`: Guide for deploying to a k3s cluster.
+  - `k8s/MINIKUBE.md`: Guide for local deployment using Minikube.

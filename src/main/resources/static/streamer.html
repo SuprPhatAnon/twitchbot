@@ -154,6 +154,7 @@
                             <thead class="table-light">
                                 <tr>
                                     <th>ID</th>
+                                    <th>Art</th>
                                     <th>Name</th>
                                     <th>Artist</th>
                                     <th>Plays</th>
@@ -357,8 +358,10 @@
                 songs.forEach(song => {
                     const tr = document.createElement('tr');
                     const redeemTitles = song.redeems.map(r => r.title).join(', ');
+                    const artImg = song.coverArt ? `<img src="${song.coverArt}" alt="Art" style="width: 30px; height: 30px; object-fit: cover; border-radius: 2px;">` : '';
                     tr.innerHTML = `
                         <td>${song.id}</td>
+                        <td>${artImg}</td>
                         <td>${song.name}</td>
                         <td>${song.artist}</td>
                         <td><span class="badge bg-light text-dark">${song.playCount || 0}</span></td>
@@ -388,10 +391,12 @@
             topSongs.forEach((song, index) => {
                 if ((song.playCount || 0) === 0) return;
                 const div = document.createElement('div');
-                div.className = 'stat-card';
+                div.className = 'stat-card d-flex align-items-center gap-2';
+                const artImg = song.coverArt ? `<img src="${song.coverArt}" alt="Art" style="width: 40px; height: 40px; object-fit: cover; border-radius: 4px;">` : '<div style="width: 40px; height: 40px; background: #eee; border-radius: 4px;"></div>';
                 div.innerHTML = `
                     <span class="stat-rank">#${index + 1}</span>
-                    <span class="stat-title">${song.name}</span>
+                    ${artImg}
+                    <span class="stat-title" style="flex: 1">${song.name}</span>
                     <span class="stat-count">${song.playCount} plays</span>
                 `;
                 statsEl.appendChild(div);
@@ -417,11 +422,13 @@
 
                 plays.forEach(play => {
                     const div = document.createElement('div');
-                    div.className = 'stat-card';
+                    div.className = 'stat-card d-flex align-items-center gap-2';
                     const time = new Date(play.timestamp).toLocaleTimeString();
+                    const artImg = play.song.coverArt ? `<img src="${play.song.coverArt}" alt="Art" style="width: 40px; height: 40px; object-fit: cover; border-radius: 4px;">` : '<div style="width: 40px; height: 40px; background: #eee; border-radius: 4px;"></div>';
                     div.innerHTML = `
                         <span class="stat-rank">${time}</span>
-                        <span class="stat-title">${play.song.name}</span>
+                        ${artImg}
+                        <span class="stat-title" style="flex: 1">${play.song.name}</span>
                         <span class="stat-count">${play.source}</span>
                     `;
                     statsEl.appendChild(div);

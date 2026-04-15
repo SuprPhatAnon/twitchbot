@@ -173,6 +173,7 @@
                             <thead class="table-light">
                                 <tr>
                                     <th>ID</th>
+                                    <th>Art</th>
                                     <th>Name</th>
                                     <th>Artist</th>
                                     <th>Plays</th>
@@ -475,8 +476,10 @@
                 songs.forEach(song => {
                     const tr = document.createElement('tr');
                     const redeemTitles = song.redeems.map(r => r.title).join(', ');
+                    const artImg = song.coverArt ? `<img src="${song.coverArt}" alt="Art" style="width: 30px; height: 30px; object-fit: cover; border-radius: 2px;">` : '';
                     tr.innerHTML = `
                         <td>${song.id}</td>
+                        <td>${artImg}</td>
                         <td>${song.name}</td>
                         <td>${song.artist}</td>
                         <td><span class="badge bg-light text-dark">${song.playCount || 0}</span></td>
@@ -524,14 +527,18 @@
 
                 plays.forEach(play => {
                     const div = document.createElement('div');
-                    div.className = 'redeem-entry';
+                    div.className = 'redeem-entry d-flex align-items-center gap-2';
                     const time = new Date(play.timestamp).toLocaleTimeString();
+                    const artImg = play.song.coverArt ? `<img src="${play.song.coverArt}" alt="Art" style="width: 40px; height: 40px; object-fit: cover; border-radius: 4px;">` : '<div style="width: 40px; height: 40px; background: #eee; border-radius: 4px;"></div>';
                     div.innerHTML = `
-                        <div class="redeem-time">${time}</div>
-                        <div>
-                            <span class="redeem-user">${play.song.name}</span>
-                            <span class="text-muted small">via</span>
-                            <span class="redeem-reward">${play.source}</span>
+                        ${artImg}
+                        <div style="flex: 1">
+                            <div class="redeem-time">${time}</div>
+                            <div>
+                                <span class="redeem-user">${play.song.name}</span>
+                                <span class="text-muted small">via</span>
+                                <span class="redeem-reward">${play.source}</span>
+                            </div>
                         </div>
                     `;
                     container.appendChild(div);

@@ -9,6 +9,7 @@ import com.github.twitch4j.auth.domain.TwitchScopes;
 import com.github.twitch4j.auth.providers.TwitchIdentityProvider;
 import com.github.twitch4j.TwitchClientBuilder;
 import com.github.twitch4j.chat.events.ChatConnectionStateEvent;
+import com.github.twitch4j.client.websocket.domain.WebsocketConnectionState;
 import com.github.twitch4j.common.events.domain.EventChannel;
 import com.github.twitch4j.events.ChannelGoLiveEvent;
 import com.github.twitch4j.events.ChannelGoOfflineEvent;
@@ -155,7 +156,7 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
      */
     public synchronized boolean isTwitchConnected() {
         return twitchClient != null && 
-               twitchClient.getChat().getConnectionState().name().equals("CONNECTED");
+               twitchClient.getChat().getState() == WebsocketConnectionState.CONNECTED;
     }
 
     /**

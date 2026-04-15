@@ -53,9 +53,17 @@ This application listens for Twitch Channel Point redemptions and plays a random
    ```
    This will start MariaDB and the Twitch Bot application.
 
+## Running on Kubernetes
+
+For general instructions on how to deploy the application to a Kubernetes cluster, see the [Kubernetes Deployment Guide](k8s/README.md).
+
 ## Running on Minikube
 
-For instructions on how to deploy the application to a local Minikube cluster, see the [Minikube Deployment Guide](MINIKUBE.md).
+For instructions on how to deploy the application to a local Minikube cluster using specific overlays, see the [Minikube Deployment Guide](k8s/MINIKUBE.md).
+
+## Running on k3s
+
+For instructions on how to deploy the application to a k3s cluster using specific overlays and configure an Apache2 proxy to access multiple clusters, see the [k3s Deployment Guide](k8s/K3S.md).
 
 ## Configuration and Usage
 

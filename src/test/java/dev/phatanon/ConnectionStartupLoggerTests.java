@@ -1,5 +1,7 @@
 package dev.phatanon;
 
+import dev.phatanon.repository.SongRepository;
+import dev.phatanon.service.SongService;
 import dev.phatanon.service.TwitchBotService;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -48,7 +50,9 @@ class ConnectionStartupLoggerTests {
                     .thenThrow(new RuntimeException("Connection refused"));
             
             // Act
-            ConnectionStartupLogger logger = new ConnectionStartupLogger(jdbcTemplate, twitchBotService);
+            SongRepository songRepository = mock(SongRepository.class);
+            SongService songService = mock(SongService.class);
+            ConnectionStartupLogger logger = new ConnectionStartupLogger(jdbcTemplate, twitchBotService, songRepository, songService);
             ReflectionTestUtils.setField(logger, "buildId", "test-build-id");
             logger.run();
 
