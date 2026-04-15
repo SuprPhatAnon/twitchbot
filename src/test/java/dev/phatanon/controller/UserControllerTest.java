@@ -140,4 +140,15 @@ class UserControllerTest {
 
         verify(userService).deleteUser(1L);
     }
+    @Test
+    void rotateApiKey_ReturnsUserWithNewKey() throws Exception {
+        User user = new User("admin", "pass", Set.of(Role.ROLE_ADMIN));
+        user.setApiKey("new-api-key");
+        when(userService.rotateApiKey("admin")).thenReturn(user);
+
+        mockMvc.perform(post("/api/users/me/rotate-api-key"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.username", is("admin")))
+                .andExpect(jsonPath("$.apiKey", is("new-api-key")));
+    }
 }
