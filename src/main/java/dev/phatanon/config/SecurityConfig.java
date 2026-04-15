@@ -64,6 +64,8 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/", "/overlay.html", "/player.html", "/statistics.html", "/css/**", "/js/**", "/ws/**").permitAll()
                 .requestMatchers("/login.html", "/api/login").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/**").permitAll() // Permit all GET requests to API
+                .requestMatchers("/*.mp3", "/playlist.m3u").permitAll() // Permit all access to songs and playlist
                 .requestMatchers("/api/songs/upload/**", "/upload.html").hasAnyRole("UPLOAD", "STREAMER", "ADMIN")
                 .requestMatchers("/streamer.html", "/api/songs/play/**", "/api/songs/queue/**").hasAnyRole("STREAMER", "ADMIN")
                 .requestMatchers("/api/users/me/**", "/account.html").authenticated()

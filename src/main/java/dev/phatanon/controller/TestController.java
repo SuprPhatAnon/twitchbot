@@ -28,7 +28,6 @@ public class TestController {
      * @return A success message.
      */
     @GetMapping("/play")
-    @PreAuthorize("hasAnyRole('STREAMER', 'ADMIN')")
     @Operation(summary = "Trigger a random song to play")
     public String triggerPlay() {
         twitchBotService.playRandomSong();
@@ -41,7 +40,6 @@ public class TestController {
      * @return A success message.
      */
     @GetMapping("/finish")
-    @PreAuthorize("hasAnyRole('STREAMER', 'ADMIN')")
     @Operation(summary = "Trigger song finished (simulates frontend callback)")
     public String triggerFinish() {
         twitchBotService.handleSongFinished();

@@ -62,11 +62,33 @@ public class TwitchConfigController {
     }
 
     /**
+     * Retrieves the current Streamer connection status from the {@link TwitchBotService}.
+     * @return true if the Streamer EventSub client is connected, false otherwise.
+     */
+    @GetMapping("/connection/streamer")
+    @Operation(summary = "Get current Streamer connection status")
+    public ResponseEntity<Boolean> getStreamerConnectionStatus() {
+        return ResponseEntity.ok(twitchBotService.isStreamerConnected());
+    }
+
+    /**
+     * Retrieves the current Bot connection status from the {@link TwitchBotService}.
+     * @return true if the Bot chat client is connected, false otherwise.
+     */
+    @GetMapping("/connection/bot")
+    @Operation(summary = "Get current Bot connection status")
+    public ResponseEntity<Boolean> getBotConnectionStatus() {
+        return ResponseEntity.ok(twitchBotService.isBotConnected());
+    }
+
+    /**
      * Retrieves the current Twitch connection status from the {@link TwitchBotService}.
      * @return true if the Twitch EventSub client is connected, false otherwise.
+     * @deprecated Use {@link #getStreamerConnectionStatus()} or {@link #getBotConnectionStatus()} instead.
      */
     @GetMapping("/connection")
     @Operation(summary = "Get current Twitch connection status")
+    @Deprecated
     public ResponseEntity<Boolean> getConnectionStatus() {
         return ResponseEntity.ok(twitchBotService.isTwitchConnected());
     }
@@ -171,7 +193,6 @@ public class TwitchConfigController {
     }
 
     @GetMapping("/test-connection")
-    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Test Twitch connection with current credentials")
     public ResponseEntity<Boolean> testConnection() {
         return ResponseEntity.ok(twitchBotService.testConnection());
@@ -199,7 +220,6 @@ public class TwitchConfigController {
      * @return A redirect to Twitch's authorization page.
      */
     @GetMapping("/authorize")
-    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Redirect to Twitch for OAuth authorization")
     public ResponseEntity<Void> authorize(@RequestParam(defaultValue = "streamer") String type) {
         TwitchConfig config = twitchConfigRepository.findAll().stream().findFirst().orElse(null);

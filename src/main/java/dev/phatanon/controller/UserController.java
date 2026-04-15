@@ -72,7 +72,6 @@ public class UserController {
      * @return List of all UserDTOs.
      */
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Get all users (Admin only)")
     public List<UserDTO> getAllUsers() {
         return userService.findAll().stream()

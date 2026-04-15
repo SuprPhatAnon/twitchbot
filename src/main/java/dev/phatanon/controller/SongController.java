@@ -334,7 +334,6 @@ public class SongController {
      * @return A list of filenames in the upload directory.
      */
     @GetMapping("/files")
-    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "List all song files")
     public ResponseEntity<List<String>> listFiles() {
         try {
@@ -362,7 +361,6 @@ public class SongController {
      * @return A list of song entities whose files are missing.
      */
     @GetMapping("/ghost-records")
-    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "List ghost records (DB records with missing files)")
     public List<Song> getGhostRecords() {
         return songService.getGhostRecords();

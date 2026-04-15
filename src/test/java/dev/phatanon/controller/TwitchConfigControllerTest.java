@@ -48,6 +48,20 @@ class TwitchConfigControllerTest {
     }
 
     @Test
+    void getStreamerConnectionStatus_ReturnsStatus() {
+        when(twitchBotService.isStreamerConnected()).thenReturn(true);
+        ResponseEntity<Boolean> response = twitchConfigController.getStreamerConnectionStatus();
+        assertTrue(response.getBody());
+    }
+
+    @Test
+    void getBotConnectionStatus_ReturnsStatus() {
+        when(twitchBotService.isBotConnected()).thenReturn(true);
+        ResponseEntity<Boolean> response = twitchConfigController.getBotConnectionStatus();
+        assertTrue(response.getBody());
+    }
+
+    @Test
     void getConnectionStatus_ReturnsStatus() {
         when(twitchBotService.isTwitchConnected()).thenReturn(true);
         ResponseEntity<Boolean> response = twitchConfigController.getConnectionStatus();
@@ -196,5 +210,12 @@ class TwitchConfigControllerTest {
         assertEquals(302, response.getStatusCode().value());
         String location = response.getHeaders().getLocation().toString();
         assertTrue(location.contains("state=bot"));
+    }
+
+    @Test
+    void callback_HandlesNullConfig() {
+        when(twitchConfigRepository.findAll()).thenReturn(List.of());
+        ResponseEntity<Void> response = twitchConfigController.callback("code", "state");
+        assertEquals(500, response.getStatusCode().value());
     }
 }

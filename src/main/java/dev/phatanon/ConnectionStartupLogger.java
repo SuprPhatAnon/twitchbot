@@ -29,9 +29,23 @@ public class ConnectionStartupLogger implements CommandLineRunner {
      */
     public interface ITwitchBotService {
         /**
-         * Checks if the Twitch EventSub connection is active.
+         * Checks if the streamer's EventSub connection is active.
          * @return true if connected, false otherwise
          */
+        boolean isStreamerConnected();
+
+        /**
+         * Checks if the bot's chat client is active.
+         * @return true if connected, false otherwise
+         */
+        boolean isBotConnected();
+
+        /**
+         * Checks if the Twitch EventSub connection is active.
+         * @return true if connected, false otherwise
+         * @deprecated Use {@link #isStreamerConnected()} or {@link #isBotConnected()} instead.
+         */
+        @Deprecated
         boolean isTwitchConnected();
     }
 
@@ -100,13 +114,26 @@ public class ConnectionStartupLogger implements CommandLineRunner {
     private void checkTwitchConnection() {
         try {
             logger.info("Verifying Twitch connection status...");
-            if (twitchBotService.isTwitchConnected()) {
-                logger.info("✅ Successfully connected to Twitch EventSub.");
+            boolean streamerConnected = twitchBotService.isStreamerConnected();
+            boolean botConnected = twitchBotService.isBotConnected();
+            
+            if (streamerConnected) {
+                logger.info("✅ Streamer EventSub: Connected.");
             } else {
-                logger.warn("⚠️ Twitch EventSub not yet connected (it may still be connecting in the background).");
+                logger.warn("⚠️ Streamer EventSub: Not yet connected.");
+            }
+            
+            if (botConnected) {
+                logger.info("✅ Bot Chat: Connected.");
+            } else {
+                logger.warn("⚠️ Bot Chat: Not yet connected.");
+            }
+            
+            if (!streamerConnected || !botConnected) {
+                logger.info("Advice: Check Twitch credentials in the Admin UI and ensure the application can reach Twitch API/WebSocket endpoints.");
             }
         } catch (Exception e) {
-            logger.error("❌ Error checking Twitch connection: {}", e.getMessage());
+            logger.error("❌ Error checking Twitch connection: {}", e.getMessage(), e);
         }
     }
 

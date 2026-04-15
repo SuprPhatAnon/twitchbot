@@ -147,6 +147,8 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
         messagingTemplate.convertAndSend("/topic/songs", "refresh");
     }
     private boolean isStreamOnline = false;
+    private boolean isStreamerConnected = false;
+    private boolean isBotConnected = false;
     private final AtomicBoolean greetingSentThisSession = new AtomicBoolean(false);
 
     private final Random random = new Random();
@@ -195,12 +197,29 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
     }
 
     /**
-     * Checks if the Twitch EventSub client is connected.
+     * Checks if the streamer's EventSub client is connected.
      * @return true if connected, false otherwise
      */
+    public synchronized boolean isStreamerConnected() {
+        return isStreamerConnected;
+    }
+
+    /**
+     * Checks if the bot's chat client is connected.
+     * @return true if connected, false otherwise
+     */
+    public synchronized boolean isBotConnected() {
+        return isBotConnected;
+    }
+
+    /**
+     * Checks if the Twitch EventSub client is connected.
+     * @return true if connected, false otherwise
+     * @deprecated Use {@link #isStreamerConnected()} or {@link #isBotConnected()} instead.
+     */
+    @Deprecated
     public synchronized boolean isTwitchConnected() {
-        return twitchClient != null && 
-               twitchClient.getEventSocket() != null;
+        return isStreamerConnected();
     }
 
     /**
@@ -220,6 +239,8 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
      */
     public synchronized void reconnect() {
         log.info("Reconnection requested. Closing existing Twitch client...");
+        isStreamerConnected = false;
+        isBotConnected = false;
         if (twitchClient != null) {
             try {
                 twitchClient.close();
@@ -242,6 +263,8 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
     @PostConstruct
     public void init() {
         try {
+            isStreamerConnected = false;
+            isBotConnected = false;
             log.info("Checking for existing Twitch configuration...");
             List<TwitchConfig> configs = twitchConfigRepository.findAll();
             if (configs.isEmpty()) {
@@ -264,6 +287,9 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
             currentSongDelaySeconds = config.getSongDelaySeconds() > 0 ? config.getSongDelaySeconds() : defaultSongDelaySeconds;
 
             log.info("Attempting to initialize Twitch bot for channel: {}", currentChannelName);
+            log.info("Client ID: {}", config.getClientId() != null ? config.getClientId().substring(0, Math.min(config.getClientId().length(), 4)) + "..." : "null");
+            log.info("Has Streamer Access Token: {}", config.getAccessToken() != null && !config.getAccessToken().isBlank());
+            log.info("Has Bot Access Token: {}", config.getBotAccessToken() != null && !config.getBotAccessToken().isBlank());
             
             CredentialManager credentialManager = CredentialManagerBuilder.builder().build();
             TwitchIdentityProvider identityProvider = new TwitchIdentityProvider(config.getClientId(), config.getClientSecret(), null);
@@ -296,14 +322,17 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
                     .withClientId(config.getClientId())
                     .withClientSecret(config.getClientSecret())
                     .withCredentialManager(credentialManager)
-                    .withEnableChat(false)
+                    .withEnableChat(true) // Ensure Chat is enabled if we want listeners
                     .withEnableEventSocket(true)
                     .withEnableHelix(true)
                     .withDefaultAuthToken(streamerCredential)
                     .withChatAccount(botCredential);
 
             if (twitchClient == null) {
+                log.info("Creating new TwitchClient instance...");
                 twitchClient = builder.build();
+            } else {
+                log.info("TwitchClient instance already exists, but re-init was called.");
             }
             log.info("TwitchClient built successfully.");
 
@@ -351,26 +380,54 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
     private void registerEventListeners() {
         log.info("Registering connection state listeners...");
         twitchClient.getEventManager().onEvent(EventSocketConnectionStateEvent.class, event -> {
-            log.info("EventSub Socket Connection State Change: {} -> {}", event.getPreviousState(), event.getState());
-            messagingTemplate.convertAndSend("/topic/connection-status", event.getState().name().equals("CONNECTED"));
+            log.info("EventSub Socket Connection State Change (Streamer): {} -> {}", event.getPreviousState(), event.getState());
+            isStreamerConnected = event.getState() == WebsocketConnectionState.CONNECTED;
+            if (event.getState() == WebsocketConnectionState.DISCONNECTED || event.getState() == WebsocketConnectionState.LOST) {
+                log.warn("EventSub Socket disconnected! Reason: {}", event.getPreviousState());
+            }
+            messagingTemplate.convertAndSend("/topic/streamer-connection-status", isStreamerConnected);
         });
 
-        log.info("Fetching channel ID for {}...", currentChannelName);
-        broadcasterId = twitchClient.getHelix().getUsers(currentAccessToken, null, List.of(currentChannelName)).execute().getUsers().get(0).getId();
-        log.info("Channel ID for {}: {}", currentChannelName, broadcasterId);
+        twitchClient.getEventManager().onEvent(ChatConnectionStateEvent.class, event -> {
+            log.info("Chat Connection State Change (Bot): {} -> {}", event.getPreviousState(), event.getState());
+            isBotConnected = event.getState() == WebsocketConnectionState.CONNECTED;
+            if (!isBotConnected && (event.getState() == WebsocketConnectionState.DISCONNECTED || event.getState() == WebsocketConnectionState.LOST)) {
+                log.warn("Chat connection lost!");
+            }
+            messagingTemplate.convertAndSend("/topic/bot-connection-status", isBotConnected);
+        });
 
-        log.info("Fetching bot user ID...");
-        botUserId = twitchClient.getHelix().getUsers(currentBotAccessToken != null && !currentBotAccessToken.isBlank() ? currentBotAccessToken : currentAccessToken, null, null).execute().getUsers().get(0).getId();
-        log.info("Bot User ID: {}", botUserId);
+        try {
+            log.info("Fetching channel ID for {} using Helix...", currentChannelName);
+            UserList userList = twitchClient.getHelix().getUsers(currentAccessToken, null, List.of(currentChannelName)).execute();
+            if (userList.getUsers().isEmpty()) {
+                log.error("Could not find Twitch user for channel name: {}", currentChannelName);
+                return;
+            }
+            broadcasterId = userList.getUsers().get(0).getId();
+            log.info("Channel ID for {}: {}", currentChannelName, broadcasterId);
 
-        // Check initial stream status
-        log.info("Checking initial stream status...");
-        StreamList streamList = twitchClient.getHelix().getStreams(currentAccessToken, null, null, 1, null, null, List.of(broadcasterId), null).execute();
-        isStreamOnline = !streamList.getStreams().isEmpty();
-        log.info("Initial stream status for {}: {}", currentChannelName, isStreamOnline ? "ONLINE" : "OFFLINE");
+            log.info("Fetching bot user ID using Helix...");
+            String botToken = currentBotAccessToken != null && !currentBotAccessToken.isBlank() ? currentBotAccessToken : currentAccessToken;
+            UserList botUserList = twitchClient.getHelix().getUsers(botToken, null, null).execute();
+            if (botUserList.getUsers().isEmpty()) {
+                log.error("Could not find Twitch user for bot token.");
+            } else {
+                botUserId = botUserList.getUsers().get(0).getId();
+                log.info("Bot User ID: {}", botUserId);
+            }
 
-        if (isStreamOnline) {
-            scheduleThumboGreeting();
+            // Check initial stream status
+            log.info("Checking initial stream status for broadcasterId {}...", broadcasterId);
+            StreamList streamList = twitchClient.getHelix().getStreams(currentAccessToken, null, null, 1, null, null, List.of(broadcasterId), null).execute();
+            isStreamOnline = !streamList.getStreams().isEmpty();
+            log.info("Initial stream status for {}: {}", currentChannelName, isStreamOnline ? "ONLINE" : "OFFLINE");
+
+            if (isStreamOnline) {
+                scheduleThumboGreeting();
+            }
+        } catch (Exception e) {
+            log.error("Error during Helix API calls in registerEventListeners: {}", e.getMessage(), e);
         }
 
         twitchClient.getEventManager().onEvent(CustomRewardRedemptionAddEvent.class, event -> {
@@ -697,14 +754,26 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
      * @return true if credentials are valid, false otherwise.
      */
     public boolean testConnection() {
+        log.info("Testing Twitch connection for channel: {}...", currentChannelName);
         try {
             if (twitchClient == null) {
+                log.info("Twitch client is null, initializing...");
                 init();
             }
+            if (twitchClient == null) {
+                log.error("Twitch client still null after initialization.");
+                return false;
+            }
+            log.info("Executing Helix getUsers call for channel: {}...", currentChannelName);
             UserList userList = twitchClient.getHelix().getUsers(currentAccessToken, null, List.of(currentChannelName)).execute();
-            return !userList.getUsers().isEmpty();
+            if (userList.getUsers().isEmpty()) {
+                log.warn("Twitch connection test: No user found for channel: {}", currentChannelName);
+                return false;
+            }
+            log.info("Twitch connection test successful. User ID: {}", userList.getUsers().get(0).getId());
+            return true;
         } catch (Exception e) {
-            log.error("Twitch connection test failed: {}", e.getMessage());
+            log.error("Twitch connection test failed: {}", e.getMessage(), e);
             return false;
         }
     }

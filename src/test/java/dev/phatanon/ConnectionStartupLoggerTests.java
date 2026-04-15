@@ -44,8 +44,10 @@ class ConnectionStartupLoggerTests {
         void testMariaDBConnectionFailure(CapturedOutput output) {
             // Arrange
             JdbcOperations jdbcTemplate = mock(JdbcOperations.class);
-            // Using a simple lambda to mock the service behavior without ByteBuddy issues on the class
-            ConnectionStartupLogger.ITwitchBotService twitchBotService = () -> false;
+            // Using a mock to handle multiple methods in the interface
+            ConnectionStartupLogger.ITwitchBotService twitchBotService = mock(ConnectionStartupLogger.ITwitchBotService.class);
+            when(twitchBotService.isStreamerConnected()).thenReturn(false);
+            when(twitchBotService.isBotConnected()).thenReturn(false);
             
             when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class)))
                     .thenThrow(new RuntimeException("Connection refused"));

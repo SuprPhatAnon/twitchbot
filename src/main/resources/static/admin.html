@@ -87,8 +87,12 @@
                 <span id="stat-stream" class="status-value status-offline">OFFLINE</span>
             </div>
             <div class="status-item">
-                <span class="status-label">Twitch:</span>
-                <span id="stat-twitch" class="status-value status-offline">DISCONNECTED</span>
+                <span class="status-label">Streamer:</span>
+                <span id="stat-streamer" class="status-value status-offline">DISCONNECTED</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Bot:</span>
+                <span id="stat-bot" class="status-value status-offline">DISCONNECTED</span>
             </div>
             <div class="status-item">
                 <span class="status-label">Queue:</span>
@@ -422,8 +426,11 @@
                 stompClient.subscribe('/topic/stream-status', function (response) {
                     updateStreamStatusDisplay(JSON.parse(response.body));
                 });
-                stompClient.subscribe('/topic/connection-status', function (response) {
-                    updateConnectionStatusDisplay(JSON.parse(response.body));
+                stompClient.subscribe('/topic/streamer-connection-status', function (response) {
+                    updateStreamerConnectionStatusDisplay(JSON.parse(response.body));
+                });
+                stompClient.subscribe('/topic/bot-connection-status', function (response) {
+                    updateBotConnectionStatusDisplay(JSON.parse(response.body));
                 });
                 stompClient.subscribe('/topic/current-song', function (response) {
                     updateCurrentSongDisplay(JSON.parse(response.body));
@@ -626,8 +633,14 @@
             el.className = 'status-value ' + (isOnline ? 'status-online' : 'status-offline');
         }
 
-        function updateConnectionStatusDisplay(isConnected) {
-            const el = document.getElementById('stat-twitch');
+        function updateStreamerConnectionStatusDisplay(isConnected) {
+            const el = document.getElementById('stat-streamer');
+            el.innerText = isConnected ? 'CONNECTED' : 'DISCONNECTED';
+            el.className = 'status-value ' + (isConnected ? 'status-online' : 'status-offline');
+        }
+
+        function updateBotConnectionStatusDisplay(isConnected) {
+            const el = document.getElementById('stat-bot');
             el.innerText = isConnected ? 'CONNECTED' : 'DISCONNECTED';
             el.className = 'status-value ' + (isConnected ? 'status-online' : 'status-offline');
         }
@@ -650,9 +663,13 @@
                 if (res.status === 401 || res.status === 403) return window.location.href = '/login.html';
                 if (res.ok) updateStreamStatusDisplay(await res.json());
 
-                // Connection status
-                res = await fetch('/api/twitch-config/connection');
-                if (res.ok) updateConnectionStatusDisplay(await res.json());
+                // Streamer connection status
+                res = await fetch('/api/twitch-config/connection/streamer');
+                if (res.ok) updateStreamerConnectionStatusDisplay(await res.json());
+
+                // Bot connection status
+                res = await fetch('/api/twitch-config/connection/bot');
+                if (res.ok) updateBotConnectionStatusDisplay(await res.json());
 
                 // Queue size
                 res = await fetch('/api/songs/queue-size');
@@ -938,7 +955,7 @@
             }
             
             const scopeString = scopes.join(' ');
-            const url = `https://id.twitch.tv/oauth2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=${encodeURIComponent(scopeString)}`;
+            const url = `https://id.twitch.tv/oauth2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scopeString)}&state=${type}`;
             
             const container = document.getElementById('auth-url-container');
             const link = document.getElementById('auth-url-link');
