@@ -108,4 +108,11 @@ class TwitchConfigControllerTest {
         assertEquals(1, profiles.size());
         assertEquals("prod", profiles.get(0));
     }
+
+    @Test
+    void sendChatMessage_CallsService() {
+        String message = "hello chat";
+        twitchConfigController.sendChatMessage(message);
+        verify(twitchBotService).sendChatMessage(message);
+    }
 }

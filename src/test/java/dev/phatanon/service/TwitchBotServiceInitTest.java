@@ -8,6 +8,7 @@ import com.github.twitch4j.helix.domain.StreamList;
 import com.github.twitch4j.helix.domain.User;
 import com.github.twitch4j.helix.domain.UserList;
 import dev.phatanon.entity.TwitchConfig;
+import dev.phatanon.service.chat.ChatMessageService;
 import dev.phatanon.repository.SongPlayRepository;
 import dev.phatanon.repository.SongRepository;
 import dev.phatanon.repository.TwitchConfigRepository;
@@ -38,6 +39,8 @@ class TwitchBotServiceInitTest {
     @Mock
     private ScheduledExecutorService scheduler;
     @Mock
+    private ChatMessageService chatMessageService;
+    @Mock
     private TwitchClient twitchClient;
     @Mock
     private EventManager eventManager;
@@ -52,7 +55,8 @@ class TwitchBotServiceInitTest {
                 songRepository,
                 songPlayRepository,
                 twitchConfigRepository,
-                scheduler
+                scheduler,
+                chatMessageService
         );
     }
 

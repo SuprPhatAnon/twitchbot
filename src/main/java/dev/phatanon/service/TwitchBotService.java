@@ -9,6 +9,7 @@ import com.github.twitch4j.auth.domain.TwitchScopes;
 import com.github.twitch4j.auth.providers.TwitchIdentityProvider;
 import com.github.twitch4j.TwitchClientBuilder;
 import com.github.twitch4j.chat.events.ChatConnectionStateEvent;
+import com.github.twitch4j.chat.events.channel.ChannelMessageEvent;
 import com.github.twitch4j.client.websocket.domain.WebsocketConnectionState;
 import com.github.twitch4j.common.events.domain.EventChannel;
 import com.github.twitch4j.events.ChannelGoLiveEvent;
@@ -32,6 +33,8 @@ import dev.phatanon.entity.TwitchConfig;
 import dev.phatanon.repository.SongPlayRepository;
 import dev.phatanon.repository.SongRepository;
 import dev.phatanon.repository.TwitchConfigRepository;
+import dev.phatanon.model.ChatMessageContext;
+import dev.phatanon.service.chat.ChatMessageService;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -79,6 +82,9 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
 
     @Value("${twitch.song-delay-seconds:5}")
     private int defaultSongDelaySeconds;
+
+    @Value("${twitch.redirect-uri-host:https://stream.phat.wtf}")
+    private String redirectUriHost;
 
 
     private final SimpMessagingTemplate messagingTemplate;
@@ -145,14 +151,16 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
 
     private final Random random = new Random();
     private final ScheduledExecutorService scheduler;
+    private final ChatMessageService chatMessageService;
     private ScheduledFuture<?> tokenRefreshTask;
 
-    public TwitchBotService(SimpMessagingTemplate messagingTemplate, SongRepository songRepository, SongPlayRepository songPlayRepository, TwitchConfigRepository twitchConfigRepository, ScheduledExecutorService scheduler) {
+    public TwitchBotService(SimpMessagingTemplate messagingTemplate, SongRepository songRepository, SongPlayRepository songPlayRepository, TwitchConfigRepository twitchConfigRepository, ScheduledExecutorService scheduler, ChatMessageService chatMessageService) {
         this.messagingTemplate = messagingTemplate;
         this.songRepository = songRepository;
         this.songPlayRepository = songPlayRepository;
         this.twitchConfigRepository = twitchConfigRepository;
         this.scheduler = scheduler;
+        this.chatMessageService = chatMessageService;
     }
 
     /**
@@ -161,6 +169,19 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
      */
     public synchronized boolean isSongPlaying() {
         return isSongPlaying;
+    }
+
+    /**
+     * Sends a chat message to the configured Twitch channel.
+     * @param message The message to send.
+     */
+    public void sendChatMessage(String message) {
+        if (isTwitchConnected()) {
+            twitchClient.getChat().sendMessage(currentChannelName, message);
+            log.info("Sent chat message to {}: {}", currentChannelName, message);
+        } else {
+            log.warn("Cannot send chat message: Twitch IRC is not connected.");
+        }
     }
 
     /**
@@ -445,6 +466,16 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
                 log.info("Stream ended. Song queue cleared.");
                 broadcastQueueSize();
             }
+        });
+
+        twitchClient.getEventManager().onEvent(ChannelMessageEvent.class, event -> {
+            ChatMessageContext context = ChatMessageContext.builder()
+                    .event(event)
+                    .message(event.getMessage())
+                    .senderName(event.getUser().getName())
+                    .channelName(event.getChannel().getName())
+                    .build();
+            chatMessageService.processMessage(context);
         });
 
         log.info("Twitch bot initialized for channel: {}", currentChannelName);

@@ -4,6 +4,7 @@ import dev.phatanon.entity.Song;
 import dev.phatanon.repository.SongPlayRepository;
 import dev.phatanon.repository.SongRepository;
 import dev.phatanon.repository.TwitchConfigRepository;
+import dev.phatanon.service.chat.ChatMessageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -39,6 +40,9 @@ public class TwitchBotServiceLogicTest {
     @Mock
     private ScheduledExecutorService scheduler;
 
+    @Mock
+    private ChatMessageService chatMessageService;
+
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
@@ -47,7 +51,8 @@ public class TwitchBotServiceLogicTest {
                 songRepository,
                 songPlayRepository,
                 twitchConfigRepository,
-                scheduler
+                scheduler,
+                chatMessageService
         );
     }
 

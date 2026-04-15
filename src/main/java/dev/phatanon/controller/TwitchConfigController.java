@@ -166,4 +166,12 @@ public class TwitchConfigController {
         twitchBotService.refreshTokens();
         return ResponseEntity.ok().build();
     }
+
+    @PostMapping("/chat")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Send a chat message to the configured Twitch channel")
+    public ResponseEntity<Void> sendChatMessage(@RequestParam String message) {
+        twitchBotService.sendChatMessage(message);
+        return ResponseEntity.ok().build();
+    }
 }
