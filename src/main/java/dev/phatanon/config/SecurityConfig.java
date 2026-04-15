@@ -48,7 +48,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/songs/upload/**", "/upload.html").hasAnyRole("UPLOAD", "STREAMER", "ADMIN")
                 .requestMatchers("/streamer.html", "/api/songs/play/**", "/api/songs/queue/**").hasAnyRole("STREAMER", "ADMIN")
                 .requestMatchers("/api/users/me/**", "/account.html").authenticated()
-                .requestMatchers("/admin.html", "/api/users/**", "/api/twitch-config/**", "/api/redeems/**").hasRole("ADMIN")
+                .requestMatchers("/admin.html", "/song-management.html", "/api/users/**", "/api/twitch-config/**", "/api/redeems/**").hasRole("ADMIN")
+                .requestMatchers("/api/songs/files/**").hasRole("ADMIN")
                 .anyRequest().authenticated()
             )
             .formLogin(form -> form

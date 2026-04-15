@@ -19,6 +19,7 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import org.springframework.mock.web.MockMultipartFile;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -130,14 +131,42 @@ public class SongControllerTest {
         when(songRepository.save(any(Song.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         String updateJson = "{\"name\": \"Updated Song\", \"artist\": \"Updated Artist\", \"url\": \"updated_url\", \"redeems\": [{\"id\": 2, \"title\": \"Updated Redeem\"}], \"enabled\": false}";
+        MockMultipartFile songPart = new MockMultipartFile("song", "", "application/json", updateJson.getBytes());
 
-        mockMvc.perform(put("/api/songs/1")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(updateJson))
+        mockMvc.perform(multipart("/api/songs/1")
+                        .file(songPart)
+                        .with(request -> {
+                            request.setMethod("PUT");
+                            return request;
+                        }))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name", is("Updated Song")))
                 .andExpect(jsonPath("$.redeems[0].title", is("Updated Redeem")))
                 .andExpect(jsonPath("$.enabled", is(false)));
+    }
+
+    @Test
+    void shouldUpdateSongWithCoverArt() throws Exception {
+        Song song = new Song("Old Song", "Old Artist", "old_url");
+        song.setId(1L);
+        when(songRepository.findById(1L)).thenReturn(Optional.of(song));
+        when(songRepository.save(any(Song.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        String updateJson = "{\"name\": \"Updated Song\", \"artist\": \"Updated Artist\", \"url\": \"old_url\", \"redeems\": [], \"enabled\": true}";
+        MockMultipartFile songPart = new MockMultipartFile("song", "", "application/json", updateJson.getBytes());
+        MockMultipartFile coverPart = new MockMultipartFile("coverArt", "test.jpg", "image/jpeg", "image data".getBytes());
+
+        mockMvc.perform(multipart("/api/songs/1")
+                        .file(songPart)
+                        .file(coverPart)
+                        .with(request -> {
+                            request.setMethod("PUT");
+                            return request;
+                        }))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name", is("Updated Song")));
+
+        org.mockito.Mockito.verify(songService).setCoverArtFromBytes(any(Song.class), any(byte[].class), any(String.class));
     }
 
     @Test
@@ -232,6 +261,38 @@ public class SongControllerTest {
 
         mockMvc.perform(get("/api/songs/current"))
                 .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void shouldDeleteSongPermanently() throws Exception {
+        Song song = new Song("Delete Me Forever", "Artist", "/testfile.mp3");
+        song.setId(1L);
+        when(songRepository.findById(1L)).thenReturn(Optional.of(song));
+        when(songService.getUploadPath()).thenReturn("/tmp");
+
+        mockMvc.perform(delete("/api/songs/1/permanent"))
+                .andExpect(status().isNoContent());
+
+        org.mockito.Mockito.verify(songRepository).delete(song);
+        org.mockito.Mockito.verify(songService).updateM3uFile();
+    }
+
+    @Test
+    void shouldListFiles() throws Exception {
+        when(songService.getUploadPath()).thenReturn(System.getProperty("java.io.tmpdir"));
+
+        mockMvc.perform(get("/api/songs/files"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray());
+    }
+
+    @Test
+    void shouldDeleteFile() throws Exception {
+        String filename = "nonexistent_file.mp3";
+        when(songService.getUploadPath()).thenReturn(System.getProperty("java.io.tmpdir"));
+
+        mockMvc.perform(delete("/api/songs/files/" + filename))
+                .andExpect(status().isNotFound());
     }
 
     @Test

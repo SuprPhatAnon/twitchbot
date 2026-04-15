@@ -95,6 +95,7 @@
         <div>
             <button id="theme-toggle" class="btn btn-outline-light btn-sm me-2" onclick="toggleTheme()">🌙</button>
             <a href="/account.html" class="btn btn-outline-light btn-sm me-2">Account</a>
+            <a href="/song-management.html" class="btn btn-outline-light btn-sm me-2">Files</a>
             <a href="/user-management.html" class="btn btn-outline-light btn-sm me-2">Users</a>
             <a href="/statistics.html" class="btn btn-outline-light btn-sm me-2">Statistics</a>
             <button class="btn btn-outline-light btn-sm" onclick="logout()">Logout</button>
@@ -209,6 +210,11 @@
                                 <div class="mb-3">
                                     <label for="edit-song-url" class="form-label">Audio URL</label>
                                     <input type="url" class="form-control" id="edit-song-url" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="edit-song-cover" class="form-label">Cover Art (Optional)</label>
+                                    <input type="file" class="form-control" id="edit-song-cover" accept="image/*">
+                                    <div class="form-text">Upload an image to replace or add album art.</div>
                                 </div>
                             </div>
                             <div class="modal-footer">
@@ -728,14 +734,23 @@
                 url: document.getElementById('edit-song-url').value,
                 redeems: selectedRedeemIds.map(id => ({ id: id }))
             };
+
+            const formData = new FormData();
+            formData.append('song', new Blob([JSON.stringify(song)], { type: 'application/json' }));
+            
+            const coverFile = document.getElementById('edit-song-cover').files[0];
+            if (coverFile) {
+                formData.append('coverArt', coverFile);
+            }
+
             try {
                 const response = await fetch(`/api/songs/${id}`, {
                     method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(song)
+                    body: formData
                 });
                 if (response.ok) {
                     editModal.hide();
+                    document.getElementById('edit-song-cover').value = ''; // Clear file input
                     fetchSongs();
                 } else {
                     alert('Failed to update song');

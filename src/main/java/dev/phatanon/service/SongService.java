@@ -61,8 +61,7 @@ public class SongService {
                     byte[] albumImage = id3v2Tag.getAlbumImage();
                     if (albumImage != null) {
                         String mimeType = id3v2Tag.getAlbumImageMimeType();
-                        String base64Image = Base64.getEncoder().encodeToString(albumImage);
-                        song.setCoverArt("data:" + mimeType + ";base64," + base64Image);
+                        setCoverArtFromBytes(song, albumImage, mimeType);
                         logger.info("Extracted cover art for song: {} ({} bytes)", song.getName(), albumImage.length);
                     } else {
                         song.setCoverArt(null);
@@ -73,6 +72,28 @@ public class SongService {
             logger.warn("Failed to extract cover art from {}: {}", url, e.getMessage());
             song.setCoverArt(null);
         }
+    }
+
+    /**
+     * Sets the cover art for a song from a byte array.
+     * @param song The song to update.
+     * @param imageBytes The image data.
+     * @param mimeType The MIME type of the image.
+     */
+    public void setCoverArtFromBytes(Song song, byte[] imageBytes, String mimeType) {
+        if (imageBytes == null) {
+            song.setCoverArt(null);
+            return;
+        }
+        String base64Image = Base64.getEncoder().encodeToString(imageBytes);
+        song.setCoverArt("data:" + mimeType + ";base64," + base64Image);
+    }
+
+    /**
+     * @return The configured upload path for songs.
+     */
+    public String getUploadPath() {
+        return uploadPath;
     }
 
     /**

@@ -87,6 +87,7 @@ The database is managed by Hibernate/JPA. Key tables:
 - The main player overlay is `src/main/resources/static/index.html`.
 - Other UIs:
   - `admin.html`: Full management dashboard.
+  - `song-management.html`: Dedicated song file management (Admin only).
   - `streamer.html`: Read-only/operational dashboard.
   - `upload.html`: Song upload interface.
   - `user-management.html`: User management interface (Admin only).

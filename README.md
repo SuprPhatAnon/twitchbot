@@ -87,6 +87,8 @@ The application includes a built-in Admin UI for full management and a Streamer 
 
 - **Admin UI**: `http://localhost:8080/admin.html`
   - Full access to manage songs, redeems, and Twitch configuration.
+- **File Management UI**: `http://localhost:8080/song-management.html`
+  - Dedicated interface for managing uploaded song files, including deleting orphan files (Admin only).
 - **Streamer UI**: `http://localhost:8080/streamer.html`
   - Read-only access to view configuration, songs, and logs.
   - Allows triggering song playback ("Play" button).

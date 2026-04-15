@@ -9,12 +9,21 @@ import dev.phatanon.service.SongService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import org.springframework.http.MediaType;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -27,6 +36,8 @@ import java.util.List;
 @SecurityRequirement(name = "apiKey")
 @SecurityRequirement(name = "basicAuth")
 public class SongController {
+
+    private static final Logger logger = LoggerFactory.getLogger(SongController.class);
 
     private final SongRepository songRepository;
     private final SongPlayRepository songPlayRepository;
@@ -85,15 +96,28 @@ public class SongController {
 
     /**
      * Updates an existing song's details and broadcasts a refresh message to WebSocket subscribers.
+     * Optionally updates the cover art if a new image file is provided.
      * Requires an API key for authorization.
      * @param id The unique ID of the song to update.
-     * @param songDetails The new details to be applied to the song.
+     * @param songDetails The new details to be applied to the song (as JSON string or part).
+     * @param coverArt Optional new cover art image file.
      * @return A {@link ResponseEntity} containing the updated {@link Song} if successful, or 404 Not Found if not.
      */
-    @PutMapping("/{id}")
+    @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Update an existing song")
-    public ResponseEntity<Song> updateSong(@PathVariable Long id, @RequestBody Song songDetails) {
+    @Operation(summary = "Update an existing song with optional cover art",
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(content = @Content(
+                    mediaType = MediaType.MULTIPART_FORM_DATA_VALUE,
+                    schema = @Schema(type = "object"),
+                    schemaProperties = {
+                            @io.swagger.v3.oas.annotations.media.SchemaProperty(name = "song", schema = @Schema(implementation = Song.class)),
+                            @io.swagger.v3.oas.annotations.media.SchemaProperty(name = "coverArt", schema = @Schema(type = "string", format = "binary"))
+                    }
+            )))
+    public ResponseEntity<Song> updateSong(
+            @PathVariable Long id,
+            @RequestPart("song") Song songDetails,
+            @RequestPart(value = "coverArt", required = false) MultipartFile coverArt) {
         return songRepository.findById(id)
                 .map(song -> {
                     song.setName(songDetails.getName());
@@ -101,7 +125,18 @@ public class SongController {
                     song.setUrl(songDetails.getUrl());
                     song.setRedeems(songDetails.getRedeems());
                     song.setEnabled(songDetails.isEnabled());
-                    songService.updateCoverArt(song);
+
+                    if (coverArt != null && !coverArt.isEmpty()) {
+                        try {
+                            songService.setCoverArtFromBytes(song, coverArt.getBytes(), coverArt.getContentType());
+                        } catch (IOException e) {
+                            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).<Song>build();
+                        }
+                    } else if (songDetails.getUrl() != null && !songDetails.getUrl().equals(song.getUrl())) {
+                        // If URL changed and no new image provided, try to extract from new URL
+                        songService.updateCoverArt(song);
+                    }
+
                     Song updatedSong = songRepository.save(song);
                     messagingTemplate.convertAndSend("/topic/songs", "refresh");
                     songService.updateM3uFile();
@@ -194,6 +229,37 @@ public class SongController {
     }
 
     /**
+     * Permanently deletes a song from the {@link SongRepository} and its associated file.
+     * @param id The ID of the song to delete permanently.
+     * @return 204 No Content if successful, or 404 Not Found if the ID does not exist.
+     */
+    @DeleteMapping("/{id}/permanent")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Permanently delete a song and its file")
+    public ResponseEntity<Void> deleteSongPermanently(@PathVariable Long id) {
+        return songRepository.findById(id)
+                .map(song -> {
+                    // Delete the file if it's a local upload
+                    String url = song.getUrl();
+                    if (url != null && url.startsWith("/")) {
+                        try {
+                            java.nio.file.Path filePath = java.nio.file.Paths.get(songService.getUploadPath(), url.substring(1));
+                            java.nio.file.Files.deleteIfExists(filePath);
+                            logger.info("Deleted song file: {}", filePath);
+                        } catch (java.io.IOException e) {
+                            logger.error("Failed to delete song file for song {}: {}", id, e.getMessage());
+                        }
+                    }
+
+                    songRepository.delete(song);
+                    messagingTemplate.convertAndSend("/topic/songs", "refresh");
+                    songService.updateM3uFile();
+                    return ResponseEntity.noContent().<Void>build();
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    /**
      * Retrieves recent song plays from the {@link SongPlayRepository}.
      * @param limit The maximum number of plays to retrieve (default is 5).
      * @return A list of the most recent {@link SongPlay} entities.
@@ -238,6 +304,56 @@ public class SongController {
             return songPlayRepository.getStatsByArtist(since);
         } else {
             return songPlayRepository.getStatsBySong(since);
+        }
+    }
+
+    /**
+     * Lists all files in the song upload directory.
+     * @return A list of filenames in the upload directory.
+     */
+    @GetMapping("/files")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "List all song files")
+    public ResponseEntity<List<String>> listFiles() {
+        try {
+            java.nio.file.Path root = java.nio.file.Paths.get(songService.getUploadPath());
+            if (!java.nio.file.Files.exists(root)) {
+                return ResponseEntity.ok(java.util.Collections.emptyList());
+            }
+            try (java.util.stream.Stream<java.nio.file.Path> stream = java.nio.file.Files.list(root)) {
+                List<String> files = stream
+                        .filter(file -> !java.nio.file.Files.isDirectory(file))
+                        .map(file -> file.getFileName().toString())
+                        .sorted()
+                        .toList();
+                return ResponseEntity.ok(files);
+            }
+        } catch (IOException e) {
+            logger.error("Failed to list song files", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    /**
+     * Deletes a file from the upload directory.
+     * @param filename The name of the file to delete.
+     * @return 204 No Content if successful, or 404 Not Found if the file does not exist.
+     */
+    @DeleteMapping("/files/{filename}")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Delete a song file")
+    public ResponseEntity<Void> deleteFile(@PathVariable String filename) {
+        try {
+            java.nio.file.Path filePath = java.nio.file.Paths.get(songService.getUploadPath()).resolve(filename);
+            if (java.nio.file.Files.deleteIfExists(filePath)) {
+                logger.info("Deleted file: {}", filePath);
+                return ResponseEntity.noContent().build();
+            } else {
+                return ResponseEntity.notFound().build();
+            }
+        } catch (IOException e) {
+            logger.error("Failed to delete file: {}", filename, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 }
