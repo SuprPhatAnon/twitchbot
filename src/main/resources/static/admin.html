@@ -247,34 +247,14 @@
                                 <input type="password" class="form-control form-control-sm" id="twitch-client-secret">
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label small">Access Token</label>
-                                <input type="password" class="form-control form-control-sm" id="twitch-access-token">
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label small">Refresh Token</label>
-                                <input type="password" class="form-control form-control-sm" id="twitch-refresh-token">
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label small">Bot Access Token</label>
-                                <input type="password" class="form-control form-control-sm" id="twitch-bot-access-token" placeholder="Leave empty to use main token">
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label small">Bot Refresh Token</label>
-                                <input type="password" class="form-control form-control-sm" id="twitch-bot-refresh-token">
-                            </div>
-                            <div class="col-md-4">
                                 <label class="form-label small">Channel Name</label>
                                 <input type="text" class="form-control form-control-sm" id="twitch-channel-name">
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label small">Redeem Title</label>
-                                <input type="text" class="form-control form-control-sm" id="twitch-redeem-title">
-                            </div>
-                            <div class="col-md-2">
                                 <label class="form-label small">Delay (s)</label>
                                 <input type="number" class="form-control form-control-sm" id="twitch-song-delay">
                             </div>
-                        <div class="col-md-2 d-flex align-items-end">
+                            <div class="col-md-2 d-flex align-items-end">
                                 <button type="submit" class="btn btn-sm btn-primary w-100">Update</button>
                             </div>
                         </div>
@@ -295,8 +275,15 @@
                             <input type="text" class="form-control" id="oauth-redirect-uri" value="">
                         </div>
                         <div class="btn-group">
-                            <button class="btn btn-sm btn-outline-info" onclick="generateAuthUrl('streamer')">Streamer Auth URL</button>
-                            <button class="btn btn-sm btn-outline-secondary" onclick="generateAuthUrl('bot')">Bot Auth URL</button>
+                            <a class="btn btn-sm btn-outline-info" href="/api/twitch-config/authorize?type=streamer">Streamer Auth (Server)</a>
+                            <a class="btn btn-sm btn-outline-secondary" href="/api/twitch-config/authorize?type=bot">Bot Auth (Server)</a>
+                        </div>
+                        <div class="mt-2">
+                            <p class="small text-muted">Or use the legacy client-side generation (requires Client ID and Manual Redirect URI above):</p>
+                            <div class="btn-group">
+                                <button class="btn btn-sm btn-outline-info" onclick="generateAuthUrl('streamer')">Streamer Auth URL (Legacy)</button>
+                                <button class="btn btn-sm btn-outline-secondary" onclick="generateAuthUrl('bot')">Bot Auth URL (Legacy)</button>
+                            </div>
                         </div>
                         <div id="auth-url-container" class="mt-2" style="display: none;">
                             <a id="auth-url-link" href="#" target="_blank" class="small text-break"></a>
@@ -753,12 +740,7 @@
                     const config = await response.json();
                     document.getElementById('twitch-client-id').value = config.clientId || '';
                     document.getElementById('twitch-client-secret').value = config.clientSecret || '';
-                    document.getElementById('twitch-access-token').value = config.accessToken || '';
-                    document.getElementById('twitch-refresh-token').value = config.refreshToken || '';
-                    document.getElementById('twitch-bot-access-token').value = config.botAccessToken || '';
-                    document.getElementById('twitch-bot-refresh-token').value = config.botRefreshToken || '';
                     document.getElementById('twitch-channel-name').value = config.channelName || '';
-                    document.getElementById('twitch-redeem-title').value = config.redeemTitle || '';
                     document.getElementById('twitch-song-delay').value = config.songDelaySeconds || 0;
                 }
 
@@ -775,12 +757,7 @@
             const config = {
                 clientId: document.getElementById('twitch-client-id').value,
                 clientSecret: document.getElementById('twitch-client-secret').value,
-                accessToken: document.getElementById('twitch-access-token').value,
-                refreshToken: document.getElementById('twitch-refresh-token').value,
-                botAccessToken: document.getElementById('twitch-bot-access-token').value,
-                botRefreshToken: document.getElementById('twitch-bot-refresh-token').value,
                 channelName: document.getElementById('twitch-channel-name').value,
-                redeemTitle: document.getElementById('twitch-redeem-title').value,
                 songDelaySeconds: parseInt(document.getElementById('twitch-song-delay').value)
             };
             try {

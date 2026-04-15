@@ -26,7 +26,6 @@ public class TwitchConfigDTO {
     private String botRefreshToken;
     
     private String channelName;
-    private String redeemTitle;
     private int songDelaySeconds;
 
     public TwitchConfigDTO() {}
@@ -41,7 +40,6 @@ public class TwitchConfigDTO {
         dto.setBotAccessToken(mask(entity.getBotAccessToken()));
         dto.setBotRefreshToken(mask(entity.getBotRefreshToken()));
         dto.setChannelName(entity.getChannelName());
-        dto.setRedeemTitle(entity.getRedeemTitle());
         dto.setSongDelaySeconds(entity.getSongDelaySeconds());
         return dto;
     }
@@ -67,8 +65,6 @@ public class TwitchConfigDTO {
     public void setBotRefreshToken(String botRefreshToken) { this.botRefreshToken = botRefreshToken; }
     public String getChannelName() { return channelName; }
     public void setChannelName(String channelName) { this.channelName = channelName; }
-    public String getRedeemTitle() { return redeemTitle; }
-    public void setRedeemTitle(String redeemTitle) { this.redeemTitle = redeemTitle; }
     public int getSongDelaySeconds() { return songDelaySeconds; }
     public void setSongDelaySeconds(int songDelaySeconds) { this.songDelaySeconds = songDelaySeconds; }
 }

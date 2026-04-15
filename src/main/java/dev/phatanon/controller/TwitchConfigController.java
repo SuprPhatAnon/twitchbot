@@ -27,9 +27,9 @@ import java.util.stream.Collectors;
 @SecurityRequirement(name = "basicAuth")
 public class TwitchConfigController {
 
-    private final TwitchConfigRepository twitchConfigRepository;
-    private final TwitchBotService twitchBotService;
     private final Environment environment;
+    private final TwitchBotService twitchBotService;
+    private final TwitchConfigRepository twitchConfigRepository;
 
     @Value("${twitch.redirect-uri-host:https://music.phat.wtf}")
     private String redirectUriHost;
@@ -100,13 +100,31 @@ public class TwitchConfigController {
         TwitchConfig existingConfig = twitchConfigRepository.findAll().stream().findFirst().orElse(null);
         
         if (existingConfig != null) {
-            config.setId(existingConfig.getId());
+            // Apply updates to the existing config, but only for non-null/non-empty fields in the incoming config
+            if (config.getClientId() != null) existingConfig.setClientId(config.getClientId());
+            if (config.getChannelName() != null) existingConfig.setChannelName(config.getChannelName());
+            if (config.getSongDelaySeconds() > 0) existingConfig.setSongDelaySeconds(config.getSongDelaySeconds());
+
+            // Handle sensitive fields (tokens and secret)
             // If tokens are masked in the request, preserve existing ones
-            if ("********".equals(config.getClientSecret())) config.setClientSecret(existingConfig.getClientSecret());
-            if ("********".equals(config.getAccessToken())) config.setAccessToken(existingConfig.getAccessToken());
-            if ("********".equals(config.getRefreshToken())) config.setRefreshToken(existingConfig.getRefreshToken());
-            if ("********".equals(config.getBotAccessToken())) config.setBotAccessToken(existingConfig.getBotAccessToken());
-            if ("********".equals(config.getBotRefreshToken())) config.setBotRefreshToken(existingConfig.getBotRefreshToken());
+            // If they are null, preserve existing ones
+            if (config.getClientSecret() != null && !"********".equals(config.getClientSecret())) 
+                existingConfig.setClientSecret(config.getClientSecret());
+                
+            if (config.getAccessToken() != null && !"********".equals(config.getAccessToken())) 
+                existingConfig.setAccessToken(config.getAccessToken());
+                
+            if (config.getRefreshToken() != null && !"********".equals(config.getRefreshToken())) 
+                existingConfig.setRefreshToken(config.getRefreshToken());
+                
+            if (config.getBotAccessToken() != null && !"********".equals(config.getBotAccessToken())) 
+                existingConfig.setBotAccessToken(config.getBotAccessToken());
+                
+            if (config.getBotRefreshToken() != null && !"********".equals(config.getBotRefreshToken())) 
+                existingConfig.setBotRefreshToken(config.getBotRefreshToken());
+            
+            // Re-assign the config variable to the modified existingConfig for saving
+            config = existingConfig;
         }
 
         TwitchConfig saved = twitchConfigRepository.save(config);
@@ -173,5 +191,82 @@ public class TwitchConfigController {
     public ResponseEntity<Void> sendChatMessage(@RequestParam String message) {
         twitchBotService.sendChatMessage(message);
         return ResponseEntity.ok().build();
+    }
+
+    /**
+     * Redirects to Twitch for OAuth authorization.
+     * @param type The type of account to authorize ('streamer' or 'bot').
+     * @return A redirect to Twitch's authorization page.
+     */
+    @GetMapping("/authorize")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Redirect to Twitch for OAuth authorization")
+    public ResponseEntity<Void> authorize(@RequestParam(defaultValue = "streamer") String type) {
+        TwitchConfig config = twitchConfigRepository.findAll().stream().findFirst().orElse(null);
+        if (config == null || config.getClientId() == null || config.getClientId().isBlank()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        String scopes;
+        if ("bot".equals(type)) {
+            scopes = "user:bot user:read:chat user:write:chat";
+        } else {
+            scopes = "channel:read:redemptions channel:read:subscriptions moderator:read:followers bits:read chat:read chat:edit channel:bot";
+        }
+
+        String redirectUri = redirectUriHost + "/api/twitch-config/callback";
+        String url = String.format(
+                "https://id.twitch.tv/oauth2/authorize?client_id=%s&redirect_uri=%s&response_type=code&scope=%s&state=%s",
+                config.getClientId(),
+                java.net.URLEncoder.encode(redirectUri, java.nio.charset.StandardCharsets.UTF_8),
+                java.net.URLEncoder.encode(scopes, java.nio.charset.StandardCharsets.UTF_8),
+                type
+        );
+
+        return ResponseEntity.status(org.springframework.http.HttpStatus.FOUND)
+                .location(java.net.URI.create(url))
+                .build();
+    }
+
+    /**
+     * Callback for Twitch OAuth.
+     * Exchanges the authorization code for tokens and saves them.
+     */
+    @GetMapping("/callback")
+    @Operation(summary = "Twitch OAuth callback")
+    public ResponseEntity<Void> callback(@RequestParam String code, @RequestParam String state) {
+        TwitchConfig config = twitchConfigRepository.findAll().stream().findFirst().orElse(null);
+        if (config == null || config.getClientId() == null || config.getClientSecret() == null) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+
+        try {
+            String redirectUri = redirectUriHost + "/api/twitch-config/callback";
+            com.github.twitch4j.auth.providers.TwitchIdentityProvider identityProvider = new com.github.twitch4j.auth.providers.TwitchIdentityProvider(
+                    config.getClientId(),
+                    config.getClientSecret(),
+                    redirectUri
+            );
+            
+            com.github.philippheuer.credentialmanager.domain.OAuth2Credential userCredential = identityProvider.getCredentialByCode(code);
+
+            if (userCredential != null) {
+                if ("bot".equals(state)) {
+                    config.setBotAccessToken(userCredential.getAccessToken());
+                    config.setBotRefreshToken(userCredential.getRefreshToken());
+                } else {
+                    config.setAccessToken(userCredential.getAccessToken());
+                    config.setRefreshToken(userCredential.getRefreshToken());
+                }
+                twitchConfigRepository.save(config);
+                twitchBotService.reconnect();
+            }
+
+            return ResponseEntity.status(org.springframework.http.HttpStatus.FOUND)
+                    .location(java.net.URI.create("/admin.html"))
+                    .build();
+        } catch (Exception e) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
 }

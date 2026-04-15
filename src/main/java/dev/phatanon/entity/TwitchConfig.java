@@ -34,7 +34,6 @@ public class TwitchConfig {
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String botRefreshToken;
     private String channelName;
-    private String redeemTitle;
     private int songDelaySeconds;
 
     public TwitchConfig() {
@@ -102,14 +101,6 @@ public class TwitchConfig {
 
     public void setChannelName(String channelName) {
         this.channelName = channelName;
-    }
-
-    public String getRedeemTitle() {
-        return redeemTitle;
-    }
-
-    public void setRedeemTitle(String redeemTitle) {
-        this.redeemTitle = redeemTitle;
     }
 
     public int getSongDelaySeconds() {

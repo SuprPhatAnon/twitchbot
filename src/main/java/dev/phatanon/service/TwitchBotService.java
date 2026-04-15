@@ -193,6 +193,14 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
                twitchClient.getChat().getState() == WebsocketConnectionState.CONNECTED;
     }
 
+    /**
+     * Retrieves the current Twitch client instance.
+     * @return The {@link TwitchClient} instance.
+     */
+    public TwitchClient getTwitchClient() {
+        return twitchClient;
+    }
+
     protected void setTwitchClient(TwitchClient twitchClient) {
         this.twitchClient = twitchClient;
     }

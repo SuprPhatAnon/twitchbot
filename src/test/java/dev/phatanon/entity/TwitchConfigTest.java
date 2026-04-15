@@ -17,7 +17,6 @@ class TwitchConfigTest {
         config.setBotAccessToken("botAccessToken");
         config.setBotRefreshToken("botRefreshToken");
         config.setChannelName("channelName");
-        config.setRedeemTitle("redeemTitle");
         config.setSongDelaySeconds(10);
 
         assertEquals(1L, config.getId());
@@ -28,7 +27,6 @@ class TwitchConfigTest {
         assertEquals("botAccessToken", config.getBotAccessToken());
         assertEquals("botRefreshToken", config.getBotRefreshToken());
         assertEquals("channelName", config.getChannelName());
-        assertEquals("redeemTitle", config.getRedeemTitle());
         assertEquals(10, config.getSongDelaySeconds());
     }
 }
