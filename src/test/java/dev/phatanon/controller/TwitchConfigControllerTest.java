@@ -1,5 +1,6 @@
 package dev.phatanon.controller;
 
+import dev.phatanon.dto.TwitchConfigDTO;
 import dev.phatanon.entity.TwitchConfig;
 import dev.phatanon.repository.TwitchConfigRepository;
 import dev.phatanon.service.TwitchBotService;
@@ -56,15 +57,16 @@ class TwitchConfigControllerTest {
     @Test
     void getConfig_ReturnsConfig() {
         TwitchConfig config = new TwitchConfig();
+        config.setClientId("test-client");
         when(twitchConfigRepository.findAll()).thenReturn(List.of(config));
-        ResponseEntity<TwitchConfig> response = twitchConfigController.getConfig();
-        assertEquals(config, response.getBody());
+        ResponseEntity<TwitchConfigDTO> response = twitchConfigController.getConfig();
+        assertEquals("test-client", response.getBody().getClientId());
     }
 
     @Test
     void getConfig_NotFound_Returns404() {
         when(twitchConfigRepository.findAll()).thenReturn(List.of());
-        ResponseEntity<TwitchConfig> response = twitchConfigController.getConfig();
+        ResponseEntity<TwitchConfigDTO> response = twitchConfigController.getConfig();
         assertEquals(404, response.getStatusCode().value());
     }
 
@@ -72,26 +74,30 @@ class TwitchConfigControllerTest {
     void updateConfig_Existing_Updates() {
         TwitchConfig existing = new TwitchConfig();
         existing.setId(1L);
+        existing.setClientSecret("secret");
         TwitchConfig newConfig = new TwitchConfig();
+        newConfig.setClientSecret("********");
         
         when(twitchConfigRepository.findAll()).thenReturn(List.of(existing));
         when(twitchConfigRepository.save(any())).thenAnswer(i -> i.getArguments()[0]);
 
-        TwitchConfig result = twitchConfigController.updateConfig(newConfig);
+        TwitchConfigDTO result = twitchConfigController.updateConfig(newConfig);
 
         assertEquals(1L, result.getId());
+        verify(twitchConfigRepository).save(argThat(c -> "secret".equals(c.getClientSecret())));
         verify(twitchBotService).reconnect();
     }
 
     @Test
     void updateConfig_New_Saves() {
         TwitchConfig newConfig = new TwitchConfig();
+        newConfig.setClientId("new-client");
         when(twitchConfigRepository.findAll()).thenReturn(List.of());
         when(twitchConfigRepository.save(any())).thenAnswer(i -> i.getArguments()[0]);
 
-        TwitchConfig result = twitchConfigController.updateConfig(newConfig);
+        TwitchConfigDTO result = twitchConfigController.updateConfig(newConfig);
 
-        assertNotNull(result);
+        assertEquals("new-client", result.getClientId());
         verify(twitchBotService).reconnect();
     }
 

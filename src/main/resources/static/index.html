@@ -54,13 +54,18 @@
         const audioPlayer = document.getElementById('audio-player');
 
         let stompClient = null;
+        let reconnectDelay = 1000;
+        const maxReconnectDelay = 30000;
 
         function connect() {
             const socket = new SockJS('/ws');
             stompClient = Stomp.over(socket);
+            stompClient.debug = null; // Disable debug logging to console
 
             stompClient.connect({}, function (frame) {
                 console.log('Connected: ' + frame);
+                reconnectDelay = 1000; // Reset delay on successful connection
+                
                 stompClient.subscribe('/topic/play', function (message) {
                     const song = JSON.parse(message.body);
                     playSong(song);
@@ -78,8 +83,10 @@
                     }
                 });
             }, function (error) {
-                console.log('STOMP error ' + error);
-                setTimeout(connect, 5000);
+                console.log('STOMP error: ' + error + '. Retrying in ' + (reconnectDelay / 1000) + 's');
+                setTimeout(connect, reconnectDelay);
+                // Exponential backoff
+                reconnectDelay = Math.min(reconnectDelay * 2, maxReconnectDelay);
             });
         }
 
@@ -94,20 +101,29 @@
             }
             songDisplay.style.display = 'flex';
             audioPlayer.src = song.url;
-            audioPlayer.play();
+            
+            const playPromise = audioPlayer.play();
+            
+            if (playPromise !== undefined) {
+                playPromise.catch(error => {
+                    console.error("Playback failed:", error);
+                    // If playback fails (e.g. autoplay blocked or 404), notify server after 3 seconds
+                    // to avoid stalling the queue completely.
+                    setTimeout(notifySongFinished, 3000);
+                });
+            }
 
-            audioPlayer.onended = () => {
-                // Hide only if there's no more song in queue
-                // The server will notify us via /topic/current-song if it's empty
-                if (stompClient && stompClient.connected) {
-                    stompClient.send("/app/song-finished", {}, JSON.stringify({status: "finished"}));
-                }
+            audioPlayer.onended = notifySongFinished;
+            audioPlayer.onerror = () => {
+                console.error("Audio error occurred");
+                setTimeout(notifySongFinished, 2000);
             };
+        }
 
-            // Hide after 10 seconds if audio is long or doesn't end
-            setTimeout(() => {
-                 // songDisplay.style.display = 'none';
-            }, 10000);
+        function notifySongFinished() {
+            if (stompClient && stompClient.connected) {
+                stompClient.send("/app/song-finished", {}, JSON.stringify({status: "finished"}));
+            }
         }
 
         connect();

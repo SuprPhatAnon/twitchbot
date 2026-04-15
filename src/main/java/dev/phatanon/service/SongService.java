@@ -138,7 +138,7 @@ public class SongService {
      * Updates the playlist.m3u file in the song-uploads-pvc directory.
      * The file contains a list of all enabled songs in M3U format.
      */
-    public void updateM3uFile() {
+    public synchronized void updateM3uFile() {
         List<Song> enabledSongs = songRepository.findAllByEnabledTrueOrderBySortNameAsc();
         Path m3uPath = Paths.get(uploadPath, "playlist.m3u");
 

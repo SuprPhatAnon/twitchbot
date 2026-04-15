@@ -52,10 +52,15 @@
             border-collapse: collapse;
             background: white;
             border-radius: 8px;
-            overflow: hidden;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-        [data-theme="dark"] table {
+        .table-container {
+            max-height: 70vh;
+            overflow-y: auto;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        [data-theme="dark"] table, [data-theme="dark"] .table-container {
             background: #2b2b2b;
             box-shadow: 0 2px 4px rgba(0,0,0,0.5);
         }
@@ -134,16 +139,18 @@
         <button onclick="loadStatistics()">Refresh</button>
     </div>
 
-    <table id="stats-table">
-        <thead>
-            <tr id="table-header">
-                <!-- Headers will be dynamic -->
-            </tr>
-        </thead>
-        <tbody id="stats-body">
-            <!-- Data will be loaded here -->
-        </tbody>
-    </table>
+    <div class="table-container">
+        <table id="stats-table">
+            <thead>
+                <tr id="table-header">
+                    <!-- Headers will be dynamic -->
+                </tr>
+            </thead>
+            <tbody id="stats-body">
+                <!-- Data will be loaded here -->
+            </tbody>
+        </table>
+    </div>
 
     <script>
         function toggleTheme() {

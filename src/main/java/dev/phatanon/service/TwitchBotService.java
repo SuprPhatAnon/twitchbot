@@ -19,6 +19,9 @@ import com.github.twitch4j.eventsub.events.ChannelSubscribeEvent;
 import com.github.twitch4j.eventsub.events.ChannelSubscriptionGiftEvent;
 import com.github.twitch4j.eventsub.events.ChannelSubscriptionMessageEvent;
 import com.github.twitch4j.eventsub.events.CustomRewardRedemptionAddEvent;
+import com.github.twitch4j.helix.domain.CustomReward;
+import com.github.twitch4j.helix.domain.User;
+import com.github.twitch4j.helix.domain.UserList;
 import com.github.twitch4j.eventsub.socket.events.EventSocketConnectionStateEvent;
 import com.github.twitch4j.helix.domain.ChatMessage;
 import com.github.twitch4j.helix.domain.StreamList;
@@ -83,6 +86,7 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
     private final SongPlayRepository songPlayRepository;
     private final TwitchConfigRepository twitchConfigRepository;
     private TwitchClient twitchClient;
+    private CredentialManager credentialManager;
 
     private String currentAccessToken;
     private String currentBotAccessToken;
@@ -613,6 +617,56 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
      */
     public synchronized void playSongById(Long id) {
         playSongById(id, false);
+    }
+
+    /**
+     * Simulates a Twitch redeem for testing purposes.
+     * @param title The title of the redeem to simulate.
+     */
+    public void simulateRedeem(String title) {
+        log.info("Simulating redeem: {}", title);
+        RedeemLog redeemLog = new RedeemLog("TestUser", title, LocalDateTime.now());
+        synchronized (recentRedeems) {
+            if (recentRedeems.size() >= MAX_REDEEM_LOGS) {
+                recentRedeems.remove(0);
+            }
+            recentRedeems.add(redeemLog);
+        }
+        messagingTemplate.convertAndSend("/topic/redeems", redeemLog);
+        playRandomSong(title);
+    }
+
+    /**
+     * Manually triggers a re-sync of Twitch EventSub listeners.
+     */
+    public void syncEventSub() {
+        log.info("Manually syncing EventSub...");
+        reconnect();
+    }
+
+    /**
+     * Verifies the current Twitch credentials.
+     * @return true if credentials are valid, false otherwise.
+     */
+    public boolean testConnection() {
+        try {
+            if (twitchClient == null) {
+                init();
+            }
+            UserList userList = twitchClient.getHelix().getUsers(currentAccessToken, null, List.of(currentChannelName)).execute();
+            return !userList.getUsers().isEmpty();
+        } catch (Exception e) {
+            log.error("Twitch connection test failed: {}", e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Forcefully refreshes the access tokens.
+     */
+    public void refreshTokens() {
+        log.info("Manually refreshing Twitch tokens...");
+        reconnect();
     }
 
     /**

@@ -106,8 +106,20 @@ public class SongUploadController {
             // Extract metadata (cover art, artist, name from tags)
             songService.updateMetadata(song);
 
-            Song savedSong = songRepository.save(song);
-            songService.updateM3uFile();
+            Song savedSong;
+            try {
+                savedSong = songRepository.save(song);
+                songService.updateM3uFile();
+            } catch (Exception e) {
+                // If database save fails, delete the "orphan" file
+                try {
+                    Files.deleteIfExists(destinationFile);
+                    logger.warn("Deleted orphan file {} after database save failure", destinationFile);
+                } catch (IOException ie) {
+                    logger.error("Failed to delete orphan file {}", destinationFile, ie);
+                }
+                throw e;
+            }
 
             logger.info("Song uploaded successfully: {} by {} to {}", savedSong.getName(), savedSong.getArtist(), destinationFile);
 

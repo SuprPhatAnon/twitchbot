@@ -1,5 +1,6 @@
 package dev.phatanon.entity;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -18,10 +19,19 @@ public class TwitchConfig {
     private Long id;
 
     private String clientId;
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String clientSecret;
+    
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String accessToken;
+    
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String refreshToken;
+    
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String botAccessToken;
+    
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String botRefreshToken;
     private String channelName;
     private String redeemTitle;

@@ -7,8 +7,9 @@
     <link rel="stylesheet" href="/css/style.css">
     <style>
         body { font-family: sans-serif; background-color: #121212; color: #eee; margin: 0; padding: 20px; }
-        .container { max-width: 800px; margin: 0 auto; background: #1e1e1e; padding: 20px; border-radius: 8px; }
+        .container { max-width: 800px; margin: 0 auto; background: #1e1e1e; padding: 20px; border-radius: 8px; max-height: 90vh; display: flex; flex-direction: column; }
         h1 { color: #9146ff; }
+        .table-container { overflow-y: auto; flex: 1; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th, td { padding: 12px; text-align: left; border-bottom: 1px solid #333; }
         th { background: #2a2a2a; }
@@ -35,16 +36,18 @@
         <h1>User Management</h1>
         <button class="btn btn-primary" onclick="openModal()">Add New User</button>
         
-        <table id="userTable">
-            <thead>
-                <tr>
-                    <th>Username</th>
-                    <th>Roles</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody></tbody>
-        </table>
+        <div class="table-container">
+            <table id="userTable">
+                <thead>
+                    <tr>
+                        <th>Username</th>
+                        <th>Roles</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
     </div>
 
     <div id="userModal" class="modal">

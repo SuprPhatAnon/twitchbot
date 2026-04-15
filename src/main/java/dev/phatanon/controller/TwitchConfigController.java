@@ -1,5 +1,6 @@
 package dev.phatanon.controller;
 
+import dev.phatanon.dto.TwitchConfigDTO;
 import dev.phatanon.entity.TwitchConfig;
 import dev.phatanon.repository.TwitchConfigRepository;
 import dev.phatanon.service.TwitchBotService;
@@ -73,14 +74,14 @@ public class TwitchConfigController {
     /**
      * Retrieves the current Twitch configuration from the database.
      * Only one configuration entry is expected to exist.
-     * @return The {@link TwitchConfig} if found, or 404 Not Found.
+     * @return The {@link TwitchConfigDTO} if found, or 404 Not Found.
      */
     @GetMapping
     @Operation(summary = "Get current Twitch configuration")
-    public ResponseEntity<TwitchConfig> getConfig() {
+    public ResponseEntity<TwitchConfigDTO> getConfig() {
         return twitchConfigRepository.findAll().stream()
                 .findFirst()
-                .map(ResponseEntity::ok)
+                .map(config -> ResponseEntity.ok(TwitchConfigDTO.fromEntity(config)))
                 .orElse(ResponseEntity.notFound().build());
     }
 
@@ -94,20 +95,26 @@ public class TwitchConfigController {
     @PutMapping
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Update Twitch configuration")
-    public TwitchConfig updateConfig(@RequestBody TwitchConfig config) {
+    public TwitchConfigDTO updateConfig(@RequestBody TwitchConfig config) {
         // We only ever want one configuration row
-        TwitchConfig saved = twitchConfigRepository.findAll().stream()
-                .findFirst()
-                .map(existing -> {
-                    config.setId(existing.getId());
-                    return twitchConfigRepository.save(config);
-                })
-                .orElseGet(() -> twitchConfigRepository.save(config));
+        TwitchConfig existingConfig = twitchConfigRepository.findAll().stream().findFirst().orElse(null);
+        
+        if (existingConfig != null) {
+            config.setId(existingConfig.getId());
+            // If tokens are masked in the request, preserve existing ones
+            if ("********".equals(config.getClientSecret())) config.setClientSecret(existingConfig.getClientSecret());
+            if ("********".equals(config.getAccessToken())) config.setAccessToken(existingConfig.getAccessToken());
+            if ("********".equals(config.getRefreshToken())) config.setRefreshToken(existingConfig.getRefreshToken());
+            if ("********".equals(config.getBotAccessToken())) config.setBotAccessToken(existingConfig.getBotAccessToken());
+            if ("********".equals(config.getBotRefreshToken())) config.setBotRefreshToken(existingConfig.getBotRefreshToken());
+        }
+
+        TwitchConfig saved = twitchConfigRepository.save(config);
         
         // Trigger reconnection with the new configuration
         twitchBotService.reconnect();
         
-        return saved;
+        return TwitchConfigDTO.fromEntity(saved);
     }
 
     /**
@@ -128,5 +135,35 @@ public class TwitchConfigController {
     @Operation(summary = "Get the configured redirect URI host")
     public ResponseEntity<String> getRedirectUriHost() {
         return ResponseEntity.ok(redirectUriHost);
+    }
+    @PostMapping("/sync-eventsub")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Manually trigger EventSub sync")
+    public ResponseEntity<Void> syncEventSub() {
+        twitchBotService.syncEventSub();
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/test-redeem")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Simulate a Twitch redeem for testing")
+    public ResponseEntity<Void> testRedeem(@RequestParam String title) {
+        twitchBotService.simulateRedeem(title);
+        return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/test-connection")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Test Twitch connection with current credentials")
+    public ResponseEntity<Boolean> testConnection() {
+        return ResponseEntity.ok(twitchBotService.testConnection());
+    }
+
+    @PostMapping("/refresh-tokens")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Manually refresh Twitch tokens")
+    public ResponseEntity<Void> refreshTokens() {
+        twitchBotService.refreshTokens();
+        return ResponseEntity.ok().build();
     }
 }
