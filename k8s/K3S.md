@@ -51,14 +51,13 @@ Alternatively, you can push your image to a public or private registry and updat
 
 The application requires configuration for database passwords and API keys, managed via Kustomize in `base/kustomization.yaml`.
 
-Update the `secretGenerator` values in `base/kustomization.yaml`. Note that the `UPLOAD_API_KEY` is a separate key specifically for song uploads:
+Update the `secretGenerator` values in `base/kustomization.yaml`. Note that the application now uses RBAC (Role-Based Access Control) via Spring Security, but you can still provide an initial admin password if needed (default is `admin`/`admin` if not changed):
 
 ```yaml
 secretGenerator:
   - name: twitchbotapp-secrets
     literals:
-      - API_KEY=your_secret_key
-      - UPLOAD_API_KEY=your_upload_secret_key
+      - DB_PASSWORD=your_db_password
   - name: db-secrets
     literals:
       - mariadb-root-password=your_db_password

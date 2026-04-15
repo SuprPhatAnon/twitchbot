@@ -18,6 +18,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/redeems")
 @Tag(name = "Redeem Management", description = "Endpoints for managing Twitch channel point redeems")
+@SecurityRequirement(name = "basicAuth")
 public class RedeemController {
 
     private final RedeemRepository redeemRepository;

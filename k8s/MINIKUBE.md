@@ -74,14 +74,13 @@ Alternatively, you can push your image to a registry and update the deployment m
 
 The application requires some configuration for database passwords and API keys. These are managed via Kustomize in `k8s/base/kustomization.yaml`.
 
-Open `base/kustomization.yaml` and update the `secretGenerator` values as needed.
+Update the `secretGenerator` values as needed. Note that the application now uses RBAC (Role-Based Access Control) via Spring Security, but you can still provide an initial admin password if needed (default is `admin`/`admin` if not changed):
 
 ```yaml
 secretGenerator:
   - name: twitchbotapp-secrets
     literals:
-      - API_KEY=your_secret_key # Change this!
-      - UPLOAD_API_KEY=your_upload_secret_key # Change this! (for song uploads)
+      - DB_PASSWORD=your_db_password # Change this!
   - name: db-secrets
     literals:
       - mariadb-root-password=your_db_password # Change this!

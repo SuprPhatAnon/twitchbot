@@ -16,6 +16,9 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+/**
+ * Service for managing user data and authentication.
+ */
 @Service
 public class UserService implements UserDetailsService {
 
@@ -27,6 +30,12 @@ public class UserService implements UserDetailsService {
         this.passwordEncoder = passwordEncoder;
     }
 
+    /**
+     * Loads user details by username for Spring Security.
+     * @param username The username of the user.
+     * @return UserDetails object for the authenticated user.
+     * @throws UsernameNotFoundException If the user is not found.
+     */
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         User user = userRepository.findByUsername(username)
@@ -41,20 +50,44 @@ public class UserService implements UserDetailsService {
         );
     }
 
+    /**
+     * Retrieves all users from the database.
+     * @return List of all User entities.
+     */
     public List<User> findAll() {
         return userRepository.findAll();
     }
 
+    /**
+     * Finds a user by their unique ID.
+     * @param id The user ID.
+     * @return Optional containing the user if found.
+     */
     public Optional<User> findById(Long id) {
         return userRepository.findById(id);
     }
 
+    /**
+     * Creates a new user with an encoded password.
+     * @param username The username.
+     * @param password The raw password (will be encoded).
+     * @param roles Set of roles for the user.
+     * @return The newly created User entity.
+     */
     @Transactional
     public User createUser(String username, String password, Set<Role> roles) {
         User user = new User(username, passwordEncoder.encode(password), roles);
         return userRepository.save(user);
     }
 
+    /**
+     * Updates an existing user's details.
+     * @param id The user ID to update.
+     * @param username The updated username.
+     * @param password The updated password (optional, will be encoded if provided).
+     * @param roles The updated set of roles.
+     * @return The updated User entity.
+     */
     @Transactional
     public User updateUser(Long id, String username, String password, Set<Role> roles) {
         User user = userRepository.findById(id)
@@ -67,6 +100,11 @@ public class UserService implements UserDetailsService {
         return userRepository.save(user);
     }
 
+    /**
+     * Changes a user's password.
+     * @param username The username.
+     * @param newPassword The new raw password (will be encoded).
+     */
     @Transactional
     public void changePassword(String username, String newPassword) {
         User user = userRepository.findByUsername(username)
@@ -75,15 +113,29 @@ public class UserService implements UserDetailsService {
         userRepository.save(user);
     }
 
+    /**
+     * Finds a user by their username.
+     * @param username The username.
+     * @return Optional containing the user if found.
+     */
     public Optional<User> findByUsername(String username) {
         return userRepository.findByUsername(username);
     }
 
+    /**
+     * Deletes a user by their unique ID.
+     * @param id The user ID to delete.
+     */
     @Transactional
     public void deleteUser(Long id) {
         userRepository.deleteById(id);
     }
 
+    /**
+     * Checks if a user exists with the given username.
+     * @param username The username to check.
+     * @return true if the user exists, false otherwise.
+     */
     public boolean existsByUsername(String username) {
         return userRepository.findByUsername(username).isPresent();
     }

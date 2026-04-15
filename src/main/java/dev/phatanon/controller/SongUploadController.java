@@ -5,6 +5,7 @@ import dev.phatanon.repository.SongRepository;
 import dev.phatanon.service.SongService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,6 +29,8 @@ import java.util.UUID;
  */
 @RestController
 @RequestMapping("/api/songs/upload")
+@Tag(name = "Song Upload", description = "Endpoints for uploading song files")
+@SecurityRequirement(name = "basicAuth")
 public class SongUploadController {
 
     private static final Logger logger = LoggerFactory.getLogger(SongUploadController.class);
@@ -43,6 +46,13 @@ public class SongUploadController {
         this.songService = songService;
     }
 
+    /**
+     * Uploads a new song file and creates a corresponding Song entity.
+     * @param file The multipart file to upload.
+     * @param name The name of the song.
+     * @param artist The artist of the song.
+     * @return The created Song entity or an error message.
+     */
     @Operation(summary = "Upload a new song file")
     @PostMapping
     public ResponseEntity<?> uploadSong(

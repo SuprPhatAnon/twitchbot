@@ -106,14 +106,14 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
     /**
      * Broadcasts the current queue size to WebSocket subscribers on /topic/queue-size.
      */
-    private void broadcastQueueSize() {
+    protected void broadcastQueueSize() {
         messagingTemplate.convertAndSend("/topic/queue-size", getQueueSize());
     }
 
     /**
      * Broadcasts the currently playing song to WebSocket subscribers on /topic/current-song.
      */
-    private void broadcastCurrentSong() {
+    protected void broadcastCurrentSong() {
         if (currentlyPlayingSong != null) {
             messagingTemplate.convertAndSend("/topic/current-song", currentlyPlayingSong);
         } else {
@@ -124,7 +124,7 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
     /**
      * Broadcasts a message to refresh the songs list on the UI.
      */
-    private void broadcastSongsRefresh() {
+    protected void broadcastSongsRefresh() {
         messagingTemplate.convertAndSend("/topic/songs", "refresh");
     }
     private boolean isStreamOnline = false;
@@ -157,6 +157,10 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
     public synchronized boolean isTwitchConnected() {
         return twitchClient != null && 
                twitchClient.getChat().getState() == WebsocketConnectionState.CONNECTED;
+    }
+
+    protected void setTwitchClient(TwitchClient twitchClient) {
+        this.twitchClient = twitchClient;
     }
 
     /**
@@ -246,7 +250,9 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
                     .withDefaultAuthToken(streamerCredential)
                     .withChatAccount(botCredential);
 
-            twitchClient = builder.build();
+            if (twitchClient == null) {
+                twitchClient = builder.build();
+            }
             log.info("TwitchClient built successfully.");
 
             tokenRefreshTask = scheduler.scheduleAtFixedRate(() -> {

@@ -159,4 +159,60 @@ public class TwitchBotServiceLogicTest {
 
         assertFalse(twitchBotService.isSongPlaying());
     }
+
+    @Test
+    void shouldGetRecentRedeems() {
+        Song song = new Song("S1", "A1", "u1");
+        song.setId(1L);
+        when(songRepository.findById(1L)).thenReturn(Optional.of(song));
+        
+        twitchBotService.playSongById(1L);
+        
+        List<TwitchBotService.RedeemLog> redeems = twitchBotService.getRecentRedeems();
+        assertNotNull(redeems);
+    }
+
+    @Test
+    void shouldBroadcastSongsRefresh() {
+        twitchBotService.broadcastSongsRefresh();
+        verify(messagingTemplate).convertAndSend(eq("/topic/songs"), eq("refresh"));
+    }
+
+    @Test
+    void shouldBroadcastQueueSize() {
+        twitchBotService.broadcastQueueSize();
+        verify(messagingTemplate).convertAndSend(eq("/topic/queue-size"), anyInt());
+    }
+
+    @Test
+    void shouldBroadcastCurrentSong() {
+        Song song = new Song("S1", "A1", "u1");
+        song.setId(1L);
+        when(songRepository.findById(1L)).thenReturn(Optional.of(song));
+        twitchBotService.playSongById(1L);
+        
+        twitchBotService.broadcastCurrentSong();
+        verify(messagingTemplate, atLeastOnce()).convertAndSend(eq("/topic/current-song"), eq(song));
+    }
+
+    @Test
+    void shouldNotPlayMissingSongById() {
+        when(songRepository.findById(1L)).thenReturn(Optional.empty());
+        twitchBotService.playSongById(1L);
+        assertFalse(twitchBotService.isSongPlaying());
+    }
+
+    @Test
+    void shouldHandleSongFinished() {
+        Song song = new Song("S1", "A1", "u1");
+        song.setId(1L);
+        when(songRepository.findById(1L)).thenReturn(Optional.of(song));
+        twitchBotService.playSongById(1L);
+        
+        twitchBotService.handleSongFinished();
+        
+        assertFalse(twitchBotService.isSongPlaying());
+        assertNull(twitchBotService.getCurrentlyPlayingSong());
+        verify(scheduler).schedule(any(Runnable.class), anyLong(), any());
+    }
 }

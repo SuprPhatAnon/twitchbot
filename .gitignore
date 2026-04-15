@@ -42,3 +42,7 @@ build/
 /.idea/
 /.mvn/
 /.idea/
+/.output.txt
+/all_classes.txt
+/tested_base_classes.txt
+/tested_classes.txt

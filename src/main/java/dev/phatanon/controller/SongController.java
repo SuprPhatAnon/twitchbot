@@ -23,6 +23,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/songs")
 @Tag(name = "Song Management", description = "Endpoints for managing songs")
+@SecurityRequirement(name = "basicAuth")
 public class SongController {
 
     private final SongRepository songRepository;

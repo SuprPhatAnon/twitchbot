@@ -100,6 +100,7 @@ The database is managed by Hibernate/JPA. Key tables:
 ### Automated Tests
 - Run tests using Maven: `mvn test`
 - Tests are located in `src/test/java/dev/phatanon/`.
+- **Maintain a minimum test coverage of 70%** for all new and modified code.
 
 ## Environment Setup for Agents
 

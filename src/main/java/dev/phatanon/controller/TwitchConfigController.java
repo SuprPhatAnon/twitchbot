@@ -21,6 +21,7 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/twitch-config")
 @Tag(name = "Twitch Configuration", description = "Endpoints for managing Twitch bot credentials and settings")
+@SecurityRequirement(name = "basicAuth")
 public class TwitchConfigController {
 
     private final TwitchConfigRepository twitchConfigRepository;

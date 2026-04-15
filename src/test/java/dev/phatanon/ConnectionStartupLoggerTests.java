@@ -3,6 +3,7 @@ package dev.phatanon;
 import dev.phatanon.repository.SongRepository;
 import dev.phatanon.service.SongService;
 import dev.phatanon.service.TwitchBotService;
+import dev.phatanon.service.UserService;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -52,7 +53,8 @@ class ConnectionStartupLoggerTests {
             // Act
             SongRepository songRepository = mock(SongRepository.class);
             SongService songService = mock(SongService.class);
-            ConnectionStartupLogger logger = new ConnectionStartupLogger(jdbcTemplate, twitchBotService, songRepository, songService);
+            UserService userService = mock(UserService.class);
+            ConnectionStartupLogger logger = new ConnectionStartupLogger(jdbcTemplate, twitchBotService, songRepository, songService, userService);
             ReflectionTestUtils.setField(logger, "buildId", "test-build-id");
             logger.run();
 
