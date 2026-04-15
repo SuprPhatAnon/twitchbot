@@ -14,12 +14,6 @@ import java.util.concurrent.ScheduledExecutorService;
  * This class initializes the Spring Boot application context.
  */
 @SpringBootApplication
-@SecurityScheme(
-        name = "X-API-Key",
-        type = SecuritySchemeType.APIKEY,
-        in = SecuritySchemeIn.HEADER,
-        paramName = "X-API-Key"
-)
 public class TwitchBotApplication {
 
     public static void main(String[] args) {

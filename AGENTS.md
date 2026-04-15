@@ -44,11 +44,19 @@ This is a Spring Boot application that integrates with Twitch to play songs on a
    - `/topic/songs`: Receives "refresh" messages when the song list changes.
    - `/topic/redeems-list`: Receives "refresh" messages when the redeems list changes.
 
+### File Storage & Playlists
+- **Song Uploads**: Managed by `SongUploadController`. Files are stored in the directory specified by `SONG_UPLOAD_PATH` (default: `/uploads/songs`).
+- **M3U Playlist**: A `playlist.m3u` file is automatically generated and updated in the `SONG_UPLOAD_PATH` directory whenever songs are added, updated, or deleted. This file contains all enabled songs.
+
 ### Authentication
-- Some API endpoints (`/api/**`) require an `X-API-Key` header.
-- **Read-only requests (GET)** are public and do not require an API key.
-- **Write requests (POST, PUT, DELETE)** require an `X-API-Key` header with your set API key.
-- The default key is `default_secret_key` if not configured via environment variables.
+- The application uses Spring Security with form-based login.
+- **Read-only requests (GET)** are generally public.
+- **Write requests (POST, PUT, DELETE)** require a logged-in user with appropriate roles.
+- **Roles**:
+  - `ROLE_UPLOAD`: Allowed to upload songs.
+  - `ROLE_STREAMER`: Allowed access to Streamer UI and song playback.
+  - `ROLE_ADMIN`: Full access (Users, Config, Songs, Redeems).
+- Default admin credentials: `admin` / `admin`.
 
 ### Database Schema
 The database is managed by Hibernate/JPA. Key tables:
@@ -68,7 +76,7 @@ The database is managed by Hibernate/JPA. Key tables:
 
 ### Adding a New Endpoint
 1. Create or update a controller in `src/main/java/dev/phatanon/controller/`.
-2. Ensure it has the `@SecurityRequirement(name = "X-API-Key")` annotation if it needs protection.
+2. Use Spring Security annotations like `@PreAuthorize` to protect endpoints.
 3. Add the endpoint to `README.md`.
 
 ### Changing Twitch Integration Logic
@@ -80,9 +88,12 @@ The database is managed by Hibernate/JPA. Key tables:
 - Other UIs:
   - `admin.html`: Full management dashboard.
   - `streamer.html`: Read-only/operational dashboard.
+  - `upload.html`: Song upload interface.
+  - `user-management.html`: User management interface (Admin only).
+  - `login.html`: Login page.
   - `player.html`: Public player for manual playback.
   - `statistics.html`: Song play statistics dashboard.
-- UIs use basic CSS, SockJS/STOMP, and often include an API key for write operations.
+- UIs use basic CSS, SockJS/STOMP, and use session-based authentication.
 
 ## Testing Procedures
 

@@ -83,17 +83,6 @@
     </style>
 </head>
 <body>
-    <div id="auth-overlay">
-        <div class="auth-card">
-            <h3 class="mb-3">Streamer Access</h3>
-            <div class="mb-3">
-                <label class="form-label">API Key</label>
-                <input type="password" class="form-control" id="api-key-input">
-            </div>
-            <button class="btn btn-primary w-100" onclick="saveApiKey()">Login</button>
-        </div>
-    </div>
-
     <div class="status-bar">
         <div class="d-flex align-items-center">
             <span class="h5 mb-0 me-4">Twitch Bot Streamer UI</span>
@@ -118,7 +107,9 @@
         </div>
         <div>
             <button id="theme-toggle" class="btn btn-outline-light btn-sm me-2" onclick="toggleTheme()">🌙</button>
+            <a href="/account.html" class="btn btn-outline-light btn-sm me-2">Account</a>
             <a href="/statistics.html" class="btn btn-outline-light btn-sm me-2">Statistics</a>
+            <button class="btn btn-outline-light btn-sm" onclick="logout()">Logout</button>
         </div>
     </div>
 
@@ -231,11 +222,9 @@
         }
 
         async function fetchRecentRedeems() {
-            const key = getApiKey();
-            if (!key) return;
             try {
-                const response = await fetch('/api/twitch-config/redeems', { headers: { 'X-API-Key': key } });
-                if (response.status === 401) return logout();
+                const response = await fetch('/api/twitch-config/redeems');
+                if (response.status === 401 || response.status === 403) return window.location.href = '/login.html';
                 const redeems = await response.json();
                 const logEl = document.getElementById('redeem-log');
                 logEl.innerHTML = '';
@@ -243,17 +232,8 @@
             } catch (error) { console.error('Error fetching redeems:', error); }
         }
 
-        function getApiKey() { return localStorage.getItem('twitch_bot_api_key') || ''; }
-        function saveApiKey() {
-            const key = document.getElementById('api-key-input').value;
-            if (key) {
-                localStorage.setItem('twitch_bot_api_key', key);
-                location.reload();
-            }
-        }
         function logout() {
-            localStorage.removeItem('twitch_bot_api_key');
-            location.reload();
+            window.location.href = '/api/logout';
         }
 
         function toggleTheme() {
@@ -317,23 +297,22 @@
         }
 
         async function refreshInitialStatus() {
-            const key = getApiKey();
-            if (!key) return;
             try {
                 // Stream status
-                let res = await fetch('/api/twitch-config/status', { headers: { 'X-API-Key': key } });
+                let res = await fetch('/api/twitch-config/status');
+                if (res.status === 401 || res.status === 403) return window.location.href = '/login.html';
                 if (res.ok) updateStreamStatusDisplay(await res.json());
 
                 // Connection status
-                res = await fetch('/api/twitch-config/connection', { headers: { 'X-API-Key': key } });
+                res = await fetch('/api/twitch-config/connection');
                 if (res.ok) updateConnectionStatusDisplay(await res.json());
 
                 // Queue size
-                res = await fetch('/api/songs/queue-size', { headers: { 'X-API-Key': key } });
+                res = await fetch('/api/songs/queue-size');
                 if (res.ok) updateQueueSizeDisplay(await res.json());
 
                 // Current song
-                res = await fetch('/api/songs/current', { headers: { 'X-API-Key': key } });
+                res = await fetch('/api/songs/current');
                 if (res.status === 200) updateCurrentSongDisplay(await res.json());
                 else updateCurrentSongDisplay(null);
 
@@ -343,11 +322,9 @@
         }
 
         async function fetchSongs() {
-            const key = getApiKey();
-            if (!key) return;
             try {
-                const response = await fetch('/api/songs', { headers: { 'X-API-Key': key } });
-                if (response.status === 401) return logout();
+                const response = await fetch('/api/songs');
+                if (response.status === 401 || response.status === 403) return window.location.href = '/login.html';
                 const songs = await response.json();
                 const tbody = document.getElementById('songs-table-body');
                 tbody.innerHTML = '';
@@ -407,9 +384,8 @@
         }
 
         async function fetchRecentPlays() {
-            const key = getApiKey();
             try {
-                const response = await fetch('/api/songs/plays/recent?limit=5', { headers: { 'X-API-Key': key } });
+                const response = await fetch('/api/songs/plays/recent?limit=5');
                 if (!response.ok) return;
                 const plays = await response.json();
                 const statsEl = document.getElementById('recent-plays-stats');
@@ -437,11 +413,9 @@
         }
 
         async function fetchRedeems() {
-            const key = getApiKey();
-            if (!key) return;
             try {
-                const response = await fetch('/api/redeems', { headers: { 'X-API-Key': key } });
-                if (response.status === 401) return logout();
+                const response = await fetch('/api/redeems');
+                if (response.status === 401 || response.status === 403) return window.location.href = '/login.html';
                 const allRedeems = await response.json();
                 
                 // Update redeems list
@@ -458,20 +432,16 @@
 
 
         async function playSong(id) {
-            const key = getApiKey();
             try {
-                const response = await fetch(`/api/songs/${id}/play?incrementStats=true`, { method: 'POST', headers: { 'X-API-Key': key } });
+                const response = await fetch(`/api/songs/${id}/play?incrementStats=true`, { method: 'POST' });
                 if (response.ok) { /* WebSocket will update queue size */ }
                 else { alert(await response.text()); }
             } catch (error) { console.error('Error playing song:', error); }
         }
 
-        checkAuth();
-        if (getApiKey()) {
-            refreshInitialStatus();
-            fetchRecentRedeems();
-            connectWebSocket();
-        }
+        refreshInitialStatus();
+        fetchRecentRedeems();
+        connectWebSocket();
     </script>
 </body>
 </html>

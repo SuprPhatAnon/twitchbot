@@ -78,9 +78,10 @@ Open `base/kustomization.yaml` and update the `secretGenerator` values as needed
 
 ```yaml
 secretGenerator:
-  - name: app-secrets
+  - name: twitchbotapp-secrets
     literals:
       - API_KEY=your_secret_key # Change this!
+      - UPLOAD_API_KEY=your_upload_secret_key # Change this! (for song uploads)
   - name: db-secrets
     literals:
       - mariadb-root-password=your_db_password # Change this!
@@ -120,13 +121,13 @@ The default Ingress configuration uses the host `stream.phat.wtf`. To access it 
 If you don't want to mess with hostnames, you can port-forward the service directly:
 
 ```bash
-kubectl port-forward -n streaming svc/app 8080:8080
+kubectl port-forward -n streaming svc/twitchbotapp 8080:8080
 ```
 Then access the app at `http://localhost:8080`.
 
 ## Troubleshooting
 
 -   **Check Pods:** `kubectl get pods -n streaming`
--   **Check Logs:** `kubectl logs -n streaming deployment/app`
+-   **Check Logs:** `kubectl logs -n streaming deployment/twitchbotapp`
 -   **MariaDB Connection:** The app might take a minute to start as it waits for MariaDB to be ready via an `initContainer`.
 -   **Ingress Issues:** Ensure `minikube tunnel` is running if you are using the Ingress hostname.

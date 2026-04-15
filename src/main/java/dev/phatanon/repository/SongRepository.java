@@ -31,4 +31,10 @@ public interface SongRepository extends JpaRepository<Song, Long> {
      * @return A list of songs matching the enabled status.
      */
     List<Song> findByEnabled(boolean enabled);
+
+    /**
+     * Finds all enabled songs sorted by sortName.
+     * @return A list of all enabled songs sorted by sortName.
+     */
+    List<Song> findAllByEnabledTrueOrderBySortNameAsc();
 }

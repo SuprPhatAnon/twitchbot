@@ -7,8 +7,9 @@ This package contains Kubernetes manifests for the Twitch Bot application, based
 ```text
 k8s/
 ├── base/
-│   ├── app/
-│   │   ├── app.yaml             # Deployment and Service for the Spring Boot app
+│   ├── twitchbotapp/
+│   │   ├── twitchbotapp.yaml    # Deployment and Service for the Spring Boot app
+│   │   ├── pvc.yaml             # PersistentVolumeClaim for song uploads
 │   │   └── ingress.yaml         # Ingress resource for the app
 │   ├── mariadb/
 │   │   └── mariadb.yaml         # Deployment, Service, and PVC for MariaDB
@@ -47,10 +48,10 @@ To deploy the application to your Kubernetes cluster:
 
 ## Key Features
 
-- **Health Probes:** Both `mariadb` and `app` have liveness and readiness probes.
-- **Dependency Management:** The `app` deployment uses an `initContainer` to wait for the `mariadb` service to be reachable before starting.
-- **Persistence:** `mariadb` uses a `PersistentVolumeClaim` (PVC) for database storage.
-- **Config Management:** Environment variables are managed via `ConfigMap` and `Secret` generators in `kustomization.yaml`.
+- **Health Probes:** Both `mariadb` and `twitchbotapp` have liveness and readiness probes.
+- **Dependency Management:** The `twitchbotapp` deployment uses an `initContainer` to wait for the `mariadb` service to be reachable before starting.
+- **Persistence:** Both `mariadb` and `twitchbotapp` (for song uploads) use `PersistentVolumeClaims` (PVC) for storage.
+- **Config Management:** Environment variables are managed via `ConfigMap` and `Secret` generators in `kustomization.yaml`. This includes the `API_KEY` for general access and the `UPLOAD_API_KEY` for song uploads.
 
 ## Important Notes
 
@@ -58,6 +59,22 @@ To deploy the application to your Kubernetes cluster:
 - **Resources:** Default resource requests/limits are not set; consider adding them based on your cluster's capacity.
 - **Ingress:** This package includes an Ingress resource configured for `stream.phat.wtf`. Ensure you have an Ingress controller (e.g., NGINX) installed.
 - **Minikube:** For local testing with Minikube, see the [Minikube Deployment Guide](MINIKUBE.md).
+
+## Persistence Configuration
+
+By default, the `PersistentVolumeClaim` (PVC) for song uploads is configured to use a `PersistentVolume` (PV) that specifies a `hostPath`. This is convenient for development and single-node setups.
+
+### Using a Specific Host Path
+
+The storage for song uploads is mapped to a directory on your host machine.
+
+1.  Edit `k8s/base/twitchbotapp/pvc.yaml`.
+2.  Set `hostPath.path` to your desired directory (default: `/mnt/data/songs`).
+3.  Re-apply the manifests: `kubectl apply -k k8s/overlays/<overlay>/`.
+
+If your environment (like a managed Kubernetes service) supports dynamic provisioning and you don't want to use `hostPath`, you should:
+1. Remove the `PersistentVolume` (lines 1-12) from `pvc.yaml`.
+2. Remove `storageClassName: manual` and `volumeName: song-uploads-pv` from the `PersistentVolumeClaim` in `pvc.yaml`.
 
 ## Specific Guides
 

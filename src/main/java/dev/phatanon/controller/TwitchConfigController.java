@@ -89,7 +89,7 @@ public class TwitchConfigController {
      * @return The saved {@link TwitchConfig} object.
      */
     @PutMapping
-    @Operation(summary = "Update Twitch configuration", security = @SecurityRequirement(name = "X-API-Key"))
+    @Operation(summary = "Update Twitch configuration")
     public TwitchConfig updateConfig(@RequestBody TwitchConfig config) {
         // We only ever want one configuration row
         TwitchConfig saved = twitchConfigRepository.findAll().stream()

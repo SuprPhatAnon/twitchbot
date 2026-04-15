@@ -1,39 +1,39 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: app
+  name: twitchbotapp
 spec:
   ports:
     - port: 8080
       targetPort: 8080
   selector:
-    app: app
+    app: twitchbotapp
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: app
+  name: twitchbotapp
 spec:
   selector:
     matchLabels:
-      app: app
+      app: twitchbotapp
   template:
     metadata:
       labels:
-        app: app
+        app: twitchbotapp
     spec:
       initContainers:
         - name: wait-for-db
           image: busybox:1.36
           command: ['sh', '-c', "until nc -zv mariadb 3306; do echo waiting for mariadb; sleep 2; done;"]
       containers:
-        - name: app
+        - name: twitchbotapp
           image: twitchbot-app:latest # Replace with actual image
           envFrom:
             - configMapRef:
-                name: app-config
+                name: twitchbotapp-config
             - secretRef:
-                name: app-secrets
+                name: twitchbotapp-secrets
           env:
             - name: DB_HOST
               value: "mariadb"
@@ -55,3 +55,10 @@ spec:
               port: 8080
             initialDelaySeconds: 30
             periodSeconds: 10
+          volumeMounts:
+            - name: song-uploads
+              mountPath: /uploads/songs
+      volumes:
+        - name: song-uploads
+          persistentVolumeClaim:
+            claimName: song-uploads-pvc

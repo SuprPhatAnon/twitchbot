@@ -46,7 +46,7 @@ public class RedeemController {
      */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Add a new redeem", security = @SecurityRequirement(name = "X-API-Key"))
+    @Operation(summary = "Add a new redeem")
     public Redeem addRedeem(@RequestBody Redeem redeem) {
         Redeem savedRedeem = redeemRepository.save(redeem);
         messagingTemplate.convertAndSend("/topic/redeems-list", "refresh");
@@ -60,7 +60,7 @@ public class RedeemController {
      * @return 204 No Content if successful, or 404 Not Found if the ID does not exist.
      */
     @DeleteMapping("/{id}")
-    @Operation(summary = "Delete a redeem", security = @SecurityRequirement(name = "X-API-Key"))
+    @Operation(summary = "Delete a redeem")
     public ResponseEntity<Void> deleteRedeem(@PathVariable Long id) {
         return redeemRepository.findById(id)
                 .map(redeem -> {

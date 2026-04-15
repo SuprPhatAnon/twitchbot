@@ -9,6 +9,7 @@ This application listens for Twitch Channel Point redemptions and plays a random
 - **Admin & Streamer UIs**: Built-in dashboards to manage songs, rewards, and monitor status.
 - **Database Driven**: All songs, rewards, and statistics are stored in a MariaDB database.
 - **API First**: Fully documented REST API with OpenAPI/Swagger support.
+- **M3U Playlist**: Automatically generates a `playlist.m3u` file containing all enabled songs in the upload directory.
 
 ## Prerequisites
 
@@ -25,7 +26,7 @@ This application listens for Twitch Channel Point redemptions and plays a random
 
 | Variable | Description |
 | --- | --- |
-| `API_KEY` | Secret key for REST API Authorization (Default: `default_secret_key`) |
+| `SONG_UPLOAD_PATH` | Path where uploaded songs are stored (Default: `/uploads/songs`) |
 | `DB_HOST` | MariaDB host (Default: `localhost`) |
 | `DB_USER` | MariaDB username (Default: `mariadb`) |
 | `DB_PASSWORD` | MariaDB password (Default: `mariadb`) |
@@ -89,10 +90,23 @@ The application includes a built-in Admin UI for full management and a Streamer 
 - **Streamer UI**: `http://localhost:8080/streamer.html`
   - Read-only access to view configuration, songs, and logs.
   - Allows triggering song playback ("Play" button).
+- **Upload UI**: `http://localhost:8080/upload.html`
+  - Interface to upload new song files (MP3) directly to the server.
 - **Public Player**: `http://localhost:8080/player.html`
   - Simple UI for regular people to play songs directly in their browser.
 
-You will need to provide your `API_KEY` in the Admin and Streamer UIs to log in and perform actions. The Public Player and Statistics pages do not require an API key.
+## Authentication
+
+The application uses a user-based authentication system with three groups:
+- **upload**: Allowed to upload songs.
+- **streamer**: Allowed access to Streamer UI and upload.
+- **admin**: Allowed everything, including user management and Twitch configuration.
+
+**Default Credentials:**
+- **Username**: `admin`
+- **Password**: `admin`
+
+Access the Admin UI to manage users and their roles.
 
 ## OpenAPI Documentation
 
@@ -114,14 +128,13 @@ When the reward is redeemed on Twitch, the overlay will pick a random song from 
 You can manually trigger a song play (for testing the overlay) by visiting:
 `http://localhost:8080/api/songs/{id}/play`
 
-Example using `curl`:
+Example using `curl` (requires session cookie or basic auth if configured, but here we assume session):
 ```bash
-curl -X POST http://localhost:8080/api/songs/1/play -H "X-API-Key: your_api_key"
+curl -X POST http://localhost:8080/api/songs/1/play
 ```
-*(Note: As this is a POST request, it requires the `X-API-Key` header.)*
 
 ### REST API
-You can manage the application using the following REST API endpoints. All write requests (**POST, PUT, DELETE**) to `/api/**` require an `X-API-Key` header with your set API key. Read-only requests (**GET**) are public.
+You can manage the application using the following REST API endpoints. Write requests (**POST, PUT, DELETE**) to `/api/**` require authentication. Read-only requests (**GET**) are public.
 Interactive documentation is available at `/swagger-ui.html`.
 
 #### Song Management (`/api/songs`)
@@ -129,6 +142,8 @@ Interactive documentation is available at `/swagger-ui.html`.
 - **GET `/api/songs/{id}`**: Get a specific song by ID.
 - **POST `/api/songs`**: Add a new song.
   - Body: `{"name": "Song Name", "artist": "Artist Name", "url": "https://example.com/song.mp3", "redeems": [{"id": 1}]}`
+- **POST `/api/songs/upload`**: Upload a new song file.
+  - Multipart form-data: `file` (MP3 file), `name` (string), `artist` (string).
 - **PUT `/api/songs/{id}`**: Update an existing song.
 - **DELETE `/api/songs/{id}`**: Remove a song from the database.
 - **POST `/api/songs/{id}/play`**: Manually queue a song for playback.
@@ -140,6 +155,12 @@ Interactive documentation is available at `/swagger-ui.html`.
   - Query parameter: `limit` (int, default: `5`).
 - **GET `/api/songs/statistics`**: Get song play statistics.
   - Query parameters: `range` (e.g., `daily`, `weekly`, `monthly`, `yearly`, `alltime`), `groupBy` (e.g., `song`, `artist`).
+
+#### User Management (`/api/users`) - Admin Only
+- **GET `/api/users`**: List all users.
+- **POST `/api/users`**: Create a new user.
+- **PUT `/api/users/{id}`**: Update a user.
+- **DELETE `/api/users/{id}`**: Delete a user.
 
 #### Redeem Management (`/api/redeems`)
 - **GET `/api/redeems`**: List all defined Twitch channel point redeems.

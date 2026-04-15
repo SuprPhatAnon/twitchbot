@@ -125,16 +125,18 @@ public class SongControllerTest {
     }
 
     @Test
-    void shouldDeleteSong() throws Exception {
+    void shouldDeleteSongSoftly() throws Exception {
         Song song = new Song("Delete Me", "Artist", "url");
         song.setId(1L);
-        when(songRepository.findById(1L)).thenReturn(Optional.of(song)).thenReturn(Optional.empty());
+        song.setEnabled(true);
+        when(songRepository.findById(1L)).thenReturn(Optional.of(song));
+        when(songRepository.save(any(Song.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         mockMvc.perform(delete("/api/songs/1"))
                 .andExpect(status().isNoContent());
 
-        mockMvc.perform(get("/api/songs/1"))
-                .andExpect(status().isNotFound());
+        org.mockito.Mockito.verify(songRepository).save(song);
+        org.junit.jupiter.api.Assertions.assertFalse(song.isEnabled());
     }
 
     @Test

@@ -1,8 +1,9 @@
 package dev.phatanon;
 
+import dev.phatanon.entity.Role;
 import dev.phatanon.repository.SongRepository;
 import dev.phatanon.service.SongService;
-import dev.phatanon.service.TwitchBotService;
+import dev.phatanon.service.UserService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -10,7 +11,9 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.jdbc.core.JdbcOperations;
 import org.springframework.stereotype.Component;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 
 /**
  * A startup component that performs connectivity checks for database and Twitch services.
@@ -36,15 +39,17 @@ public class ConnectionStartupLogger implements CommandLineRunner {
     private final ITwitchBotService twitchBotService;
     private final SongRepository songRepository;
     private final SongService songService;
+    private final UserService userService;
 
     @Value("${spring.application.build-id:unknown}")
     private String buildId;
 
-    public ConnectionStartupLogger(JdbcOperations jdbcTemplate, ITwitchBotService twitchBotService, SongRepository songRepository, SongService songService) {
+    public ConnectionStartupLogger(JdbcOperations jdbcTemplate, ITwitchBotService twitchBotService, SongRepository songRepository, SongService songService, UserService userService) {
         this.jdbcTemplate = jdbcTemplate;
         this.twitchBotService = twitchBotService;
         this.songRepository = songRepository;
         this.songService = songService;
+        this.userService = userService;
     }
 
     @Override
@@ -55,8 +60,17 @@ public class ConnectionStartupLogger implements CommandLineRunner {
         checkDatabaseConnection();
         checkTwitchConnection();
         backfillCoverArt();
+        initializeAdminUser();
 
         logger.info("Startup connection checks completed.");
+    }
+
+    private void initializeAdminUser() {
+        if (!userService.existsByUsername("admin")) {
+            logger.info("Initializing default admin user...");
+            userService.createUser("admin", "admin", Set.of(Role.ROLE_ADMIN));
+            logger.info("✅ Default admin user created.");
+        }
     }
 
     private void backfillCoverArt() {

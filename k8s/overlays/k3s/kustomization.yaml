@@ -7,7 +7,7 @@ resources:
 patches:
   - target:
       kind: Ingress
-      name: app-ingress
+      name: twitchbotapp-ingress
     patch: |-
       - op: remove
         path: /metadata/annotations/kubernetes.io~1ingress.class

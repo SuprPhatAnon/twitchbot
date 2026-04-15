@@ -70,11 +70,12 @@ public class SongController {
      */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Add a new song", security = @SecurityRequirement(name = "X-API-Key"))
+    @Operation(summary = "Add a new song")
     public Song addSong(@RequestBody Song song) {
         songService.updateCoverArt(song);
         Song savedSong = songRepository.save(song);
         messagingTemplate.convertAndSend("/topic/songs", "refresh");
+        songService.updateM3uFile();
         return savedSong;
     }
 
@@ -86,7 +87,7 @@ public class SongController {
      * @return A {@link ResponseEntity} containing the updated {@link Song} if successful, or 404 Not Found if not.
      */
     @PutMapping("/{id}")
-    @Operation(summary = "Update an existing song", security = @SecurityRequirement(name = "X-API-Key"))
+    @Operation(summary = "Update an existing song")
     public ResponseEntity<Song> updateSong(@PathVariable Long id, @RequestBody Song songDetails) {
         return songRepository.findById(id)
                 .map(song -> {
@@ -98,6 +99,7 @@ public class SongController {
                     songService.updateCoverArt(song);
                     Song updatedSong = songRepository.save(song);
                     messagingTemplate.convertAndSend("/topic/songs", "refresh");
+                    songService.updateM3uFile();
                     return ResponseEntity.ok(updatedSong);
                 })
                 .orElse(ResponseEntity.notFound().build());
@@ -112,7 +114,7 @@ public class SongController {
      * @return A {@link ResponseEntity} indicating whether the song was successfully queued.
      */
     @PostMapping("/{id}/play")
-    @Operation(summary = "Play a song by ID", security = @SecurityRequirement(name = "X-API-Key"))
+    @Operation(summary = "Play a song by ID")
     public ResponseEntity<String> playSong(@PathVariable Long id, @RequestParam(required = false, defaultValue = "false") boolean incrementStats) {
         /*
         if (!twitchBotService.isStreamOnline()) {
@@ -133,7 +135,7 @@ public class SongController {
      * @return A {@link ResponseEntity} indicating that the queue was cleared.
      */
     @PostMapping("/clear")
-    @Operation(summary = "Clear song queue and stop playback", security = @SecurityRequirement(name = "X-API-Key"))
+    @Operation(summary = "Clear song queue and stop playback")
     public ResponseEntity<String> clearQueue() {
         twitchBotService.clearQueue();
         return ResponseEntity.ok().body("Song queue cleared and playback stopped.");
@@ -164,17 +166,20 @@ public class SongController {
     }
 
     /**
-     * Deletes a song from the {@link SongRepository}.
+     * Deletes a song from the {@link SongRepository} (Soft delete).
+     * Only sets the enabled flag to false and never deletes the row.
      * @param id The ID of the song to delete.
      * @return 204 No Content if successful, or 404 Not Found if the ID does not exist.
      */
     @DeleteMapping("/{id}")
-    @Operation(summary = "Delete a song", security = @SecurityRequirement(name = "X-API-Key"))
+    @Operation(summary = "Delete a song")
     public ResponseEntity<Void> deleteSong(@PathVariable Long id) {
         return songRepository.findById(id)
                 .map(song -> {
-                    songRepository.delete(song);
+                    song.setEnabled(false);
+                    songRepository.save(song);
                     messagingTemplate.convertAndSend("/topic/songs", "refresh");
+                    songService.updateM3uFile();
                     return ResponseEntity.noContent().<Void>build();
                 })
                 .orElse(ResponseEntity.notFound().build());

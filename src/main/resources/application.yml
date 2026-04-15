@@ -31,6 +31,8 @@ server:
 
 twitch:
   api-key: ${API_KEY:default_secret_key}
+  upload-api-key: ${UPLOAD_API_KEY:default_upload_secret_key}
+  song-upload-path: ${SONG_UPLOAD_PATH:/uploads/songs}
   song-delay-seconds: 5
   redirect-uri-host: ${TWITCH_REDIRECT_URI_HOST:https://stream.phat.wtf}
 springdoc:

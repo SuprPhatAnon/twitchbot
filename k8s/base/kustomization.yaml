@@ -6,18 +6,20 @@ namespace: streaming
 resources:
   - namespace.yaml
   - mariadb/mariadb.yaml
-  - app/app.yaml
-  - app/ingress.yaml
+  - twitchbotapp/pvc.yaml
+  - twitchbotapp/twitchbotapp.yaml
+  - twitchbotapp/ingress.yaml
 
 configMapGenerator:
-  - name: app-config
+  - name: twitchbotapp-config
     literals:
       - SPRING_PROFILES_ACTIVE=prod
 
 secretGenerator:
-  - name: app-secrets
+  - name: twitchbotapp-secrets
     literals:
       - API_KEY=default_secret_key
+      - UPLOAD_API_KEY=default_upload_secret_key
   - name: db-secrets
     literals:
       - mariadb-root-password=mariadb
