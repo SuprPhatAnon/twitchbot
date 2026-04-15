@@ -9,7 +9,7 @@ public class MusicCommandHandler implements ChatMessageHandler {
 
     private final String redirectUriHost;
 
-    public MusicCommandHandler(@Value("${app.redirect-uri-host}") String redirectUriHost) {
+    public MusicCommandHandler(@Value("${twitch.redirect-uri-host}") String redirectUriHost) {
         this.redirectUriHost = redirectUriHost;
     }
 

@@ -75,13 +75,17 @@ This will automatically adjust the ingress for Traefik (the default k3s Ingress 
 
 ### 4. Ingress Configuration
 
-The `k3s` overlay automatically configures the Ingress for **Traefik** (k3s's default Ingress controller) by removing the `nginx` class annotation and adding Traefik-specific entrypoint annotations.
+The `k3s` overlay automatically configures the Ingress for **Traefik** (k3s's default Ingress controller) by:
+-   Updating the host to `music.phat.wtf`.
+-   Enabling TLS via Traefik annotations.
+-   Configuring `cert-manager` with the `letsencrypt-prod` cluster issuer.
+-   Setting up the `tls` section with the secret `music-phat-wtf-tls`.
 
-If you are using a different Ingress controller, you might need to adjust the overlay in `overlays/k3s/kustomization.yaml`.
+If you are using a different Ingress controller or a different cluster issuer, you might need to adjust the overlay in `overlays/k3s/kustomization.yaml`.
 
 ### 5. Accessing the App
 
-If k3s is on a remote server, ensure your DNS or `/etc/hosts` points `stream.phat.wtf` to the server's IP.
+If k3s is on a remote server, ensure your DNS or `/etc/hosts` points `music.phat.wtf` to the server's IP.
 
 ---
 
@@ -101,7 +105,7 @@ Create a virtual host configuration (e.g., `/etc/apache2/sites-available/twitchb
 
 ```apache
 <VirtualHost *:80>
-    ServerName minikube.stream.phat.wtf
+    ServerName minikube.music.phat.wtf
 
     # WebSocket Proxy (for SockJS/STOMP)
     ProxyPass /ws/ ws://<MINIKUBE_IP>/ws/
@@ -114,8 +118,8 @@ Create a virtual host configuration (e.g., `/etc/apache2/sites-available/twitchb
     ProxyPreserveHost On
 </VirtualHost>
 
-<VirtualHost *:80>
-    ServerName k3s.stream.phat.wtf
+<VirtualHost *:443>
+    ServerName music.phat.wtf
 
     # WebSocket Proxy (for SockJS/STOMP)
     ProxyPass /ws/ ws://<K3S_SERVER_IP>/ws/
@@ -126,6 +130,8 @@ Create a virtual host configuration (e.g., `/etc/apache2/sites-available/twitchb
     ProxyPassReverse / http://<K3S_SERVER_IP>/
 
     ProxyPreserveHost On
+
+    # Add your SSL configuration here if Apache handles SSL termination
 </VirtualHost>
 ```
 
@@ -140,6 +146,6 @@ Create a virtual host configuration (e.g., `/etc/apache2/sites-available/twitchb
 Update your local machine's `/etc/hosts`:
 
 ```text
-<APACHE_SERVER_IP> minikube.stream.phat.wtf
-<APACHE_SERVER_IP> k3s.stream.phat.wtf
+<APACHE_SERVER_IP> minikube.music.phat.wtf
+<APACHE_SERVER_IP> music.phat.wtf
 ```

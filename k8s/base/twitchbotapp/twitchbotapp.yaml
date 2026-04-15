@@ -28,7 +28,7 @@ spec:
           command: ['sh', '-c', "until nc -zv mariadb 3306; do echo waiting for mariadb; sleep 2; done;"]
       containers:
         - name: twitchbotapp
-          image: twitchbot-app:latest # Replace with actual image
+          image: localhost:30500/twitchbot-app:latest # Replace with actual image
           envFrom:
             - configMapRef:
                 name: twitchbotapp-config

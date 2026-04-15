@@ -31,7 +31,7 @@ public class TwitchConfigController {
     private final TwitchBotService twitchBotService;
     private final Environment environment;
 
-    @Value("${twitch.redirect-uri-host:https://stream.phat.wtf}")
+    @Value("${twitch.redirect-uri-host:https://music.phat.wtf}")
     private String redirectUriHost;
 
     public TwitchConfigController(TwitchConfigRepository twitchConfigRepository, TwitchBotService twitchBotService, Environment environment) {

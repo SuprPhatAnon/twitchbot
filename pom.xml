@@ -149,7 +149,41 @@
                                 <argument>build</argument>
                                 <argument>-t</argument>
                                 <argument>twitchbot-app:latest</argument>
+                                <argument>-t</argument>
+                                <argument>twitchbot-app:${build.id}</argument>
+                                <argument>-t</argument>
+                                <argument>10.80.0.85:30500/twitchbot-app:latest</argument>
+                                <argument>-t</argument>
+                                <argument>10.80.0.85:30500/twitchbot-app:${build.id}</argument>
                                 <argument>.</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>docker-push</id>
+                        <phase>install</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <executable>docker</executable>
+                            <arguments>
+                                <argument>push</argument>
+                                <argument>10.80.0.85:30500/twitchbot-app:latest</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>docker-push-tag</id>
+                        <phase>install</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <executable>docker</executable>
+                            <arguments>
+                                <argument>push</argument>
+                                <argument>10.80.0.85:30500/twitchbot-app:${build.id}</argument>
                             </arguments>
                         </configuration>
                     </execution>

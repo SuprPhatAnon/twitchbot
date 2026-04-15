@@ -83,7 +83,7 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
     @Value("${twitch.song-delay-seconds:5}")
     private int defaultSongDelaySeconds;
 
-    @Value("${twitch.redirect-uri-host:https://stream.phat.wtf}")
+    @Value("${twitch.redirect-uri-host:https://music.phat.wtf}")
     private String redirectUriHost;
 
 

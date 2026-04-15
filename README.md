@@ -35,7 +35,7 @@ This application listens for Twitch Channel Point redemptions and plays a random
 
 | Variable | Description |
 | --- | --- |
-| `TWITCH_REDIRECT_URI_HOST` | Host part of the OAuth redirect URI (e.g., `https://mybot.com`). Default: `https://stream.phat.wtf` |
+| `TWITCH_REDIRECT_URI_HOST` | Host part of the OAuth redirect URI (e.g., `https://mybot.com`). Default: `https://music.phat.wtf` |
 | `SPRING_PROFILES_ACTIVE` | Active Spring profiles (e.g. `prod`, `test`) |
 
 ## Running with Docker Compose

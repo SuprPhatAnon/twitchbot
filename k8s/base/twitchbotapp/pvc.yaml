@@ -8,7 +8,7 @@ spec:
   accessModes:
     - ReadWriteOnce
   hostPath:
-    path: /mnt/data/songs # Change this to your desired path on the host system
+    path: /opt/httpd/music/giantthumb # Change this to your desired path on the host system
   storageClassName: manual
 ---
 apiVersion: v1

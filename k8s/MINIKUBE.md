@@ -98,7 +98,7 @@ This will create a `streaming` namespace and deploy MariaDB and the Twitch Bot a
 
 ### 5. Access the Application
 
-The default Ingress configuration uses the host `stream.phat.wtf`. To access it locally:
+The default Ingress configuration uses the host `music.phat.wtf`. To access it locally:
 
 #### Option A: Map Minikube IP to `/etc/hosts`
 
@@ -108,7 +108,7 @@ The default Ingress configuration uses the host `stream.phat.wtf`. To access it 
     ```
 2.  Add an entry to your `/etc/hosts` (or `C:\Windows\System32\drivers\etc\hosts` on Windows):
     ```text
-    <MINIKUBE_IP> stream.phat.wtf
+    <MINIKUBE_IP> music.phat.wtf
     ```
 3.  Run a tunnel to expose the Ingress controller:
     ```bash

@@ -9,8 +9,23 @@ patches:
       kind: Ingress
       name: twitchbotapp-ingress
     patch: |-
+      - op: replace
+        path: /spec/rules/0/host
+        value: music.phat.wtf
       - op: remove
         path: /metadata/annotations/kubernetes.io~1ingress.class
       - op: add
         path: /metadata/annotations/traefik.ingress.kubernetes.io~1router.entrypoints
-        value: web
+        value: websecure
+      - op: add
+        path: /metadata/annotations/traefik.ingress.kubernetes.io~1router.tls
+        value: "true"
+      - op: add
+        path: /metadata/annotations/cert-manager.io~1cluster-issuer
+        value: letsencrypt-prod
+      - op: add
+        path: /spec/tls
+        value:
+          - hosts:
+              - music.phat.wtf
+            secretName: music-phat-wtf-tls
