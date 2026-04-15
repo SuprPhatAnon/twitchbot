@@ -61,7 +61,7 @@ public class SecurityConfig {
             .httpBasic(AbstractHttpConfigurer::disable)
             .addFilterBefore(new ApiKeyAuthenticationFilter(userService), UsernamePasswordAuthenticationFilter.class)
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/", "/index.html", "/player.html", "/statistics.html", "/css/**", "/js/**", "/ws/**").permitAll()
+                .requestMatchers("/", "/overlay.html", "/player.html", "/statistics.html", "/css/**", "/js/**", "/ws/**").permitAll()
                 .requestMatchers("/login.html", "/api/login").permitAll()
                 .requestMatchers("/api/songs/upload/**", "/upload.html").hasAnyRole("UPLOAD", "STREAMER", "ADMIN")
                 .requestMatchers("/streamer.html", "/api/songs/play/**", "/api/songs/queue/**").hasAnyRole("STREAMER", "ADMIN")

@@ -35,7 +35,7 @@ This is a Spring Boot application that integrates with Twitch to play songs on a
 ## Technical Details for Agents
 
 ### WebSocket Flow
-1. The overlay (`index.html`) connects to `/ws` using SockJS and STOMP.
+1. The overlay (`overlay.html`) connects to `/ws` using SockJS and STOMP.
 2. It subscribes to `/topic/play` to receive song play events.
 3. When a song finishes, the overlay sends a message to `/app/song-finished`.
 4. It also subscribes to:
@@ -89,7 +89,7 @@ The database is managed by Hibernate/JPA. Key tables:
 - If adding new event listeners, look at how `registerEventListeners()` is implemented.
 
 ### Modifying the Overlay
-- The main player overlay is `src/main/resources/static/index.html`.
+- The main player overlay is `src/main/resources/static/overlay.html`.
 - Other UIs:
   - `admin.html`: Full management dashboard.
   - `song-management.html`: Dedicated song file management (Admin only).

@@ -3,6 +3,7 @@ package dev.phatanon.config;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
+import org.springframework.web.servlet.config.annotation.ViewControllerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /**
@@ -13,6 +14,11 @@ public class WebMvcConfig implements WebMvcConfigurer {
 
     @Value("${twitch.song-upload-path}")
     private String uploadPath;
+
+    @Override
+    public void addViewControllers(ViewControllerRegistry registry) {
+        registry.addViewController("/").setViewName("forward:/login.html");
+    }
 
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
