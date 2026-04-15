@@ -80,7 +80,7 @@ public class ConnectionStartupLogger implements CommandLineRunner {
             int backfilledCount = 0;
             for (dev.phatanon.entity.Song song : songs) {
                 if (song.getCoverArt() == null) {
-                    songService.updateCoverArt(song);
+                    songService.updateMetadata(song);
                     if (song.getCoverArt() != null) {
                         songRepository.save(song);
                         backfilledCount++;

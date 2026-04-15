@@ -87,7 +87,7 @@ public class SongController {
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Add a new song")
     public Song addSong(@RequestBody Song song) {
-        songService.updateCoverArt(song);
+        songService.updateMetadata(song);
         Song savedSong = songRepository.save(song);
         messagingTemplate.convertAndSend("/topic/songs", "refresh");
         songService.updateM3uFile();
@@ -134,7 +134,7 @@ public class SongController {
                         }
                     } else if (songDetails.getUrl() != null && !songDetails.getUrl().equals(song.getUrl())) {
                         // If URL changed and no new image provided, try to extract from new URL
-                        songService.updateCoverArt(song);
+                        songService.updateMetadata(song);
                     }
 
                     Song updatedSong = songRepository.save(song);
@@ -191,6 +191,20 @@ public class SongController {
     @Operation(summary = "Get current song queue size")
     public int getQueueSize() {
         return twitchBotService.getQueueSize();
+    }
+
+    @Operation(summary = "Get the current song queue")
+    @GetMapping("/queue")
+    public List<dev.phatanon.service.TwitchBotService.QueuedSong> getQueue() {
+        return twitchBotService.getQueue();
+    }
+
+    @Operation(summary = "Remove a song from the queue")
+    @DeleteMapping("/queue/{index}")
+    @PreAuthorize("hasAnyRole('STREAMER', 'ADMIN')")
+    public ResponseEntity<Void> removeFromQueue(@PathVariable("index") int index) {
+        twitchBotService.removeFromQueue(index);
+        return ResponseEntity.noContent().build();
     }
 
     /**
@@ -324,6 +338,7 @@ public class SongController {
                 List<String> files = stream
                         .filter(file -> !java.nio.file.Files.isDirectory(file))
                         .map(file -> file.getFileName().toString())
+                        .filter(name -> !name.equals("playlist.m3u"))
                         .sorted()
                         .toList();
                 return ResponseEntity.ok(files);
@@ -332,6 +347,17 @@ public class SongController {
             logger.error("Failed to list song files", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
+    }
+
+    /**
+     * Lists ghost records (DB records with missing files).
+     * @return A list of song entities whose files are missing.
+     */
+    @GetMapping("/ghost-records")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "List ghost records (DB records with missing files)")
+    public List<Song> getGhostRecords() {
+        return songService.getGhostRecords();
     }
 
     /**

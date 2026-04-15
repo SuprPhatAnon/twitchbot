@@ -157,7 +157,13 @@
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     Songs Database
-                    <button class="btn btn-sm btn-outline-secondary" onclick="fetchSongs()">Refresh</button>
+                    <div class="d-flex">
+                        <div class="input-group input-group-sm me-2" style="width: 200px;">
+                            <span class="input-group-text">Search</span>
+                            <input type="text" id="song-search" class="form-control" oninput="filterSongsTable()" placeholder="Name, artist...">
+                        </div>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="fetchSongs()">Refresh</button>
+                    </div>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
@@ -292,6 +298,11 @@
         </div>
 
         <div class="right-panel">
+            <h5 class="mb-3">Current Queue</h5>
+            <div id="queue-list" class="mb-4">
+                <div class="text-muted small">Queue is empty</div>
+            </div>
+
             <h5 class="mb-3">Recent Song Plays</h5>
             <div id="recent-plays-log" class="mb-4">
                 <!-- Recent plays loaded here -->
@@ -320,6 +331,9 @@
                 });
                 stompClient.subscribe('/topic/queue-size', function (response) {
                     updateQueueSizeDisplay(JSON.parse(response.body));
+                });
+                stompClient.subscribe('/topic/queue', function (response) {
+                    updateQueueDisplay(JSON.parse(response.body));
                 });
                 stompClient.subscribe('/topic/stream-status', function (response) {
                     updateStreamStatusDisplay(JSON.parse(response.body));
@@ -403,6 +417,39 @@
             document.getElementById('stat-queue').innerText = size;
         }
 
+        function updateQueueDisplay(queue) {
+            const container = document.getElementById('queue-list');
+            container.innerHTML = '';
+            
+            if (!queue || queue.length === 0) {
+                container.innerHTML = '<div class="text-muted small">Queue is empty</div>';
+                return;
+            }
+
+            queue.forEach((item, index) => {
+                const div = document.createElement('div');
+                div.className = 'redeem-entry d-flex align-items-center justify-content-between gap-2';
+                const artImg = item.song.coverArt ? `<img src="${item.song.coverArt}" alt="Art" style="width: 32px; height: 32px; object-fit: cover; border-radius: 4px;">` : '<div style="width: 32px; height: 32px; background: #eee; border-radius: 4px;"></div>';
+                div.innerHTML = `
+                    <div class="d-flex align-items-center gap-2" style="flex: 1; overflow: hidden;">
+                        ${artImg}
+                        <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                            <div class="fw-bold small">${item.song.name}</div>
+                            <div class="text-muted" style="font-size: 0.7rem;">${item.song.artist} <span class="badge bg-light text-dark ms-1" style="font-size: 0.6rem;">${item.source}</span></div>
+                        </div>
+                    </div>
+                    <button class="btn btn-sm btn-outline-danger py-0 px-1" onclick="removeFromQueue(${index})" title="Remove from queue">×</button>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        async function removeFromQueue(index) {
+            try {
+                await fetch(`/api/songs/queue/${index}`, { method: 'DELETE' });
+            } catch (e) { console.error('Error removing from queue:', e); }
+        }
+
         function updateStreamStatusDisplay(isOnline) {
             const el = document.getElementById('stat-stream');
             el.innerText = isOnline ? 'ONLINE' : 'OFFLINE';
@@ -441,6 +488,10 @@
                 res = await fetch('/api/songs/queue-size');
                 if (res.ok) updateQueueSizeDisplay(await res.json());
 
+                // Queue
+                res = await fetch('/api/songs/queue');
+                if (res.ok) updateQueueDisplay(await res.json());
+
                 // Current song
                 res = await fetch('/api/songs/current');
                 if (res.status === 200) updateCurrentSongDisplay(await res.json());
@@ -449,36 +500,54 @@
             } catch (e) { console.error('Error refreshing status:', e); }
         }
 
+        let allSongs = [];
+
         async function fetchSongs() {
             try {
                 const response = await fetch('/api/songs');
                 if (response.status === 401 || response.status === 403) return window.location.href = '/login.html';
-                const songs = await response.json();
-                const tbody = document.getElementById('songs-table-body');
-                tbody.innerHTML = '';
-                songs.forEach(song => {
-                    const tr = document.createElement('tr');
-                    const redeemTitles = song.redeems.map(r => r.title).join(', ');
-                    const artImg = song.coverArt ? `<img src="${song.coverArt}" alt="Art" style="width: 30px; height: 30px; object-fit: cover; border-radius: 2px;">` : '';
-                    tr.innerHTML = `
-                        <td>${song.id}</td>
-                        <td>${artImg}</td>
-                        <td>${song.name}</td>
-                        <td>${song.artist}</td>
-                        <td><span class="badge bg-light text-dark">${song.playCount || 0}</span></td>
-                        <td>${redeemTitles}</td>
-                        <td>
-                            <button class="btn btn-sm btn-success me-1" onclick="playSong(${song.id})">Play</button>
-                            <button class="btn btn-sm btn-warning me-1" onclick="openEditModal(${song.id})">Edit</button>
-                            <button class="btn btn-sm btn-danger" onclick="deleteSong(${song.id})">Delete</button>
-                        </td>
-                    `;
-                    tbody.appendChild(tr);
-                });
+                allSongs = await response.json();
+                renderSongsTable();
                 
                 // Also fetch recent plays
                 fetchRecentPlays();
             } catch (error) { console.error('Error fetching songs:', error); }
+        }
+
+        function filterSongsTable() {
+            renderSongsTable();
+        }
+
+        function renderSongsTable() {
+            const searchTerm = document.getElementById('song-search').value.toLowerCase();
+            const tbody = document.getElementById('songs-table-body');
+            tbody.innerHTML = '';
+            
+            const filteredSongs = allSongs.filter(song => 
+                song.name.toLowerCase().includes(searchTerm) || 
+                song.artist.toLowerCase().includes(searchTerm) ||
+                song.id.toString().includes(searchTerm)
+            );
+
+            filteredSongs.forEach(song => {
+                const tr = document.createElement('tr');
+                const redeemTitles = song.redeems.map(r => r.title).join(', ');
+                const artImg = song.coverArt ? `<img src="${song.coverArt}" alt="Art" style="width: 30px; height: 30px; object-fit: cover; border-radius: 2px;">` : '';
+                tr.innerHTML = `
+                    <td>${song.id}</td>
+                    <td>${artImg}</td>
+                    <td>${song.name}</td>
+                    <td>${song.artist}</td>
+                    <td><span class="badge bg-light text-dark">${song.playCount || 0}</span></td>
+                    <td>${redeemTitles}</td>
+                    <td>
+                        <button class="btn btn-sm btn-success me-1" onclick="playSong(${song.id})">Play</button>
+                        <button class="btn btn-sm btn-warning me-1" onclick="openEditModal(${song.id})">Edit</button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteSong(${song.id})">Delete</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
         }
 
         async function clearQueue() {

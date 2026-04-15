@@ -68,8 +68,16 @@
                 <div class="card shadow-sm">
                     <div class="card-header d-flex justify-content-between align-items-center bg-white">
                         <h5 class="mb-0">Song File Management</h5>
-                        <div>
-                            <button class="btn btn-sm btn-outline-danger me-2" onclick="deleteOrphanFiles()">Delete Orphan Files</button>
+                        <div class="d-flex">
+                            <div class="input-group input-group-sm me-2" style="width: 250px;">
+                                <span class="input-group-text">Search</span>
+                                <input type="text" id="search-input" class="form-control" oninput="renderTable()" placeholder="Filename, artist, title...">
+                            </div>
+                            <div class="btn-group btn-group-sm me-2">
+                                <button id="filter-all" class="btn btn-secondary" onclick="setFilter('all')">All</button>
+                                <button id="filter-orphan" class="btn btn-outline-danger" onclick="setFilter('orphan')">Orphans</button>
+                                <button id="filter-ghost" class="btn btn-outline-warning" onclick="setFilter('ghost')">Ghosts</button>
+                            </div>
                             <button class="btn btn-sm btn-primary" onclick="fetchData()">Refresh</button>
                         </div>
                     </div>
@@ -150,15 +158,18 @@
         let songs = [];
         let files = [];
         let redeems = [];
+        let ghostRecords = [];
+        let currentFilter = 'all';
         let currentPlayingFile = null;
         const audioPlayer = document.getElementById('local-audio-player');
 
         async function fetchData() {
             try {
-                const [songsRes, filesRes, redeemsRes] = await Promise.all([
+                const [songsRes, filesRes, redeemsRes, ghostRes] = await Promise.all([
                     fetch('/api/songs'),
                     fetch('/api/songs/files'),
-                    fetch('/api/redeems')
+                    fetch('/api/redeems'),
+                    fetch('/api/songs/ghost-records')
                 ]);
                 
                 if (songsRes.status === 401 || filesRes.status === 401 || redeemsRes.status === 401) {
@@ -169,6 +180,7 @@
                 songs = await songsRes.json();
                 files = await filesRes.json();
                 redeems = await redeemsRes.json();
+                ghostRecords = await ghostRes.json();
                 
                 updateRedeemsSelect();
                 renderTable();
@@ -188,9 +200,33 @@
             });
         }
 
+        function setFilter(filter) {
+            currentFilter = filter;
+            document.querySelectorAll('#filter-all, #filter-orphan, #filter-ghost').forEach(btn => {
+                btn.classList.remove('btn-secondary', 'btn-danger', 'btn-warning');
+                btn.classList.add('btn-outline-secondary', 'btn-outline-danger', 'btn-outline-warning');
+            });
+            
+            const activeBtn = document.getElementById(`filter-${filter}`);
+            if (filter === 'all') {
+                activeBtn.classList.remove('btn-outline-secondary');
+                activeBtn.classList.add('btn-secondary');
+            } else if (filter === 'orphan') {
+                activeBtn.classList.remove('btn-outline-danger');
+                activeBtn.classList.add('btn-danger');
+            } else if (filter === 'ghost') {
+                activeBtn.classList.remove('btn-outline-warning');
+                activeBtn.classList.add('btn-warning');
+            }
+            
+            renderTable();
+        }
+
         function renderTable() {
             const tbody = document.getElementById('files-table-body');
             tbody.innerHTML = '';
+            const searchInput = document.getElementById('search-input');
+            const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
 
             // Map files to their songs
             const fileMap = {};
@@ -199,55 +235,88 @@
                 fileMap[filename] = linkedSongs;
             });
 
-            if (files.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="4" class="text-center">No files found in upload directory.</td></tr>';
+            let displayItems = [];
+
+            if (currentFilter === 'ghost') {
+                displayItems = ghostRecords.map(s => ({ type: 'ghost', song: s }));
+            } else {
+                files.forEach(filename => {
+                    const linkedSongs = fileMap[filename];
+                    if (currentFilter === 'orphan' && linkedSongs.length > 0) return;
+                    displayItems.push({ type: 'file', filename, linkedSongs });
+                });
+            }
+
+            // Apply search
+            displayItems = displayItems.filter(item => {
+                if (item.type === 'file') {
+                    const matchesFilename = item.filename.toLowerCase().includes(searchTerm);
+                    const matchesSongs = item.linkedSongs.some(s => s.name.toLowerCase().includes(searchTerm) || s.artist.toLowerCase().includes(searchTerm));
+                    return matchesFilename || matchesSongs;
+                } else if (item.type === 'ghost') {
+                    return item.song.name.toLowerCase().includes(searchTerm) || item.song.artist.toLowerCase().includes(searchTerm) || item.song.url.toLowerCase().includes(searchTerm);
+                }
+                return false;
+            });
+
+            if (displayItems.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="text-center">No ${currentFilter === 'all' ? '' : currentFilter} items found matching your search.</td></tr>`;
                 return;
             }
 
-            files.forEach(filename => {
-                const linkedSongs = fileMap[filename];
+            displayItems.forEach(item => {
                 const tr = document.createElement('tr');
                 
-                let songCell = '<span class="text-muted small">No record</span>';
-                let statusBadge = '<span class="badge bg-danger status-badge">Orphan</span>';
-                
-                if (linkedSongs.length > 0) {
-                    songCell = linkedSongs.map(s => `<div><strong>${s.name}</strong><br><small class="text-muted">by ${s.artist} (ID: ${s.id})</small></div>`).join('');
-                    statusBadge = '<span class="badge bg-success status-badge">Linked</span>';
+                if (item.type === 'file') {
+                    const filename = item.filename;
+                    const linkedSongs = item.linkedSongs;
+                    let songCell = '<span class="text-muted small">No record</span>';
+                    let statusBadge = '<span class="badge bg-danger status-badge">Orphan</span>';
+                    
+                    if (linkedSongs.length > 0) {
+                        songCell = linkedSongs.map(s => `<div><strong>${s.name}</strong><br><small class="text-muted">by ${s.artist} (ID: ${s.id})</small></div>`).join('');
+                        statusBadge = '<span class="badge bg-success status-badge">Linked</span>';
+                    }
+
+                    if (filename === 'playlist.m3u') {
+                        statusBadge = '<span class="badge bg-info status-badge">System</span>';
+                    }
+
+                    const isPlaying = currentPlayingFile === filename;
+                    const actionButtons = `
+                        <div class="btn-group btn-group-sm">
+                            ${filename !== 'playlist.m3u' ? `<button class="btn btn-sm ${isPlaying ? 'btn-danger' : 'btn-outline-primary'}" onclick="togglePlay('${filename}')">${isPlaying ? 'Stop' : 'Play'}</button>` : ''}
+                            ${linkedSongs.length > 0 
+                                ? `<button class="btn btn-sm btn-outline-info" onclick="openEditModal(${linkedSongs[0].id})">Edit</button>`
+                                : (filename !== 'playlist.m3u' ? `<button class="btn btn-sm btn-outline-success" onclick="openAddModal('${filename}')">Add</button>` : '')
+                            }
+                            <button class="btn btn-sm btn-outline-danger" onclick="deleteFile('${filename}')" ${filename === 'playlist.m3u' ? 'disabled' : ''}>Delete File</button>
+                            ${linkedSongs.length > 0 ? `<button class="btn btn-sm btn-outline-danger" onclick="deleteSongPermanently(${linkedSongs[0].id})">Full Del</button>` : ''}
+                        </div>
+                    `;
+
+                    tr.innerHTML = `
+                        <td class="text-break">${isPlaying ? '<span class="playing-indicator me-1">▶</span>' : ''}${filename}</td>
+                        <td>${songCell}</td>
+                        <td>${statusBadge}</td>
+                        <td class="text-end">${actionButtons}</td>
+                    `;
+                } else {
+                    // Ghost Record
+                    const s = item.song;
+                    tr.classList.add('table-warning');
+                    tr.innerHTML = `
+                        <td class="text-break text-danger"><i class="small">Missing: ${s.url}</i></td>
+                        <td><strong>${s.name}</strong><br><small class="text-muted">by ${s.artist} (ID: ${s.id})</small></td>
+                        <td><span class="badge bg-warning text-dark status-badge">Ghost Record</span></td>
+                        <td class="text-end">
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-sm btn-outline-info" onclick="openEditModal(${s.id})">Fix Link</button>
+                                <button class="btn btn-sm btn-danger" onclick="deleteSongOnly(${s.id})">Del Record</button>
+                            </div>
+                        </td>
+                    `;
                 }
-
-                if (filename === 'playlist.m3u') {
-                    statusBadge = '<span class="badge bg-info status-badge">System</span>';
-                }
-
-                const isPlaying = currentPlayingFile === filename;
-                const playBtn = `
-                    <button class="btn btn-sm ${isPlaying ? 'btn-danger' : 'btn-outline-primary'}" 
-                            onclick="togglePlay('${filename}')" title="${isPlaying ? 'Stop' : 'Play Locally'}">
-                        ${isPlaying ? 'Stop' : 'Play'}
-                    </button>`;
-
-                const actionButtons = `
-                    <div class="btn-group btn-group-sm">
-                        ${filename !== 'playlist.m3u' ? playBtn : ''}
-                        ${linkedSongs.length > 0 
-                            ? `<button class="btn btn-sm btn-outline-info" onclick="openEditModal(${linkedSongs[0].id})">Edit</button>`
-                            : (filename !== 'playlist.m3u' ? `<button class="btn btn-sm btn-outline-success" onclick="openAddModal('${filename}')">Add</button>` : '')
-                        }
-                        <button class="btn btn-sm btn-outline-danger" onclick="deleteFile('${filename}')" ${filename === 'playlist.m3u' ? 'disabled' : ''}>Delete File</button>
-                        ${linkedSongs.length > 0 ? `<button class="btn btn-sm btn-outline-danger" onclick="deleteSongPermanently(${linkedSongs[0].id})" title="Delete song record AND file">Full Del</button>` : ''}
-                    </div>
-                `;
-
-                tr.innerHTML = `
-                    <td class="text-break">
-                        ${isPlaying ? '<span class="playing-indicator me-1">▶</span>' : ''}
-                        ${filename}
-                    </td>
-                    <td>${songCell}</td>
-                    <td>${statusBadge}</td>
-                    <td class="text-end">${actionButtons}</td>
-                `;
                 tbody.appendChild(tr);
             });
         }
@@ -406,6 +475,21 @@
                 }
             } catch (error) {
                 console.error('Error deleting file:', error);
+            }
+        }
+
+        async function deleteSongOnly(id) {
+            if (!confirm(`Are you sure you want to delete ONLY the database record for song ID ${id}?`)) return;
+            try {
+                const res = await fetch(`/api/songs/${id}`, { method: 'DELETE' });
+                if (res.ok) {
+                    fetchData();
+                } else {
+                    const error = await res.text();
+                    alert('Error deleting song record: ' + error);
+                }
+            } catch (error) {
+                console.error('Error deleting song:', error);
             }
         }
 

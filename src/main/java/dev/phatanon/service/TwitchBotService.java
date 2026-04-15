@@ -104,10 +104,19 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
     }
 
     /**
-     * Broadcasts the current queue size to WebSocket subscribers on /topic/queue-size.
+     * Retrieves the current song queue.
+     * @return A list of songs currently in the queue.
+     */
+    public synchronized List<QueuedSong> getQueue() {
+        return new LinkedList<>(songQueue);
+    }
+
+    /**
+     * Broadcasts the current queue size and the full queue to WebSocket subscribers.
      */
     protected void broadcastQueueSize() {
         messagingTemplate.convertAndSend("/topic/queue-size", getQueueSize());
+        messagingTemplate.convertAndSend("/topic/queue", getQueue());
     }
 
     /**
@@ -552,8 +561,9 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
                     log.info("Another song started during delay. Skipping queue poll.");
                     return;
                 }
-        if (!songQueue.isEmpty()) {
+                if (!songQueue.isEmpty()) {
                     QueuedSong next = songQueue.poll();
+                    log.info("Queue polling successful. Next song: {} by {}", next.song().getName(), next.song().getArtist());
                     playSong(next.song(), next.source(), next.incrementStats());
                     broadcastQueueSize();
                 } else {
@@ -604,6 +614,20 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
     public List<RedeemLog> getRecentRedeems() {
         synchronized (recentRedeems) {
             return List.copyOf(recentRedeems);
+        }
+    }
+
+    /**
+     * Removes a song from the queue by its index.
+     * @param index The index of the song to remove.
+     */
+    public synchronized void removeFromQueue(int index) {
+        if (index >= 0 && index < songQueue.size()) {
+            List<QueuedSong> list = new LinkedList<>(songQueue);
+            list.remove(index);
+            songQueue.clear();
+            songQueue.addAll(list);
+            broadcastQueueSize();
         }
     }
 

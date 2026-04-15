@@ -85,7 +85,7 @@ class SongServiceTest {
     void shouldHandleNullUrlWhenUpdatingCoverArt() {
         Song song = new Song();
         song.setUrl(null);
-        songService.updateCoverArt(song);
+        songService.updateMetadata(song);
         assertNull(song.getCoverArt());
     }
 
@@ -93,7 +93,7 @@ class SongServiceTest {
     void shouldHandleMissingFileWhenUpdatingCoverArt() {
         Song song = new Song();
         song.setUrl(tempDir.resolve("missing.mp3").toString());
-        songService.updateCoverArt(song);
+        songService.updateMetadata(song);
         assertNull(song.getCoverArt());
     }
 
@@ -108,7 +108,7 @@ class SongServiceTest {
         song.setUrl("/" + filename);
         song.setName("Test Relative Song");
 
-        songService.updateCoverArt(song);
+        songService.updateMetadata(song);
 
         // It should look in tempDir and find the file (but no cover art since it's empty)
         assertNull(song.getCoverArt());

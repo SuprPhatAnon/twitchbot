@@ -9,7 +9,10 @@ spring:
     driver-class-name: org.mariadb.jdbc.Driver
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MariaDBDialect
@@ -28,6 +31,10 @@ management:
           include: readinessState,db
 server:
   port: 8080
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 20MB
 
 twitch:
   api-key: ${API_KEY:default_secret_key}

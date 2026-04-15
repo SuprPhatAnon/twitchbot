@@ -165,6 +165,12 @@ Interactive documentation is available at `/swagger-ui.html`.
 - **POST `/api/songs/clear`**: Clear the song queue and stop playback.
 - **GET `/api/songs/queue-size`**: Get the current number of songs in the queue.
 - **GET `/api/songs/current`**: Get the currently playing song.
+- **GET `/api/songs/queue`**: Get the current song queue.
+- **DELETE `/api/songs/queue/{index}`**: Remove a song from the queue.
+- **GET `/api/songs/ghost-records`**: List DB records with missing files.
+- **GET `/api/songs/files`**: List all files in the upload directory.
+- **DELETE `/api/songs/files/{filename}`**: Delete a file from the upload directory.
+- **DELETE `/api/songs/{id}/permanent`**: Delete a song record AND its associated file.
 - **GET `/api/songs/plays/recent`**: Get the most recent song plays.
   - Query parameter: `limit` (int, default: `5`).
 - **GET `/api/songs/statistics`**: Get song play statistics.
@@ -219,6 +225,16 @@ python3 scripts/upload_songs.py /path/to/song.mp3 --artist "Artist Name" --url h
 - `--artist`: Default artist for the songs (default: `Unknown Artist`).
 - `--url`: The API upload endpoint URL (default: `http://localhost:8080/api/songs/upload`).
 - `--api-key`: API Key for authentication (Required).
+
+### Backup Script
+
+A script `scripts/backup.sh` is provided to back up the database and the song upload directory.
+
+**Usage:**
+```bash
+./scripts/backup.sh
+```
+The script will create a timestamped backup in the `backups/` directory and keep the last 7 days of backups.
 
 ## Development
 

@@ -60,11 +60,21 @@ public class SongUploadController {
     @PreAuthorize("hasAnyRole('UPLOAD', 'STREAMER', 'ADMIN')")
     public ResponseEntity<?> uploadSong(
             @RequestParam("file") MultipartFile file,
-            @RequestParam("name") String name,
-            @RequestParam("artist") String artist) {
+            @RequestParam(value = "name", required = false) String name,
+            @RequestParam(value = "artist", required = false) String artist) {
 
         if (file.isEmpty()) {
             return ResponseEntity.badRequest().body("Please select a file to upload");
+        }
+
+        // Validate file type
+        String contentType = file.getContentType();
+        if (contentType == null || !contentType.startsWith("audio/")) {
+            // Some systems might not identify mp3 correctly, so check extension as fallback
+            String originalFilename = file.getOriginalFilename();
+            if (originalFilename == null || !originalFilename.toLowerCase().endsWith(".mp3")) {
+                return ResponseEntity.badRequest().body("Only audio files (MP3) are allowed");
+            }
         }
 
         try {
@@ -88,18 +98,18 @@ public class SongUploadController {
 
             // Create and save Song entity
             Song song = new Song();
-            song.setName(name);
-            song.setArtist(artist);
+            song.setName(name != null && !name.trim().isEmpty() ? name : "Unknown Title");
+            song.setArtist(artist != null && !artist.trim().isEmpty() ? artist : "Unknown Artist");
             song.setUrl("/" + filename);
             song.setEnabled(true);
 
-            // Extract cover art if possible
-            songService.updateCoverArt(song);
+            // Extract metadata (cover art, artist, name from tags)
+            songService.updateMetadata(song);
 
             Song savedSong = songRepository.save(song);
             songService.updateM3uFile();
 
-            logger.info("Song uploaded successfully: {} by {} to {}", name, artist, destinationFile);
+            logger.info("Song uploaded successfully: {} by {} to {}", savedSong.getName(), savedSong.getArtist(), destinationFile);
 
             return ResponseEntity.status(HttpStatus.CREATED).body(savedSong);
 

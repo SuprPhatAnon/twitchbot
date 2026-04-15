@@ -32,46 +32,66 @@ public class SongService {
     }
 
     /**
-     * Extracts cover art from the MP3 file at the given song's URL.
-     * @param song The song to update with cover art.
+     * Extracts cover art, artist, and name from the MP3 file at the given song's URL.
+     * @param song The song to update with metadata.
      */
-    public void updateCoverArt(Song song) {
+    public void updateMetadata(Song song) {
         String url = song.getUrl();
         if (url == null || url.isEmpty()) {
             return;
         }
 
         try {
-            // Check if it's a local file
-            File file = new File(url);
-            if (!file.exists()) {
-                // Try relative to current directory if it doesn't exist
-                file = Paths.get(url).toFile();
-            }
+            File file = getFileFromUrl(url);
 
-            // If still not exists and starts with /, try relative to uploadPath
-            if (!file.exists() && url.startsWith("/")) {
-                file = Paths.get(uploadPath, url.substring(1)).toFile();
-            }
-
-            if (file.exists() && file.isFile()) {
+            if (file != null && file.exists() && file.isFile()) {
                 Mp3File mp3file = new Mp3File(file);
                 if (mp3file.hasId3v2Tag()) {
                     ID3v2 id3v2Tag = mp3file.getId3v2Tag();
+
+                    // Extract cover art
                     byte[] albumImage = id3v2Tag.getAlbumImage();
                     if (albumImage != null) {
                         String mimeType = id3v2Tag.getAlbumImageMimeType();
                         setCoverArtFromBytes(song, albumImage, mimeType);
                         logger.info("Extracted cover art for song: {} ({} bytes)", song.getName(), albumImage.length);
-                    } else {
-                        song.setCoverArt(null);
+                    }
+
+                    // Extract Artist if not set
+                    if (song.getArtist() == null || song.getArtist().trim().isEmpty() || "Unknown Artist".equalsIgnoreCase(song.getArtist())) {
+                        String artist = id3v2Tag.getArtist();
+                        if (artist != null && !artist.trim().isEmpty()) {
+                            song.setArtist(artist.trim());
+                        }
+                    }
+
+                    // Extract Title if not set
+                    if (song.getName() == null || song.getName().trim().isEmpty() || "Unknown Title".equalsIgnoreCase(song.getName())) {
+                        String title = id3v2Tag.getTitle();
+                        if (title != null && !title.trim().isEmpty()) {
+                            song.setName(title.trim());
+                        }
                     }
                 }
             }
         } catch (Exception e) {
-            logger.warn("Failed to extract cover art from {}: {}", url, e.getMessage());
-            song.setCoverArt(null);
+            logger.warn("Failed to extract metadata from {}: {}", url, e.getMessage());
         }
+    }
+
+    private File getFileFromUrl(String url) {
+        // Check if it's a local file
+        File file = new File(url);
+        if (!file.exists()) {
+            // Try relative to current directory if it doesn't exist
+            file = Paths.get(url).toFile();
+        }
+
+        // If still not exists and starts with /, try relative to uploadPath
+        if (!file.exists() && url.startsWith("/")) {
+            file = Paths.get(uploadPath, url.substring(1)).toFile();
+        }
+        return file.exists() ? file : null;
     }
 
     /**
@@ -94,6 +114,20 @@ public class SongService {
      */
     public String getUploadPath() {
         return uploadPath;
+    }
+
+    /**
+     * @return A list of songs that point to non-existent files.
+     */
+    public List<Song> getGhostRecords() {
+        return songRepository.findAll().stream()
+                .filter(song -> {
+                    String url = song.getUrl();
+                    if (url == null || url.isEmpty()) return true;
+                    File file = getFileFromUrl(url);
+                    return file == null || !file.exists();
+                })
+                .toList();
     }
 
     /**
