@@ -1,5 +1,6 @@
 package dev.phatanon.controller;
 
+import dev.phatanon.dto.UserDTO;
 import dev.phatanon.entity.Role;
 import dev.phatanon.entity.User;
 import dev.phatanon.service.UserService;
@@ -35,9 +36,9 @@ public class UserController {
      */
     @GetMapping("/me")
     @Operation(summary = "Get current user profile")
-    public ResponseEntity<User> getCurrentUser(@AuthenticationPrincipal UserDetails userDetails) {
+    public ResponseEntity<UserDTO> getCurrentUser(@AuthenticationPrincipal UserDetails userDetails) {
         return userService.findByUsername(userDetails.getUsername())
-                .map(ResponseEntity::ok)
+                .map(user -> ResponseEntity.ok(UserDTO.fromEntity(user)))
                 .orElse(ResponseEntity.notFound().build());
     }
 
@@ -61,9 +62,9 @@ public class UserController {
      */
     @PostMapping("/me/rotate-api-key")
     @Operation(summary = "Rotate current user's API key")
-    public ResponseEntity<User> rotateApiKey(@AuthenticationPrincipal UserDetails userDetails) {
+    public ResponseEntity<UserDTO> rotateApiKey(@AuthenticationPrincipal UserDetails userDetails) {
         User user = userService.rotateApiKey(userDetails.getUsername());
-        return ResponseEntity.ok(user);
+        return ResponseEntity.ok(UserDTO.fromEntity(user));
     }
 
     /**
@@ -73,8 +74,11 @@ public class UserController {
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Get all users (Admin only)")
-    public List<User> getAllUsers() {
-        return userService.findAll();
+    public List<UserDTO> getAllUsers() {
+        return userService.findAll().stream()
+                .map(UserDTO::fromEntity)
+                .map(dto -> new UserDTO(dto.id(), dto.username(), dto.roles(), "********")) // Mask API keys for list
+                .toList();
     }
 
     /**
@@ -90,7 +94,7 @@ public class UserController {
             return ResponseEntity.badRequest().body("Username already exists");
         }
         User user = userService.createUser(request.username(), request.password(), request.roles());
-        return ResponseEntity.ok(user);
+        return ResponseEntity.ok(UserDTO.fromEntity(user));
     }
 
     /**
@@ -104,7 +108,7 @@ public class UserController {
     @Operation(summary = "Update an existing user (Admin only)")
     public ResponseEntity<?> updateUser(@PathVariable Long id, @RequestBody UserRequest request) {
         User user = userService.updateUser(id, request.username(), request.password(), request.roles());
-        return ResponseEntity.ok(user);
+        return ResponseEntity.ok(UserDTO.fromEntity(user));
     }
 
     /**

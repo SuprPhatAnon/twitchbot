@@ -78,8 +78,12 @@ public class UserService implements UserDetailsService {
     @Transactional
     public User createUser(String username, String password, Set<Role> roles) {
         User user = new User(username, passwordEncoder.encode(password), roles);
-        user.setApiKey(UUID.randomUUID().toString());
-        return userRepository.save(user);
+        String rawApiKey = UUID.randomUUID().toString();
+        user.setApiKey(passwordEncoder.encode(rawApiKey));
+        User savedUser = userRepository.save(user);
+        // We need to return the raw API key once so the user can see it
+        savedUser.setApiKey(rawApiKey);
+        return savedUser;
     }
 
     /**
@@ -138,11 +142,15 @@ public class UserService implements UserDetailsService {
 
     /**
      * Finds a user by their API key.
-     * @param apiKey The API key.
+     * Note: This now performs a linear scan because keys are hashed.
+     * In a high-traffic system, consider a different approach like indexing a prefix or a separate fast-hash.
+     * @param apiKey The raw API key.
      * @return Optional containing the user if found and not deleted.
      */
     public Optional<User> findByApiKey(String apiKey) {
-        return userRepository.findByApiKeyAndDeletedFalse(apiKey);
+        return userRepository.findAllByDeletedFalse().stream()
+                .filter(user -> passwordEncoder.matches(apiKey, user.getApiKey()))
+                .findFirst();
     }
 
     /**
@@ -154,8 +162,11 @@ public class UserService implements UserDetailsService {
     public User rotateApiKey(String username) {
         User user = userRepository.findByUsernameAndDeletedFalse(username)
                 .orElseThrow(() -> new RuntimeException("User not found"));
-        user.setApiKey(UUID.randomUUID().toString());
-        return userRepository.save(user);
+        String rawApiKey = UUID.randomUUID().toString();
+        user.setApiKey(passwordEncoder.encode(rawApiKey));
+        User savedUser = userRepository.save(user);
+        savedUser.setApiKey(rawApiKey);
+        return savedUser;
     }
 
     /**

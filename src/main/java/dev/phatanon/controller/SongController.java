@@ -257,7 +257,15 @@ public class SongController {
                     String url = song.getUrl();
                     if (url != null && url.startsWith("/")) {
                         try {
-                            java.nio.file.Path filePath = java.nio.file.Paths.get(songService.getUploadPath(), url.substring(1));
+                            String filename = new java.io.File(url.substring(1)).getName();
+                            java.nio.file.Path filePath = java.nio.file.Paths.get(songService.getUploadPath()).resolve(filename).normalize();
+                            
+                            // Ensure the file is within the upload directory
+                            if (!filePath.startsWith(java.nio.file.Paths.get(songService.getUploadPath()).normalize())) {
+                                logger.error("Attempted path traversal attack for song {}: {}", id, filePath);
+                                return ResponseEntity.status(HttpStatus.FORBIDDEN).<Void>build();
+                            }
+
                             java.nio.file.Files.deleteIfExists(filePath);
                             logger.info("Deleted song file: {}", filePath);
                         } catch (java.io.IOException e) {
@@ -370,7 +378,16 @@ public class SongController {
     @Operation(summary = "Delete a song file")
     public ResponseEntity<Void> deleteFile(@PathVariable String filename) {
         try {
-            java.nio.file.Path filePath = java.nio.file.Paths.get(songService.getUploadPath()).resolve(filename);
+            java.nio.file.Path uploadDir = java.nio.file.Paths.get(songService.getUploadPath()).normalize();
+            // Get only the filename part to prevent traversal
+            String safeFilename = new java.io.File(filename).getName();
+            java.nio.file.Path filePath = uploadDir.resolve(safeFilename).normalize();
+
+            if (!filePath.startsWith(uploadDir)) {
+                logger.error("Attempted path traversal attack: {}", filename);
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            }
+
             if (java.nio.file.Files.deleteIfExists(filePath)) {
                 logger.info("Deleted file: {}", filePath);
                 return ResponseEntity.noContent().build();

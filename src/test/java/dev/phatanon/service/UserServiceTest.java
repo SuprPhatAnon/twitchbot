@@ -68,13 +68,13 @@ class UserServiceTest {
 
     @Test
     void createUser_EncodesPasswordAndSaves() {
-        when(passwordEncoder.encode("rawPassword")).thenReturn("encodedPassword");
+        when(passwordEncoder.encode(anyString())).thenReturn("encoded");
         when(userRepository.save(any(User.class))).thenAnswer(i -> i.getArguments()[0]);
 
         User result = userService.createUser("newuser", "rawPassword", Set.of(Role.ROLE_UPLOAD));
 
         assertNotNull(result);
-        assertEquals("encodedPassword", result.getPassword());
+        assertEquals("encoded", result.getPassword());
         assertNotNull(result.getApiKey());
         verify(passwordEncoder).encode("rawPassword");
         verify(userRepository).save(any(User.class));
@@ -83,10 +83,11 @@ class UserServiceTest {
     @Test
     void findByApiKey_ReturnsUser() {
         User user = new User("test", "pass", Set.of());
-        user.setApiKey("test-api-key");
-        when(userRepository.findByApiKeyAndDeletedFalse("test-api-key")).thenReturn(Optional.of(user));
+        user.setApiKey("hashed-api-key");
+        when(userRepository.findAllByDeletedFalse()).thenReturn(List.of(user));
+        when(passwordEncoder.matches("raw-api-key", "hashed-api-key")).thenReturn(true);
         
-        Optional<User> result = userService.findByApiKey("test-api-key");
+        Optional<User> result = userService.findByApiKey("raw-api-key");
         
         assertTrue(result.isPresent());
         assertEquals("test", result.get().getUsername());
@@ -95,9 +96,10 @@ class UserServiceTest {
     @Test
     void rotateApiKey_UpdatesApiKey() {
         User user = new User("testuser", "pass", Set.of());
-        String oldKey = "old-key";
+        String oldKey = "old-hashed-key";
         user.setApiKey(oldKey);
         when(userRepository.findByUsernameAndDeletedFalse("testuser")).thenReturn(Optional.of(user));
+        when(passwordEncoder.encode(anyString())).thenReturn("new-hashed-key");
         when(userRepository.save(any(User.class))).thenAnswer(i -> i.getArguments()[0]);
 
         User result = userService.rotateApiKey("testuser");

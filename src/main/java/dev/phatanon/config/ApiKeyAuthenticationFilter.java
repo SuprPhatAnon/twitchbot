@@ -40,7 +40,7 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
                 User user = userOptional.get();
                 UserDetails userDetails = new org.springframework.security.core.userdetails.User(
                         user.getUsername(),
-                        user.getPassword(),
+                        "", // Do not store password in context
                         user.getRoles().stream()
                                 .map(role -> new SimpleGrantedAuthority(role.name()))
                                 .collect(Collectors.toList())
@@ -50,6 +50,11 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
                         userDetails, null, userDetails.getAuthorities());
                 
                 SecurityContextHolder.getContext().setAuthentication(authentication);
+            } else {
+                // Security: Invalid API key
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.getWriter().write("Invalid API Key");
+                return;
             }
         }
 

@@ -86,12 +86,35 @@ public class SongUploadController {
 
             // Generate a unique filename to avoid collisions
             String originalFilename = file.getOriginalFilename();
+            if (originalFilename != null) {
+                // Security: Prevent path traversal by getting only the filename
+                originalFilename = new java.io.File(originalFilename).getName();
+            }
             String extension = "";
             if (originalFilename != null && originalFilename.contains(".")) {
                 extension = originalFilename.substring(originalFilename.lastIndexOf("."));
             }
+            // Limit extension length and check for valid extension if needed
+            if (extension.length() > 5) {
+                extension = ".mp3";
+            }
+            
             String filename = UUID.randomUUID().toString() + extension;
-            Path destinationFile = root.resolve(filename);
+            Path destinationFile = root.resolve(filename).normalize();
+
+            // Security: Ensure destination is within the upload directory
+            if (!destinationFile.startsWith(root.normalize())) {
+                logger.error("Attempted path traversal attack via upload: {}", originalFilename);
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Invalid filename");
+            }
+
+            // Additional extension check
+            if (originalFilename != null && !originalFilename.toLowerCase().endsWith(".mp3") && 
+                !originalFilename.toLowerCase().endsWith(".wav") && 
+                !originalFilename.toLowerCase().endsWith(".ogg")) {
+                logger.error("Invalid file extension: {}", originalFilename);
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Unsupported file extension");
+            }
 
             // Save the file
             Files.copy(file.getInputStream(), destinationFile);

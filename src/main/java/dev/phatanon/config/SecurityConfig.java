@@ -39,6 +39,22 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
+            .headers(headers -> headers
+                .contentSecurityPolicy(csp -> csp
+                    .policyDirectives("default-src 'self'; " +
+                                     "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; " +
+                                     "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; " +
+                                     "font-src 'self' https://fonts.gstatic.com; " +
+                                     "img-src 'self' data: https://static-cdn.jtvnw.net; " +
+                                     "connect-src 'self' ws: wss:; " +
+                                     "frame-ancestors 'none';")
+                )
+                .frameOptions(org.springframework.security.config.annotation.web.configurers.HeadersConfigurer.FrameOptionsConfig::deny)
+                .httpStrictTransportSecurity(hsts -> hsts
+                    .includeSubDomains(true)
+                    .maxAgeInSeconds(31536000)
+                )
+            )
             .csrf(csrf -> csrf
                 .ignoringRequestMatchers("/api/**") // Disable CSRF for API endpoints (using API Keys)
             )
