@@ -32,7 +32,7 @@ public class UserController {
     /**
      * Retrieves the profile of the currently authenticated user.
      * @param userDetails The details of the authenticated user.
-     * @return The User entity for the current user.
+     * @return The UserDTO for the current user.
      */
     @GetMapping("/me")
     @Operation(summary = "Get current user profile")
@@ -58,7 +58,7 @@ public class UserController {
     /**
      * Rotates (regenerates) the API key of the currently authenticated user.
      * @param userDetails The details of the authenticated user.
-     * @return The updated User entity with a new API key.
+     * @return The UserDTO with the new raw API key.
      */
     @PostMapping("/me/rotate-api-key")
     @Operation(summary = "Rotate current user's API key")
@@ -69,7 +69,7 @@ public class UserController {
 
     /**
      * Retrieves a list of all users. Requires ADMIN role.
-     * @return List of all User entities.
+     * @return List of all UserDTOs.
      */
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
@@ -84,7 +84,7 @@ public class UserController {
     /**
      * Creates a new user. Requires ADMIN role.
      * @param request The user creation request.
-     * @return The newly created User entity or an error message if the username exists.
+     * @return The newly created UserDTO with raw API key or an error message if the username exists.
      */
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
@@ -101,7 +101,7 @@ public class UserController {
      * Updates an existing user's details. Requires ADMIN role.
      * @param id The user ID to update.
      * @param request The updated user details.
-     * @return The updated User entity.
+     * @return The updated UserDTO.
      */
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")

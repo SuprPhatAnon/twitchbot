@@ -104,6 +104,8 @@ The application uses a user-based authentication system with three groups:
 - **streamer**: Allowed access to Streamer UI and upload.
 - **admin**: Allowed everything, including user management and Twitch configuration.
 
+API keys are stored securely using hashing. When creating a user or rotating an API key, the raw key is shown only once. Make sure to copy it and store it in a secure location.
+
 **Default Credentials:**
 - **Username**: `admin`
 - **Password**: `admin`
@@ -116,7 +118,7 @@ In addition to username/password authentication, the application supports **API 
 
 1.  Log in to the Admin or Streamer UI.
 2.  Go to the **Account** page.
-3.  You can view, copy, or rotate your **API Key**.
+3.  You can view (if just created/rotated) or rotate your **API Key**.
 4.  To use the API key, include it in the `X-API-KEY` header of your requests:
     ```bash
     curl -H "X-API-KEY: your_api_key" http://localhost:8080/api/songs
@@ -148,7 +150,7 @@ curl -X POST http://localhost:8080/api/songs/1/play
 ```
 
 ### REST API
-You can manage the application using the following REST API endpoints. Write requests (**POST, PUT, DELETE**) and protected **GET** requests require authentication. The API supports both **API Key** (`X-API-KEY` header) and **Basic Authentication**.
+You can manage the application using the following REST API endpoints. Write requests (**POST, PUT, DELETE**) and protected **GET** requests require authentication. The API supports **API Key** (`X-API-KEY` header) authentication.
 Interactive documentation is available at `/swagger-ui.html`.
 
 #### Song Management (`/api/songs`)

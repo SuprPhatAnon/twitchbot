@@ -51,7 +51,8 @@ This is a Spring Boot application that integrates with Twitch to play songs on a
 
 ### Authentication
 - The application uses Spring Security with form-based login for the Web UI.
-- **API Access**: All API write requests (POST, PUT, DELETE) and protected GET requests must use **API Key authentication** via the `X-API-KEY` header. Username and password (Basic Auth) are NOT supported for the API. API keys can be managed/rotated in the User Management UI.
+- **API Access**: All API write requests (POST, PUT, DELETE) and protected GET requests must use **API Key authentication** via the `X-API-KEY` header. Username and password (Basic Auth) are NOT supported for the API. API keys are stored securely using hashing (BCrypt) and can be managed/rotated in the User Management UI.
+- **Data Transfer Objects (DTOs)**: The application uses DTOs (e.g., `UserDTO`, `TwitchConfigDTO`) to expose only necessary data and mask sensitive information like passwords or API keys in list views.
 - **Read-only requests (GET)**: Some are public, while others require authentication (API Key or Session).
 - **Roles**:
   - `ROLE_UPLOAD`: Allowed to upload songs and manage files.
@@ -66,7 +67,7 @@ The database is managed by Hibernate/JPA. Key tables:
 - `twitch_config`: `id`, `client_id`, `client_secret`, `access_token`, `refresh_token`, `bot_access_token`, `bot_refresh_token`, `channel_name`, `redeem_title`, `song_delay_seconds`.
 - `redeems`: `id`, `title`.
 - `song_redeem_link`: (Join table for `songs` and `redeems`).
-- `users`: `id`, `username`, `password`, `api_key`.
+- `users`: `id`, `username`, `password`, `api_key` (hashed), `deleted`.
 - `user_roles`: (Join table for `users` and `Role` enum).
 
 ## Common Development Tasks

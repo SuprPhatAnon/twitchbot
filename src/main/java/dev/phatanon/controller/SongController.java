@@ -243,9 +243,9 @@ public class SongController {
     }
 
     /**
-     * Permanently deletes a song from the {@link SongRepository} and its associated file.
+     * Deletes a song record and its associated file from the disk. Requires ADMIN role.
      * @param id The ID of the song to delete permanently.
-     * @return 204 No Content if successful, or 404 Not Found if the ID does not exist.
+     * @return 204 No Content.
      */
     @DeleteMapping("/{id}/permanent")
     @PreAuthorize("hasRole('ADMIN')")
