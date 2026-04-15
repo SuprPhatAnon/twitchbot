@@ -18,6 +18,7 @@ This is a Spring Boot application that integrates with Twitch to play songs on a
 
 ### Core Logic
 - `dev.phatanon.service.TwitchBotService`: Main service handling Twitch events (EventSub), song queue management, and redemption processing.
+- `dev.phatanon.service.chat.ChatMessageService`: Extensible service for processing incoming Twitch chat messages using various `ChatMessageHandler` implementations.
 - `dev.phatanon.controller.WebSocketController`: Handles incoming WebSocket messages from the overlay (e.g., song completion).
 - `dev.phatanon.ConnectionStartupLogger`: Helper for logging startup status.
 
@@ -25,12 +26,15 @@ This is a Spring Boot application that integrates with Twitch to play songs on a
 - `SongController`: Manages song database, statistics, and manual playback.
 - `RedeemController`: Manages Twitch redemption titles that trigger the bot.
 - `TwitchConfigController`: Manages Twitch credentials and connection status.
+- `SongUploadController`: Handles song file uploads and management.
+- `UserController`: Manages user accounts and API keys.
 
 ### Entities
 - `Song`: Represents a song in the database.
 - `SongPlay`: Records an instance of a song being played (for statistics).
 - `TwitchConfig`: Stores Twitch API credentials and channel information.
 - `Redeem`: Represents a Twitch redemption title.
+- `User`: Represents a system user with roles and an API key.
 
 ## Technical Details for Agents
 
@@ -87,6 +91,7 @@ The database is managed by Hibernate/JPA. Key tables:
 ### Changing Twitch Integration Logic
 - Modify `TwitchBotService`. It uses `twitch4j` to interact with Twitch.
 - If adding new event listeners, look at how `registerEventListeners()` is implemented.
+- **Chat Command Handling**: To add or modify chat commands (e.g., `!music`), implement or modify `ChatMessageHandler` in `dev.phatanon.service.chat`. These are automatically picked up by `ChatMessageService`.
 - **IMPORTANT: The use of Twitch IRC is strictly forbidden.** All chat-related functionality must use the Twitch Helix API (for sending messages) and Twitch EventSub (for receiving messages and other events).
 
 ### Modifying the Overlay
