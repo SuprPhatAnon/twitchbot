@@ -47,29 +47,33 @@ This is a Spring Boot application that integrates with Twitch to play songs on a
 ### File Storage & Playlists
 - **Song Uploads**: Managed by `SongUploadController`. Files are stored in the directory specified by `SONG_UPLOAD_PATH` (default: `/uploads/songs`).
 - **M3U Playlist**: A `playlist.m3u` file is automatically generated and updated in the `SONG_UPLOAD_PATH` directory whenever songs are added, updated, or deleted. This file contains all enabled songs.
+- **Metadata Extraction**: `SongService` automatically extracts metadata (artist, title, and cover art) from uploaded MP3 files using the `mp3agic` library. Cover art is stored as a Base64-encoded Data URI in the `Song` entity.
 
 ### Authentication
 - The application uses Spring Security with form-based login for the Web UI.
-- **API Access**: All API write requests (POST, PUT, DELETE) and protected GET requests must use **API Key authentication** via the `X-API-KEY` header. Username and password (Basic Auth) are NOT supported for the API.
+- **API Access**: All API write requests (POST, PUT, DELETE) and protected GET requests must use **API Key authentication** via the `X-API-KEY` header. Username and password (Basic Auth) are NOT supported for the API. API keys can be managed/rotated in the User Management UI.
 - **Read-only requests (GET)**: Some are public, while others require authentication (API Key or Session).
 - **Roles**:
-  - `ROLE_UPLOAD`: Allowed to upload songs.
-  - `ROLE_STREAMER`: Allowed access to Streamer UI and song playback.
-  - `ROLE_ADMIN`: Full access (Users, Config, Songs, Redeems).
+  - `ROLE_UPLOAD`: Allowed to upload songs and manage files.
+  - `ROLE_STREAMER`: Allowed access to Streamer UI and song playback controls.
+  - `ROLE_ADMIN`: Full access (Users, Config, Songs, Redeems, System).
 - Default admin credentials: `admin` / `admin`.
 
 ### Database Schema
 The database is managed by Hibernate/JPA. Key tables:
-- `songs`: `id`, `name`, `artist`, `url`, `sort_name`, `enabled`, `play_count`.
-- `song_plays`: `id`, `song_id`, `timestamp`, `source`.
+- `songs`: `id`, `name`, `artist`, `url`, `sort_name`, `enabled`, `play_count`, `cover_art`.
+- `song_plays`: `id`, `song_id`, `timestamp`, `source`. Tracks each play instance for statistics.
 - `twitch_config`: `id`, `client_id`, `client_secret`, `access_token`, `refresh_token`, `bot_access_token`, `bot_refresh_token`, `channel_name`, `redeem_title`, `song_delay_seconds`.
 - `redeems`: `id`, `title`.
 - `song_redeem_link`: (Join table for `songs` and `redeems`).
+- `users`: `id`, `username`, `password`, `api_key`.
+- `user_roles`: (Join table for `users` and `Role` enum).
 
 ## Common Development Tasks
 
 ### General Requirements
 - **Always keep documentation updated**: If you change functionality, update `README.md`, `AGENTS.md`, and any relevant K8s/Docker documentation (including `k8s/K3S.md` and `k8s/MINIKUBE.md`).
+- **Keep AGENTS.md current**: When adding new core services, entities, or significant architectural changes, ensure they are documented here for future AI agents.
 - **Maintain Kubernetes Configurations**: Keep all Kubernetes deployment files in the `k8s/` directory (including `base` and `overlays` for production, minikube, and k3s) up-to-date with any changes in the application's infrastructure or configuration requirements.
 - **Maintain OpenAPI documentation**: Ensure SpringDoc/OpenAPI annotations in controllers are accurate and up-to-date.
 - **Update Javadocs**: Provide or update Javadocs for new or modified public classes and methods.

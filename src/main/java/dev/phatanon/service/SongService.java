@@ -18,6 +18,10 @@ import java.nio.file.Paths;
 import java.util.Base64;
 import java.util.List;
 
+/**
+ * Service for managing song files and metadata.
+ * Handles metadata extraction from MP3 files and M3U playlist generation.
+ */
 @Service
 public class SongService {
 

@@ -264,6 +264,8 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
             }
             log.info("TwitchClient built successfully.");
 
+            registerEventListeners();
+
             tokenRefreshTask = scheduler.scheduleAtFixedRate(() -> {
                 try {
                     List<TwitchConfig> currentConfigs = twitchConfigRepository.findAll();
@@ -294,6 +296,16 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
                 }
             }, 5, 5, TimeUnit.MINUTES);
 
+        } catch (Exception e) {
+            log.error("Failed to initialize Twitch bot: {}", e.getMessage());
+            throw e;
+        }
+    }
+
+    /**
+     * Registers EventSub and IRC event listeners with the Twitch client.
+     */
+    private void registerEventListeners() {
         log.info("Registering connection state listeners...");
         twitchClient.getEventManager().onEvent(EventSocketConnectionStateEvent.class, event -> {
             log.info("EventSub Socket Connection State Change: {} -> {}", event.getPreviousState(), event.getState());
@@ -322,7 +334,7 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
             String title = event.getReward().getTitle();
             String user = event.getUserName();
             log.info("Reward '{}' redeemed by {}", title, user);
-            
+
             RedeemLog redeemLog = new RedeemLog(user, title, LocalDateTime.now());
             synchronized (recentRedeems) {
                 if (recentRedeems.size() >= MAX_REDEEM_LOGS) {
@@ -331,7 +343,7 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
                 recentRedeems.add(redeemLog);
             }
             messagingTemplate.convertAndSend("/topic/redeems", redeemLog);
-            
+
             playRandomSong(title);
         });
 
@@ -432,10 +444,6 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
         });
 
         log.info("Twitch bot initialized for channel: {}", currentChannelName);
-        } catch (Exception e) {
-            log.error("Failed to initialize Twitch bot: {}", e.getMessage());
-            throw e;
-        }
     }
 
     /**
