@@ -147,7 +147,6 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
         messagingTemplate.convertAndSend("/topic/songs", "refresh");
     }
     private boolean isStreamOnline = false;
-    private boolean isStreamerConnected = false;
     private boolean isBotConnected = false;
     private final AtomicBoolean greetingSentThisSession = new AtomicBoolean(false);
 
@@ -201,7 +200,8 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
      * @return true if connected, false otherwise
      */
     public synchronized boolean isStreamerConnected() {
-        return isStreamerConnected;
+        return twitchClient != null && 
+               twitchClient.getEventSocket() != null;
     }
 
     /**
@@ -239,8 +239,6 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
      */
     public synchronized void reconnect() {
         log.info("Reconnection requested. Closing existing Twitch client...");
-        isStreamerConnected = false;
-        isBotConnected = false;
         if (twitchClient != null) {
             try {
                 twitchClient.close();
@@ -263,8 +261,6 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
     @PostConstruct
     public void init() {
         try {
-            isStreamerConnected = false;
-            isBotConnected = false;
             log.info("Checking for existing Twitch configuration...");
             List<TwitchConfig> configs = twitchConfigRepository.findAll();
             if (configs.isEmpty()) {
@@ -381,11 +377,10 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
         log.info("Registering connection state listeners...");
         twitchClient.getEventManager().onEvent(EventSocketConnectionStateEvent.class, event -> {
             log.info("EventSub Socket Connection State Change (Streamer): {} -> {}", event.getPreviousState(), event.getState());
-            isStreamerConnected = event.getState() == WebsocketConnectionState.CONNECTED;
             if (event.getState() == WebsocketConnectionState.DISCONNECTED || event.getState() == WebsocketConnectionState.LOST) {
                 log.warn("EventSub Socket disconnected! Reason: {}", event.getPreviousState());
             }
-            messagingTemplate.convertAndSend("/topic/streamer-connection-status", isStreamerConnected);
+            messagingTemplate.convertAndSend("/topic/streamer-connection-status", event.getState() == WebsocketConnectionState.CONNECTED);
         });
 
         twitchClient.getEventManager().onEvent(ChatConnectionStateEvent.class, event -> {
