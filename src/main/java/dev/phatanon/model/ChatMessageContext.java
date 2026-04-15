@@ -1,15 +1,11 @@
 package dev.phatanon.model;
 
-import com.github.twitch4j.chat.events.channel.ChannelMessageEvent;
-
 public class ChatMessageContext {
-    private final ChannelMessageEvent event;
     private final String message;
     private final String senderName;
     private final String channelName;
 
-    public ChatMessageContext(ChannelMessageEvent event, String message, String senderName, String channelName) {
-        this.event = event;
+    public ChatMessageContext(String message, String senderName, String channelName) {
         this.message = message;
         this.senderName = senderName;
         this.channelName = channelName;
@@ -17,10 +13,6 @@ public class ChatMessageContext {
 
     public static ChatMessageContextBuilder builder() {
         return new ChatMessageContextBuilder();
-    }
-
-    public ChannelMessageEvent getEvent() {
-        return event;
     }
 
     public String getMessage() {
@@ -36,15 +28,9 @@ public class ChatMessageContext {
     }
 
     public static class ChatMessageContextBuilder {
-        private ChannelMessageEvent event;
         private String message;
         private String senderName;
         private String channelName;
-
-        public ChatMessageContextBuilder event(ChannelMessageEvent event) {
-            this.event = event;
-            return this;
-        }
 
         public ChatMessageContextBuilder message(String message) {
             this.message = message;
@@ -62,7 +48,7 @@ public class ChatMessageContext {
         }
 
         public ChatMessageContext build() {
-            return new ChatMessageContext(event, message, senderName, channelName);
+            return new ChatMessageContext(message, senderName, channelName);
         }
     }
 }

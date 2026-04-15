@@ -29,7 +29,7 @@ public class ConnectionStartupLogger implements CommandLineRunner {
      */
     public interface ITwitchBotService {
         /**
-         * Checks if the Twitch IRC connection is active.
+         * Checks if the Twitch EventSub connection is active.
          * @return true if connected, false otherwise
          */
         boolean isTwitchConnected();
@@ -101,9 +101,9 @@ public class ConnectionStartupLogger implements CommandLineRunner {
         try {
             logger.info("Verifying Twitch connection status...");
             if (twitchBotService.isTwitchConnected()) {
-                logger.info("✅ Successfully connected to Twitch IRC.");
+                logger.info("✅ Successfully connected to Twitch EventSub.");
             } else {
-                logger.warn("⚠️ Twitch IRC not yet connected (it may still be connecting in the background).");
+                logger.warn("⚠️ Twitch EventSub not yet connected (it may still be connecting in the background).");
             }
         } catch (Exception e) {
             logger.error("❌ Error checking Twitch connection: {}", e.getMessage());

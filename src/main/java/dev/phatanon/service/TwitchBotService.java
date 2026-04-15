@@ -54,7 +54,7 @@ import java.util.concurrent.ScheduledFuture;
 
 /**
  * Service responsible for interacting with Twitch API and managing song playback.
- * It handles Twitch IRC connection, EventSub events for rewards, and maintains a song queue.
+ * It handles Twitch EventSub events for messages and rewards, and maintains a song queue.
  */
 @Service
 public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotService {
@@ -177,20 +177,30 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
      */
     public void sendChatMessage(String message) {
         if (isTwitchConnected()) {
-            twitchClient.getChat().sendMessage(currentChannelName, message);
-            log.info("Sent chat message to {}: {}", currentChannelName, message);
+            try {
+                String token = currentBotAccessToken != null && !currentBotAccessToken.isBlank() ? currentBotAccessToken : currentAccessToken;
+                ChatMessage chatMessage = ChatMessage.builder()
+                        .broadcasterId(broadcasterId)
+                        .senderId(botUserId)
+                        .message(message)
+                        .build();
+                twitchClient.getHelix().sendChatMessage(token, chatMessage).execute();
+                log.info("Sent chat message to {}: {}", currentChannelName, message);
+            } catch (Exception e) {
+                log.error("Failed to send chat message via Helix: {}", e.getMessage());
+            }
         } else {
-            log.warn("Cannot send chat message: Twitch IRC is not connected.");
+            log.warn("Cannot send chat message: Twitch EventSub is not connected.");
         }
     }
 
     /**
-     * Checks if the Twitch IRC client is connected.
+     * Checks if the Twitch EventSub client is connected.
      * @return true if connected, false otherwise
      */
     public synchronized boolean isTwitchConnected() {
         return twitchClient != null && 
-               twitchClient.getChat().getState() == WebsocketConnectionState.CONNECTED;
+               twitchClient.getEventSocket() != null;
     }
 
     /**
@@ -286,7 +296,7 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
                     .withClientId(config.getClientId())
                     .withClientSecret(config.getClientSecret())
                     .withCredentialManager(credentialManager)
-                    .withEnableChat(true)
+                    .withEnableChat(false)
                     .withEnableEventSocket(true)
                     .withEnableHelix(true)
                     .withDefaultAuthToken(streamerCredential)
@@ -336,7 +346,7 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
     }
 
     /**
-     * Registers EventSub and IRC event listeners with the Twitch client.
+     * Registers EventSub event listeners with the Twitch client.
      */
     private void registerEventListeners() {
         log.info("Registering connection state listeners...");
@@ -478,7 +488,6 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
 
         twitchClient.getEventManager().onEvent(ChannelMessageEvent.class, event -> {
             ChatMessageContext context = ChatMessageContext.builder()
-                    .event(event)
                     .message(event.getMessage())
                     .senderName(event.getUser().getName())
                     .channelName(event.getChannel().getName())

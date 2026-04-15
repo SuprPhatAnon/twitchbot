@@ -48,10 +48,17 @@
         [data-bs-theme="dark"] .redeem-entry { border-bottom-color: #495057; }
         .redeem-time { color: #6c757d; font-size: 0.75rem; }
         .redeem-user { font-weight: bold; color: #0d6efd; }
-        [data-bs-theme="dark"] .redeem-user { color: #3d8bfd; }
-        .redeem-reward { color: #198754; }
-        [data-bs-theme="dark"] .redeem-reward { color: #75b798; }
-
+        .card-header { cursor: pointer; user-select: none; position: relative; }
+        .card-header .collapse-toggle::after {
+            content: '▼';
+            font-size: 0.8rem;
+            transition: transform 0.3s;
+            display: inline-block;
+        }
+        .card-header.collapsed .collapse-toggle::after {
+            transform: rotate(-90deg);
+        }
+        
         #auth-overlay {
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -105,12 +112,15 @@
 
     <div class="main-container">
         <div class="left-panel">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
+            <div class="card" id="card-redeems">
+                <div class="card-header d-flex justify-content-between align-items-center" onclick="toggleCard('card-redeems')">
                     Manage Redeems
-                    <button class="btn btn-sm btn-outline-secondary" onclick="fetchRedeems()">Refresh</button>
+                    <div class="d-flex align-items-center">
+                        <button class="btn btn-sm btn-outline-secondary me-2" onclick="event.stopPropagation(); fetchRedeems()">Refresh</button>
+                        <span class="collapse-toggle"></span>
+                    </div>
                 </div>
-                <div class="card-body">
+                <div class="card-body collapse show">
                     <form id="add-redeem-form" class="mb-3">
                         <div class="input-group input-group-sm">
                             <input type="text" id="new-redeem-title" class="form-control" placeholder="Redeem Title" required>
@@ -123,9 +133,12 @@
                 </div>
             </div>
 
-            <div class="card">
-                <div class="card-header">Add New Song</div>
-                <div class="card-body">
+            <div class="card" id="card-add-song">
+                <div class="card-header d-flex justify-content-between align-items-center" onclick="toggleCard('card-add-song')">
+                    Add New Song
+                    <span class="collapse-toggle"></span>
+                </div>
+                <div class="card-body collapse show">
                     <form id="add-song-form">
                         <div class="row g-3">
                             <div class="col-md-4">
@@ -145,7 +158,7 @@
                             </div>
                             <div class="col-md-9">
                                 <label class="form-label small">Audio URL</label>
-                                <input type="url" class="form-control form-control-sm" id="song-url" placeholder="https://example.com/audio.mp3" required>
+                                <input type="text" class="form-control form-control-sm" id="song-url" placeholder="/uploads/songs/audio.mp3" required>
                             </div>
                             <div class="col-md-3 d-flex align-items-end">
                                 <button type="submit" class="btn btn-primary btn-sm w-100">Add Song</button>
@@ -155,18 +168,19 @@
                 </div>
             </div>
 
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
+            <div class="card" id="card-songs-database">
+                <div class="card-header d-flex justify-content-between align-items-center" onclick="toggleCard('card-songs-database')">
                     Songs Database
-                    <div class="d-flex">
-                        <div class="input-group input-group-sm me-2" style="width: 200px;">
+                    <div class="d-flex align-items-center">
+                        <div class="input-group input-group-sm me-2" style="width: 200px;" onclick="event.stopPropagation()">
                             <span class="input-group-text">Search</span>
                             <input type="text" id="song-search" class="form-control" oninput="filterSongsTable()" placeholder="Name, artist...">
                         </div>
-                        <button class="btn btn-sm btn-outline-secondary" onclick="fetchSongs()">Refresh</button>
+                        <button class="btn btn-sm btn-outline-secondary me-2" onclick="event.stopPropagation(); fetchSongs()">Refresh</button>
+                        <span class="collapse-toggle"></span>
                     </div>
                 </div>
-                <div class="card-body p-0">
+                <div class="card-body p-0 collapse show">
                     <div class="table-responsive">
                         <table class="table table-hover mb-0">
                             <thead class="table-light">
@@ -216,7 +230,7 @@
                                 </div>
                                 <div class="mb-3">
                                     <label for="edit-song-url" class="form-label">Audio URL</label>
-                                    <input type="url" class="form-control" id="edit-song-url" required>
+                                    <input type="text" class="form-control" id="edit-song-url" required>
                                 </div>
                                 <div class="mb-3">
                                     <label for="edit-song-cover" class="form-label">Cover Art (Optional)</label>
@@ -233,10 +247,48 @@
                 </div>
             </div>
 
-            <div class="card">
-                <div class="card-header">Twitch Configuration</div>
-                <div class="card-body">
+            <div class="card" id="card-twitch-config">
+                <div class="card-header d-flex justify-content-between align-items-center" onclick="toggleCard('card-twitch-config')">
+                    Twitch Configuration
+                    <span class="collapse-toggle"></span>
+                </div>
+                <div class="card-body collapse show">
                     <form id="twitch-config-form">
+                        <div class="row g-2 mb-3">
+                            <div class="col-md-3">
+                                <div class="card bg-light border-0">
+                                    <div class="card-body p-2 text-center">
+                                        <div class="small text-muted mb-1">Client ID</div>
+                                        <div id="status-client-id" class="fw-bold text-danger">Not Set</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card bg-light border-0">
+                                    <div class="card-body p-2 text-center">
+                                        <div class="small text-muted mb-1">Client Secret</div>
+                                        <div id="status-client-secret" class="fw-bold text-danger">Not Set</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card bg-light border-0">
+                                    <div class="card-body p-2 text-center">
+                                        <div class="small text-muted mb-1">Streamer Tokens</div>
+                                        <div id="status-streamer-tokens" class="fw-bold text-danger">Not Set</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card bg-light border-0">
+                                    <div class="card-body p-2 text-center">
+                                        <div class="small text-muted mb-1">Bot Tokens</div>
+                                        <div id="status-bot-tokens" class="fw-bold text-danger">Not Set</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="row g-2">
                             <div class="col-md-4">
                                 <label class="form-label small">Client ID</label>
@@ -294,24 +346,48 @@
         </div>
 
         <div class="right-panel">
-            <h5 class="mb-3">Current Queue</h5>
-            <div id="queue-list" class="mb-4">
-                <div class="text-muted small">Queue is empty</div>
+            <div class="card" id="card-queue">
+                <div class="card-header d-flex justify-content-between align-items-center" onclick="toggleCard('card-queue')">
+                    <h5 class="mb-0 h6">Current Queue</h5>
+                    <span class="collapse-toggle"></span>
+                </div>
+                <div class="card-body collapse show">
+                    <div id="queue-list" class="mb-0">
+                        <div class="text-muted small">Queue is empty</div>
+                    </div>
+                </div>
             </div>
 
-            <h5 class="mb-3">Recent Song Plays</h5>
-            <div id="recent-plays-log" class="mb-4">
-                <!-- Recent plays loaded here -->
+            <div class="card" id="card-recent-plays">
+                <div class="card-header d-flex justify-content-between align-items-center" onclick="toggleCard('card-recent-plays')">
+                    <h5 class="mb-0 h6">Recent Song Plays</h5>
+                    <span class="collapse-toggle"></span>
+                </div>
+                <div class="card-body collapse show">
+                    <div id="recent-plays-log" class="mb-0">
+                        <!-- Recent plays loaded here -->
+                    </div>
+                </div>
             </div>
 
-            <h5 class="mb-3">Event Log (Redeems, Subs, Follows)</h5>
-            <div id="redeem-log" class="mb-3">
-                <!-- Redeems added here -->
+            <div class="card" id="card-event-log">
+                <div class="card-header d-flex justify-content-between align-items-center" onclick="toggleCard('card-event-log')">
+                    <h5 class="mb-0 h6">Event Log (Redeems, Subs, Follows)</h5>
+                    <span class="collapse-toggle"></span>
+                </div>
+                <div class="card-body collapse show">
+                    <div id="redeem-log" class="mb-0">
+                        <!-- Redeems added here -->
+                    </div>
+                </div>
             </div>
 
-            <div class="card mt-auto">
-                <div class="card-header py-2 small fw-bold">Send Chat Message</div>
-                <div class="card-body p-2">
+            <div class="card mt-auto" id="card-chat">
+                <div class="card-header py-2 small fw-bold d-flex justify-content-between align-items-center" onclick="toggleCard('card-chat')">
+                    Send Chat Message
+                    <span class="collapse-toggle"></span>
+                </div>
+                <div class="card-body p-2 collapse show">
                     <form id="chat-form">
                         <div class="input-group input-group-sm">
                             <input type="text" id="chat-message" class="form-control" placeholder="Type a message..." required>
@@ -361,6 +437,34 @@
             }, function (error) {
                 console.error('WebSocket Error: ' + error);
                 setTimeout(connectWebSocket, 5000);
+            });
+        }
+
+        function toggleCard(cardId) {
+            const card = document.getElementById(cardId);
+            const header = card.querySelector('.card-header');
+            const body = card.querySelector('.card-body');
+            const isCollapsed = header.classList.toggle('collapsed');
+            
+            if (isCollapsed) {
+                body.classList.remove('show');
+                localStorage.setItem(cardId + '-collapsed', 'true');
+            } else {
+                body.classList.add('show');
+                localStorage.removeItem(cardId + '-collapsed');
+            }
+        }
+
+        function restoreCollapsedStates() {
+            const cards = ['card-redeems', 'card-add-song', 'card-songs-database', 'card-twitch-config', 'card-queue', 'card-recent-plays', 'card-event-log', 'card-chat'];
+            cards.forEach(cardId => {
+                const card = document.getElementById(cardId);
+                if (card && localStorage.getItem(cardId + '-collapsed') === 'true') {
+                    const header = card.querySelector('.card-header');
+                    const body = card.querySelector('.card-body');
+                    header.classList.add('collapsed');
+                    body.classList.remove('show');
+                }
             });
         }
 
@@ -732,6 +836,22 @@
             } catch (error) { console.error('Error deleting redeem:', error); }
         }
 
+        function updateConfigStatus(id, value) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            if (value) {
+                if (id === 'status-client-id') {
+                    el.innerText = value;
+                } else {
+                    el.innerText = 'Added';
+                }
+                el.className = 'fw-bold text-success';
+            } else {
+                el.innerText = 'Not Set';
+                el.className = 'fw-bold text-danger';
+            }
+        }
+
         async function fetchTwitchConfig() {
             try {
                 const response = await fetch('/api/twitch-config');
@@ -742,12 +862,24 @@
                     document.getElementById('twitch-client-secret').value = config.clientSecret || '';
                     document.getElementById('twitch-channel-name').value = config.channelName || '';
                     document.getElementById('twitch-song-delay').value = config.songDelaySeconds || 0;
+
+                    // Update Status Indicators
+                    updateConfigStatus('status-client-id', config.clientId);
+                    updateConfigStatus('status-client-secret', config.clientSecret);
+                    updateConfigStatus('status-streamer-tokens', config.accessToken);
+                    updateConfigStatus('status-bot-tokens', config.botAccessToken);
+                } else {
+                    // Reset status if not found
+                    updateConfigStatus('status-client-id', null);
+                    updateConfigStatus('status-client-secret', null);
+                    updateConfigStatus('status-streamer-tokens', null);
+                    updateConfigStatus('status-bot-tokens', null);
                 }
 
                 const hostResponse = await fetch('/api/twitch-config/redirect-uri-host');
                 if (hostResponse.ok) {
                     const host = await hostResponse.text();
-                    document.getElementById('oauth-redirect-uri').value = host + '/admin.html';
+                    document.getElementById('oauth-redirect-uri').value = host + '/api/twitch-config/callback';
                 }
             } catch (error) { console.error('Error fetching config:', error); }
         }
@@ -948,6 +1080,7 @@
         fetchTwitchConfig();
         fetchRecentRedeems();
         connectWebSocket();
+        restoreCollapsedStates();
     </script>
 </body>
 </html>

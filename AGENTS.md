@@ -17,7 +17,7 @@ This is a Spring Boot application that integrates with Twitch to play songs on a
 ## Key Components
 
 ### Core Logic
-- `dev.phatanon.service.TwitchBotService`: Main service handling Twitch events (EventSub, IRC), song queue management, and redemption processing.
+- `dev.phatanon.service.TwitchBotService`: Main service handling Twitch events (EventSub), song queue management, and redemption processing.
 - `dev.phatanon.controller.WebSocketController`: Handles incoming WebSocket messages from the overlay (e.g., song completion).
 - `dev.phatanon.ConnectionStartupLogger`: Helper for logging startup status.
 
@@ -87,6 +87,7 @@ The database is managed by Hibernate/JPA. Key tables:
 ### Changing Twitch Integration Logic
 - Modify `TwitchBotService`. It uses `twitch4j` to interact with Twitch.
 - If adding new event listeners, look at how `registerEventListeners()` is implemented.
+- **IMPORTANT: The use of Twitch IRC is strictly forbidden.** All chat-related functionality must use the Twitch Helix API (for sending messages) and Twitch EventSub (for receiving messages and other events).
 
 ### Modifying the Overlay
 - The main player overlay is `src/main/resources/static/overlay.html`.

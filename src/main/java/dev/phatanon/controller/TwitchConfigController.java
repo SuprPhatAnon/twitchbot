@@ -63,7 +63,7 @@ public class TwitchConfigController {
 
     /**
      * Retrieves the current Twitch connection status from the {@link TwitchBotService}.
-     * @return true if the Twitch IRC client is connected, false otherwise.
+     * @return true if the Twitch EventSub client is connected, false otherwise.
      */
     @GetMapping("/connection")
     @Operation(summary = "Get current Twitch connection status")

@@ -10,19 +10,14 @@ public class TwitchConfigDTO {
     private Long id;
     private String clientId;
     
-    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String clientSecret;
     
-    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String accessToken;
     
-    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String refreshToken;
     
-    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String botAccessToken;
     
-    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String botRefreshToken;
     
     private String channelName;
