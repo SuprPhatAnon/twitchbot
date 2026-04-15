@@ -38,7 +38,7 @@ class UserServiceTest {
     @Test
     void loadUserByUsername_UserExists_ReturnsUserDetails() {
         User user = new User("testuser", "password", Set.of(Role.ROLE_ADMIN));
-        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(user));
+        when(userRepository.findByUsernameAndDeletedFalse("testuser")).thenReturn(Optional.of(user));
 
         UserDetails userDetails = userService.loadUserByUsername("testuser");
 
@@ -50,7 +50,7 @@ class UserServiceTest {
 
     @Test
     void loadUserByUsername_UserDoesNotExist_ThrowsException() {
-        when(userRepository.findByUsername("nonexistent")).thenReturn(Optional.empty());
+        when(userRepository.findByUsernameAndDeletedFalse("nonexistent")).thenReturn(Optional.empty());
 
         assertThrows(UsernameNotFoundException.class, () -> userService.loadUserByUsername("nonexistent"));
     }
@@ -58,7 +58,7 @@ class UserServiceTest {
     @Test
     void findAll_ReturnsAllUsers() {
         List<User> users = List.of(new User("user1", "p1", Set.of()), new User("user2", "p2", Set.of()));
-        when(userRepository.findAll()).thenReturn(users);
+        when(userRepository.findAllByDeletedFalse()).thenReturn(users);
 
         List<User> result = userService.findAll();
 
@@ -84,7 +84,7 @@ class UserServiceTest {
     void findByApiKey_ReturnsUser() {
         User user = new User("test", "pass", Set.of());
         user.setApiKey("test-api-key");
-        when(userRepository.findByApiKey("test-api-key")).thenReturn(Optional.of(user));
+        when(userRepository.findByApiKeyAndDeletedFalse("test-api-key")).thenReturn(Optional.of(user));
         
         Optional<User> result = userService.findByApiKey("test-api-key");
         
@@ -97,7 +97,7 @@ class UserServiceTest {
         User user = new User("testuser", "pass", Set.of());
         String oldKey = "old-key";
         user.setApiKey(oldKey);
-        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(user));
+        when(userRepository.findByUsernameAndDeletedFalse("testuser")).thenReturn(Optional.of(user));
         when(userRepository.save(any(User.class))).thenAnswer(i -> i.getArguments()[0]);
 
         User result = userService.rotateApiKey("testuser");
@@ -110,7 +110,7 @@ class UserServiceTest {
     @Test
     void changePassword_UpdatesPassword() {
         User user = new User("testuser", "oldPass", Set.of());
-        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(user));
+        when(userRepository.findByUsernameAndDeletedFalse("testuser")).thenReturn(Optional.of(user));
         when(passwordEncoder.encode("newPass")).thenReturn("encodedNewPass");
 
         userService.changePassword("testuser", "newPass");
@@ -120,21 +120,26 @@ class UserServiceTest {
     }
 
     @Test
-    void deleteUser_CallsRepository() {
+    void deleteUser_SetsDeletedFlag() {
+        User user = new User("test", "pass", Set.of());
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        
         userService.deleteUser(1L);
-        verify(userRepository).deleteById(1L);
+        
+        assertTrue(user.isDeleted());
+        verify(userRepository).save(user);
     }
 
     @Test
     void existsByUsername_ReturnsTrueIfFound() {
-        when(userRepository.findByUsername("test")).thenReturn(Optional.of(new User()));
+        when(userRepository.findByUsernameAndDeletedFalse("test")).thenReturn(Optional.of(new User()));
         assertTrue(userService.existsByUsername("test"));
     }
 
     @Test
     void findById_ReturnsUser() {
         User user = new User("test", "pass", Set.of());
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(userRepository.findByIdAndDeletedFalse(1L)).thenReturn(Optional.of(user));
         
         Optional<User> result = userService.findById(1L);
         
@@ -145,7 +150,7 @@ class UserServiceTest {
     @Test
     void findByUsername_ReturnsUser() {
         User user = new User("test", "pass", Set.of());
-        when(userRepository.findByUsername("test")).thenReturn(Optional.of(user));
+        when(userRepository.findByUsernameAndDeletedFalse("test")).thenReturn(Optional.of(user));
         
         Optional<User> result = userService.findByUsername("test");
         
@@ -190,7 +195,7 @@ class UserServiceTest {
 
     @Test
     void changePassword_NonExistentUser_ThrowsException() {
-        when(userRepository.findByUsername("test")).thenReturn(Optional.empty());
+        when(userRepository.findByUsernameAndDeletedFalse("test")).thenReturn(Optional.empty());
 
         assertThrows(RuntimeException.class, () -> userService.changePassword("test", "pass"));
     }

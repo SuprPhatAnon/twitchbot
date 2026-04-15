@@ -39,7 +39,7 @@ public class UserService implements UserDetailsService {
      */
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        User user = userRepository.findByUsername(username)
+        User user = userRepository.findByUsernameAndDeletedFalse(username)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
 
         return new org.springframework.security.core.userdetails.User(
@@ -53,19 +53,19 @@ public class UserService implements UserDetailsService {
 
     /**
      * Retrieves all users from the database.
-     * @return List of all User entities.
+     * @return List of all non-deleted User entities.
      */
     public List<User> findAll() {
-        return userRepository.findAll();
+        return userRepository.findAllByDeletedFalse();
     }
 
     /**
      * Finds a user by their unique ID.
      * @param id The user ID.
-     * @return Optional containing the user if found.
+     * @return Optional containing the user if found and not deleted.
      */
     public Optional<User> findById(Long id) {
-        return userRepository.findById(id);
+        return userRepository.findByIdAndDeletedFalse(id);
     }
 
     /**
@@ -109,7 +109,7 @@ public class UserService implements UserDetailsService {
      */
     @Transactional
     public void changePassword(String username, String newPassword) {
-        User user = userRepository.findByUsername(username)
+        User user = userRepository.findByUsernameAndDeletedFalse(username)
                 .orElseThrow(() -> new RuntimeException("User not found"));
         user.setPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);
@@ -118,28 +118,31 @@ public class UserService implements UserDetailsService {
     /**
      * Finds a user by their username.
      * @param username The username.
-     * @return Optional containing the user if found.
+     * @return Optional containing the user if found and not deleted.
      */
     public Optional<User> findByUsername(String username) {
-        return userRepository.findByUsername(username);
+        return userRepository.findByUsernameAndDeletedFalse(username);
     }
 
     /**
-     * Deletes a user by their unique ID.
+     * Soft deletes a user by setting their deleted flag to true.
      * @param id The user ID to delete.
      */
     @Transactional
     public void deleteUser(Long id) {
-        userRepository.deleteById(id);
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        user.setDeleted(true);
+        userRepository.save(user);
     }
 
     /**
      * Finds a user by their API key.
      * @param apiKey The API key.
-     * @return Optional containing the user if found.
+     * @return Optional containing the user if found and not deleted.
      */
     public Optional<User> findByApiKey(String apiKey) {
-        return userRepository.findByApiKey(apiKey);
+        return userRepository.findByApiKeyAndDeletedFalse(apiKey);
     }
 
     /**
@@ -149,7 +152,7 @@ public class UserService implements UserDetailsService {
      */
     @Transactional
     public User rotateApiKey(String username) {
-        User user = userRepository.findByUsername(username)
+        User user = userRepository.findByUsernameAndDeletedFalse(username)
                 .orElseThrow(() -> new RuntimeException("User not found"));
         user.setApiKey(UUID.randomUUID().toString());
         return userRepository.save(user);
@@ -158,9 +161,9 @@ public class UserService implements UserDetailsService {
     /**
      * Checks if a user exists with the given username.
      * @param username The username to check.
-     * @return true if the user exists, false otherwise.
+     * @return true if a non-deleted user exists, false otherwise.
      */
     public boolean existsByUsername(String username) {
-        return userRepository.findByUsername(username).isPresent();
+        return userRepository.findByUsernameAndDeletedFalse(username).isPresent();
     }
 }
