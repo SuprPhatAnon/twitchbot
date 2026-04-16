@@ -40,6 +40,12 @@ This is a Spring Boot application that integrates with Twitch to play songs on a
 
 ## Technical Details for Agents
 
+### Logging
+- The application uses **Log4j2** for logging.
+- Configuration is located in `src/main/resources/log4j2-spring.xml`.
+- Log levels can be configured in the XML file or overridden via environment variables if configured.
+- Logs are output to the console and to `logs/twitchbot.log` with a rolling policy (10MB per file, 7 files max).
+
 ### WebSocket Flow
 1. The overlay (`overlay.html`) connects to `/ws` using SockJS and STOMP.
 2. It subscribes to `/topic/play` to receive song play events.

@@ -77,6 +77,20 @@ public class SongControllerTest {
     }
 
     @Test
+    void shouldGetAllSongsSortedByNewest() throws Exception {
+        when(songRepository.findAllByOrderByCreatedTimestampDesc()).thenReturn(java.util.List.of(
+                new Song("Song 2", "Artist 2", "url2"),
+                new Song("Song 1", "Artist 1", "url1")
+        ));
+
+        mockMvc.perform(get("/api/songs").param("sort", "newest"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[0].name", is("Song 2")))
+                .andExpect(jsonPath("$[1].name", is("Song 1")));
+    }
+
+    @Test
     void shouldGetSongById() throws Exception {
         Song song = new Song("Song 1", "Artist 1", "url1");
         song.setId(1L);

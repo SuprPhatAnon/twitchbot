@@ -18,6 +18,12 @@ public interface SongRepository extends JpaRepository<Song, Long> {
     List<Song> findAllByOrderBySortNameAsc();
 
     /**
+     * Finds all songs sorted by created timestamp descending.
+     * @return A list of all songs sorted by created timestamp descending.
+     */
+    List<Song> findAllByOrderByCreatedTimestampDesc();
+
+    /**
      * Finds songs that are linked to a specific redeem title.
      * @param redeemTitle The title of the channel point redeem.
      * @return A list of songs matching the redeem title.

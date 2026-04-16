@@ -54,12 +54,16 @@ public class SongController {
     }
 
     /**
-     * Retrieves all available songs from the {@link SongRepository}, ordered by their sort name.
+     * Retrieves all available songs from the {@link SongRepository}, ordered by their sort name or created date.
+     * @param sort The sorting criteria: "name" (default) or "newest".
      * @return A list of all {@link Song} entities.
      */
     @GetMapping
     @Operation(summary = "Get all songs")
-    public List<Song> getAllSongs() {
+    public List<Song> getAllSongs(@RequestParam(required = false, defaultValue = "name") String sort) {
+        if ("newest".equalsIgnoreCase(sort)) {
+            return songRepository.findAllByOrderByCreatedTimestampDesc();
+        }
         return songRepository.findAllByOrderBySortNameAsc();
     }
 

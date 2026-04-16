@@ -155,6 +155,7 @@ Interactive documentation is available at `/swagger-ui.html`.
 
 #### Song Management (`/api/songs`)
 - **GET `/api/songs`**: List all songs.
+  - Query parameter: `sort` (string, default: `name`, options: `name`, `newest`).
 - **GET `/api/songs/{id}`**: Get a specific song by ID.
 - **POST `/api/songs`**: Add a new song.
   - Body: `{"name": "Song Name", "artist": "Artist Name", "url": "https://example.com/song.mp3", "redeems": [{"id": 1}]}`

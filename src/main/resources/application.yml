@@ -55,9 +55,3 @@ logging:
     root: INFO
     dev.phatanon: DEBUG
     com.github.twitch4j: DEBUG
-  file:
-    name: logs/twitchbot.log
-  logback:
-    rollingpolicy:
-      max-file-size: 10MB
-      max-history: 7
