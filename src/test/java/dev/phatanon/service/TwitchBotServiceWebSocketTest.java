@@ -39,7 +39,7 @@ public class TwitchBotServiceWebSocketTest {
 
     @Test
     void shouldBroadcastCurrentSong() {
-        twitchBotService.handleSongFinished();
+        twitchBotService.clearQueue();
         
         // Verification of broadcast on /topic/current-song with "null" (as it clears it)
         verify(messagingTemplate).convertAndSend(eq("/topic/current-song"), eq("null"));

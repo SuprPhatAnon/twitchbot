@@ -99,6 +99,11 @@ The database is managed by Hibernate/JPA. Key tables:
 
 ### Modifying the Overlay
 - The main player overlay is `src/main/resources/static/overlay.html`.
+- **Overlay Behavior Directives**:
+  - The overlay MUST play a song when it receives a message on `/topic/play`.
+  - It MUST display "Now Playing" information (title, artist, and cover art if available) while the song is playing.
+  - It MUST stop the song and REMOVE the "Now Playing" message immediately when the song finishes.
+  - It MUST stop the song and REMOVE the "Now Playing" message immediately when a "clear queue" instruction is received (via a `null` or empty message on `/topic/current-song`).
 - Other UIs:
   - `admin.html`: Full management dashboard.
   - `song-management.html`: Dedicated song file management (Admin only).
@@ -116,6 +121,13 @@ The database is managed by Hibernate/JPA. Key tables:
 - Run tests using Maven: `mvn test`
 - Tests are located in `src/test/java/dev/phatanon/`.
 - **Maintain a minimum test coverage of 70%** for all new and modified code.
+
+### Headless Browser Testing
+The project supports headless browser testing using Selenium and Chrome. This is particularly useful for testing JavaScript functionality on the web pages.
+- **Local Execution**: Ensure you have Chrome installed and use `WebDriverManager` (included in `pom.xml`) to manage drivers.
+- **Docker Environment**: A dedicated Docker environment is provided for running these tests in a consistent, headless environment.
+  - Run tests with: `docker-compose -f docker-compose.test.yml up --build --exit-code-from test-runner`
+  - This setup uses a MariaDB container for the database and a Maven container with Chrome installed for running the tests.
 
 ## Environment Setup for Agents
 

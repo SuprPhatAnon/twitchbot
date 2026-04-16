@@ -25,4 +25,13 @@ public class WebSocketController {
     public void songFinished(@Payload(required = false) String payload) {
         twitchBotService.handleSongFinished();
     }
+
+    /**
+     * Endpoint for requesting the current state (currently playing song, queue size, etc.)
+     */
+    @MessageMapping("/request-state")
+    public void requestState() {
+        twitchBotService.broadcastCurrentSong();
+        twitchBotService.broadcastQueueSize();
+    }
 }

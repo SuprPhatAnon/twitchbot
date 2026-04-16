@@ -1,13 +1,13 @@
 spring:
   datasource:
-    url: jdbc:h2:mem:testdb;MODE=MariaDB;DB_CLOSE_DELAY=-1
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
+    url: ${SPRING_DATASOURCE_URL:jdbc:h2:mem:testdb;MODE=MariaDB;DB_CLOSE_DELAY=-1}
+    driver-class-name: ${SPRING_DATASOURCE_DRIVER:org.h2.Driver}
+    username: ${SPRING_DATASOURCE_USERNAME:sa}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
   jpa:
-    database-platform: org.hibernate.dialect.H2Dialect
+    database-platform: ${SPRING_JPA_DIALECT:org.hibernate.dialect.H2Dialect}
     hibernate:
-      ddl-auto: create-drop
+      ddl-auto: validate
   config:
     activate:
       on-profile: test

@@ -1,0 +1,30 @@
+services:
+  test-db:
+    image: mariadb:10.11
+    container_name: twitchbot-test-db
+    environment:
+      MARIADB_DATABASE: twitchbot_test
+      MARIADB_USER: test
+      MARIADB_PASSWORD: test
+      MARIADB_ROOT_PASSWORD: test
+    healthcheck:
+      test: ["CMD-SHELL", "mariadb-admin ping -h localhost -u root -ptest"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  test-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: twitchbot-test-runner
+    environment:
+      SPRING_PROFILES_ACTIVE: test
+      SPRING_DATASOURCE_URL: jdbc:mariadb://test-db:3306/twitchbot_test
+      SPRING_DATASOURCE_DRIVER: org.mariadb.jdbc.Driver
+      SPRING_DATASOURCE_USERNAME: test
+      SPRING_DATASOURCE_PASSWORD: test
+      SPRING_JPA_DIALECT: org.hibernate.dialect.MariaDBDialect
+    depends_on:
+      test-db:
+        condition: service_healthy

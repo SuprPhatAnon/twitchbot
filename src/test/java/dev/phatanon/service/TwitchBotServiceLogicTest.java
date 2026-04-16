@@ -221,8 +221,34 @@ public class TwitchBotServiceLogicTest {
         
         twitchBotService.handleSongFinished();
         
-        // handleSongFinished should broadcast null immediately before scheduling next poll
+        // handleSongFinished should NOT broadcast null immediately if it wants to keep current song on UI
+        verify(messagingTemplate, never()).convertAndSend(eq("/topic/current-song"), eq("null"));
+
+        // Capture the task scheduled
+        ArgumentCaptor<Runnable> runnableCaptor = ArgumentCaptor.forClass(Runnable.class);
+        verify(scheduler).schedule(runnableCaptor.capture(), anyLong(), eq(TimeUnit.SECONDS));
+
+        // Execute the scheduled task (queue is empty)
+        runnableCaptor.getValue().run();
+
+        // Now it should broadcast null
         verify(messagingTemplate).convertAndSend(eq("/topic/current-song"), eq("null"));
+    }
+
+    @Test
+    void shouldNotBroadcastRedundantlyWhenQueueIsEmpty() {
+        // Initial state: nothing playing, queue empty.
+        assertFalse(twitchBotService.isSongPlaying());
+        assertNull(twitchBotService.getCurrentlyPlayingSong());
+        clearInvocations(messagingTemplate);
+
+        // Call handleSongFinished when nothing is playing
+        twitchBotService.handleSongFinished();
+
+        // Should not schedule any task
+        verify(scheduler, never()).schedule(any(Runnable.class), anyLong(), any(TimeUnit.class));
+        // Should not broadcast null again
+        verify(messagingTemplate, never()).convertAndSend(eq("/topic/current-song"), any(Object.class));
     }
 
     @Test
@@ -242,7 +268,8 @@ public class TwitchBotServiceLogicTest {
         twitchBotService.handleSongFinished();
         
         assertFalse(twitchBotService.isSongPlaying());
-        assertNull(twitchBotService.getCurrentlyPlayingSong());
+        // Currently playing song should NOT be null immediately after finished, to keep it on UI during delay
+        assertEquals(song, twitchBotService.getCurrentlyPlayingSong());
         verify(scheduler).schedule(any(Runnable.class), anyLong(), any());
     }
 }

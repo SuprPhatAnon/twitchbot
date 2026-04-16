@@ -506,7 +506,7 @@
                     headers: getHeaders()
                 });
                 if (response.status === 401 || response.status === 403) {
-                    window.location.href = '/login.html';
+                    handleAuthError();
                     return;
                 }
                 const redeems = await response.json();
@@ -514,6 +514,16 @@
                 logEl.innerHTML = '';
                 redeems.reverse().forEach(redeem => addRedeemToLog(redeem, false));
             } catch (error) { console.error('Error fetching redeems:', error); }
+        }
+
+        function getApiKey() {
+            // Admin UI primarily uses session-based authentication.
+            // This is a placeholder for endpoints that explicitly request an API Key.
+            return '';
+        }
+
+        function handleAuthError() {
+            window.location.href = '/login.html';
         }
 
         function logout() {
@@ -711,7 +721,7 @@
                     headers: getHeaders()
                 });
                 if (response.status === 401 || response.status === 403) {
-                    window.location.href = '/login.html';
+                    handleAuthError();
                     return;
                 }
                 allSongs = await response.json();
@@ -817,7 +827,7 @@
                     headers: getHeaders()
                 });
                 if (response.status === 401 || response.status === 403) {
-                    window.location.href = '/login.html';
+                    handleAuthError();
                     return;
                 }
                 allRedeems = await response.json();
@@ -910,7 +920,7 @@
                     headers: getHeaders()
                 });
                 if (response.status === 401 || response.status === 403) {
-                    window.location.href = '/login.html';
+                    handleAuthError();
                     return;
                 }
                 if (response.ok) {

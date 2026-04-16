@@ -57,13 +57,18 @@
         const maxReconnectDelay = 30000;
 
         function connect() {
+            console.log("Connecting to /ws...");
             const socket = new SockJS('/ws');
             stompClient = Stomp.over(socket);
-            stompClient.debug = null; // Disable debug logging to console
-
+            // stompClient.debug = null; // Disable debug logging to console
+            
             stompClient.connect({}, function (frame) {
                 console.log('Connected: ' + frame);
+                window.connectedAt = new Date().getTime();
                 reconnectDelay = 1000; // Reset delay on successful connection
+                
+                // Request current state immediately after connecting
+                stompClient.send("/app/request-state", {}, {});
                 
                 stompClient.subscribe('/topic/play', function (message) {
                     const song = JSON.parse(message.body);
@@ -74,24 +79,11 @@
                     console.log("[DEBUG_LOG] Received message on /topic/current-song:", message.body);
                     const song = (message.body && message.body !== 'null' && message.body !== '') ? JSON.parse(message.body) : null;
                     if (!song) {
-                        console.log("[DEBUG_LOG] Stopping playback because song is null");
-                        songDisplay.style.display = 'none';
-                        songTitle.innerText = '';
-                        songArt.src = '';
-                        songArt.style.display = 'none';
-                        audioPlayer.pause();
-                        audioPlayer.src = '';
+                        console.log("[DEBUG_LOG] Clearing display and stopping audio because song is null (queue cleared)");
+                        stopPlayback();
                     } else {
                         // Current song is playing, update display (case where overlay reloads while song is active)
-                        songTitle.innerText = song.name + ' - ' + song.artist;
-                        if (song.coverArt) {
-                            songArt.src = song.coverArt;
-                            songArt.style.display = 'block';
-                        } else {
-                            songArt.src = '';
-                            songArt.style.display = 'none';
-                        }
-                        songDisplay.style.display = 'flex';
+                        updateDisplay(song);
                     }
                 });
             }, function (error) {
@@ -103,15 +95,7 @@
         }
 
         function playSong(song) {
-            songTitle.innerText = song.name + ' - ' + song.artist;
-            if (song.coverArt) {
-                songArt.src = song.coverArt;
-                songArt.style.display = 'block';
-            } else {
-                songArt.src = '';
-                songArt.style.display = 'none';
-            }
-            songDisplay.style.display = 'flex';
+            updateDisplay(song);
             audioPlayer.src = song.url;
             
             const playPromise = audioPlayer.play();
@@ -125,11 +109,48 @@
                 });
             }
 
-            audioPlayer.onended = notifySongFinished;
-            audioPlayer.onerror = () => {
-                console.error("Audio error occurred");
-                setTimeout(notifySongFinished, 2000);
+            audioPlayer.onended = () => {
+                clearDisplay();
+                notifySongFinished();
             };
+            audioPlayer.onerror = () => {
+                if (audioPlayer.src && !audioPlayer.src.endsWith('/null') && !audioPlayer.src.endsWith('undefined')) {
+                    console.error("Audio error occurred for src:", audioPlayer.src);
+                    clearDisplay();
+                    setTimeout(notifySongFinished, 2000);
+                } else {
+                    console.log("[DEBUG_LOG] Audio error ignored for empty/null src");
+                }
+            };
+        }
+
+        function updateDisplay(song) {
+            if (!song) {
+                clearDisplay();
+                return;
+            }
+            songTitle.innerText = song.name + ' - ' + song.artist;
+            if (song.coverArt) {
+                songArt.src = song.coverArt;
+                songArt.style.display = 'block';
+            } else {
+                songArt.src = '';
+                songArt.style.display = 'none';
+            }
+            songDisplay.style.display = 'flex';
+        }
+
+        function clearDisplay() {
+            songDisplay.style.display = 'none';
+            songTitle.innerText = '';
+            songArt.src = '';
+            songArt.style.display = 'none';
+        }
+
+        function stopPlayback() {
+            audioPlayer.pause();
+            audioPlayer.src = "";
+            clearDisplay();
         }
 
         function notifySongFinished() {

@@ -247,3 +247,22 @@ If you want to run the application locally without Docker for development:
   ```bash
   mvn spring-boot:run
   ```
+
+## Testing
+
+### Automated Tests
+Run standard unit and integration tests using Maven:
+```bash
+mvn test
+```
+
+### Headless Browser Testing (Docker)
+A dedicated Docker environment is provided to run tests that require a headless browser (e.g., Selenium for JavaScript functionality).
+```bash
+docker-compose -f docker-compose.test.yml up --build --exit-code-from test-runner
+```
+This will:
+1. Start a temporary MariaDB container for testing.
+2. Build a test runner image with Google Chrome installed.
+3. Run the Selenium-based tests.
+4. Shut down the environment and return the test exit code.

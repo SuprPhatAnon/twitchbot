@@ -132,7 +132,7 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
     /**
      * Broadcasts the current queue size and the full queue to WebSocket subscribers.
      */
-    protected void broadcastQueueSize() {
+    public void broadcastQueueSize() {
         messagingTemplate.convertAndSend("/topic/queue-size", getQueueSize());
         messagingTemplate.convertAndSend("/topic/queue", getQueue());
     }
@@ -140,12 +140,8 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
     /**
      * Broadcasts the currently playing song to WebSocket subscribers on /topic/current-song.
      */
-    protected void broadcastCurrentSong() {
-        if (currentlyPlayingSong != null) {
-            messagingTemplate.convertAndSend("/topic/current-song", currentlyPlayingSong);
-        } else {
-            messagingTemplate.convertAndSend("/topic/current-song", "null");
-        }
+    public void broadcastCurrentSong() {
+        messagingTemplate.convertAndSend("/topic/current-song", currentlyPlayingSong != null ? currentlyPlayingSong : "null");
     }
 
     /**
@@ -832,10 +828,15 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
      * Triggers the playback of the next song in the queue after a configured delay.
      */
     public synchronized void handleSongFinished() {
+        if (!isSongPlaying && currentlyPlayingSong == null && songQueue.isEmpty()) {
+            log.info("handleSongFinished called but nothing is playing and queue is empty. Ignoring.");
+            return;
+        }
+
         log.info("Song finished. Waiting {} seconds before next song...", currentSongDelaySeconds);
         isSongPlaying = false;
-        currentlyPlayingSong = null;
-        broadcastCurrentSong();
+        // Don't set currentlyPlayingSong to null yet, to keep it on the UI during delay
+        // broadcastCurrentSong(); // Also don't broadcast null yet
 
         scheduler.schedule(() -> {
             synchronized (this) {
@@ -850,6 +851,8 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
                     broadcastQueueSize();
                 } else {
                     log.info("Queue is empty, no more songs to play.");
+                    currentlyPlayingSong = null;
+                    broadcastCurrentSong();
                 }
             }
         }, currentSongDelaySeconds, java.util.concurrent.TimeUnit.SECONDS);
