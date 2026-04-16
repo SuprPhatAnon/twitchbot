@@ -46,3 +46,4 @@ build/
 /all_classes.txt
 /tested_base_classes.txt
 /tested_classes.txt
+/logs/twitchbot.log
