@@ -4,11 +4,13 @@ public class ChatMessageContext {
     private final String message;
     private final String senderName;
     private final String channelName;
+    private final String source;
 
-    public ChatMessageContext(String message, String senderName, String channelName) {
+    public ChatMessageContext(String message, String senderName, String channelName, String source) {
         this.message = message;
         this.senderName = senderName;
         this.channelName = channelName;
+        this.source = source;
     }
 
     public static ChatMessageContextBuilder builder() {
@@ -27,10 +29,15 @@ public class ChatMessageContext {
         return channelName;
     }
 
+    public String getSource() {
+        return source;
+    }
+
     public static class ChatMessageContextBuilder {
         private String message;
         private String senderName;
         private String channelName;
+        private String source;
 
         public ChatMessageContextBuilder message(String message) {
             this.message = message;
@@ -47,8 +54,13 @@ public class ChatMessageContext {
             return this;
         }
 
+        public ChatMessageContextBuilder source(String source) {
+            this.source = source;
+            return this;
+        }
+
         public ChatMessageContext build() {
-            return new ChatMessageContext(message, senderName, channelName);
+            return new ChatMessageContext(message, senderName, channelName, source);
         }
     }
 }

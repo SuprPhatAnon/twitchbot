@@ -23,9 +23,8 @@
             background: rgba(0, 0, 0, 0.5);
             padding: 10px 20px;
             border-radius: 5px;
-            display: none;
             border-left: 5px solid #6441a5; /* Twitch Purple */
-            display: flex;
+            display: none;
             align-items: center;
             gap: 15px;
         }
@@ -72,14 +71,27 @@
                 });
 
                 stompClient.subscribe('/topic/current-song', function (message) {
-                    const song = (message.body && message.body !== 'null') ? JSON.parse(message.body) : null;
+                    console.log("[DEBUG_LOG] Received message on /topic/current-song:", message.body);
+                    const song = (message.body && message.body !== 'null' && message.body !== '') ? JSON.parse(message.body) : null;
                     if (!song) {
+                        console.log("[DEBUG_LOG] Stopping playback because song is null");
                         songDisplay.style.display = 'none';
                         songTitle.innerText = '';
                         songArt.src = '';
                         songArt.style.display = 'none';
                         audioPlayer.pause();
                         audioPlayer.src = '';
+                    } else {
+                        // Current song is playing, update display (case where overlay reloads while song is active)
+                        songTitle.innerText = song.name + ' - ' + song.artist;
+                        if (song.coverArt) {
+                            songArt.src = song.coverArt;
+                            songArt.style.display = 'block';
+                        } else {
+                            songArt.src = '';
+                            songArt.style.display = 'none';
+                        }
+                        songDisplay.style.display = 'flex';
                     }
                 });
             }, function (error) {

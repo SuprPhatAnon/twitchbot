@@ -110,6 +110,11 @@ public class TwitchBotServiceLogicTest {
         assertEquals(0, twitchBotService.getQueueSize());
         assertFalse(twitchBotService.isSongPlaying());
         assertNull(twitchBotService.getCurrentlyPlayingSong());
+        
+        // Regression Check: ensure null was broadcasted during clearQueue
+        verify(messagingTemplate, atLeastOnce()).convertAndSend(eq("/topic/current-song"), eq("null"));
+        // Check queue-size broadcast as well
+        verify(messagingTemplate, atLeastOnce()).convertAndSend(eq("/topic/queue-size"), eq(0));
     }
 
     @Test
@@ -198,6 +203,26 @@ public class TwitchBotServiceLogicTest {
         
         twitchBotService.broadcastCurrentSong();
         verify(messagingTemplate, atLeastOnce()).convertAndSend(eq("/topic/current-song"), eq(song));
+
+        // Test transition to null
+        twitchBotService.clearQueue();
+        verify(messagingTemplate, atLeastOnce()).convertAndSend(eq("/topic/current-song"), eq("null"));
+    }
+
+    @Test
+    void shouldBroadcastNullWhenSongFinishesAndQueueIsEmpty() {
+        Song song = new Song("S1", "A1", "u1");
+        song.setId(1L);
+        when(songRepository.findById(1L)).thenReturn(Optional.of(song));
+        
+        twitchBotService.playSongById(1L);
+        // Initially, playSong broadcasts the song. Reset the mock for clean verify.
+        clearInvocations(messagingTemplate);
+        
+        twitchBotService.handleSongFinished();
+        
+        // handleSongFinished should broadcast null immediately before scheduling next poll
+        verify(messagingTemplate).convertAndSend(eq("/topic/current-song"), eq("null"));
     }
 
     @Test

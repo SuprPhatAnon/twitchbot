@@ -23,6 +23,23 @@
             background-color: #2b3035;
             border-color: #495057;
         }
+        #auth-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .auth-card {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            width: 100%;
+            max-width: 400px;
+        }
+        [data-bs-theme="dark"] .auth-card { background: #2b3035; color: white; }
     </style>
 </head>
 <body>
@@ -84,6 +101,14 @@
             document.documentElement.setAttribute('data-bs-theme', 'dark');
         }
 
+        function getApiKey() {
+            return '';
+        }
+
+        function logout() {
+            window.location.href = '/logout';
+        }
+
         let currentApiKey = '';
         let isKeyVisible = false;
 
@@ -102,7 +127,13 @@
                 return;
             }
             try {
-                const response = await fetch('/api/users/me/rotate-api-key', { method: 'POST' });
+                const response = await fetch('/api/users/me/rotate-api-key', { 
+                    method: 'POST'
+                });
+                if (response.status === 401 || response.status === 403) {
+                    handleAuthError();
+                    return;
+                }
                 if (response.ok) {
                     const user = await response.json();
                     currentApiKey = user.apiKey;
@@ -118,7 +149,7 @@
         }
 
         function copyApiKey() {
-            if (!currentApiKey || currentApiKey === 'No API key generated') return;
+            if (!currentApiKey || currentApiKey === 'No API key generated' || currentApiKey.startsWith('••••')) return;
             navigator.clipboard.writeText(currentApiKey).then(() => {
                 alert('API Key copied to clipboard!');
             }).catch(err => {
@@ -130,13 +161,20 @@
             try {
                 const res = await fetch('/api/users/me');
                 if (res.status === 401 || res.status === 403) {
-                    window.location.href = '/login.html';
+                    handleAuthError();
                     return;
                 }
                 const user = await res.json();
                 document.getElementById('display-username').innerText = user.username;
                 document.getElementById('display-roles').innerText = user.roles.join(', ');
-                currentApiKey = user.apiKey || 'No API key generated';
+                
+                // Get the actual key (it will be redacted if already hashed, but rotateApiKey returns the raw one)
+                const keyRes = await fetch('/api/users/me/api-key');
+                if (keyRes.ok) {
+                    currentApiKey = await keyRes.text();
+                } else {
+                    currentApiKey = 'No API key generated';
+                }
                 updateApiKeyDisplay();
             } catch (err) {
                 console.error('Failed to fetch account info', err);
@@ -158,9 +196,17 @@
             try {
                 const res = await fetch('/api/users/me/change-password', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'X-API-KEY': getApiKey()
+                    },
                     body: JSON.stringify({ newPassword })
                 });
+
+                if (res.status === 401 || res.status === 403) {
+                    handleAuthError();
+                    return;
+                }
 
                 if (res.ok) {
                     alert('Password updated successfully!');
@@ -173,6 +219,10 @@
                 alert('An error occurred while updating password.');
             }
         };
+
+        function handleAuthError() {
+            window.location.href = '/login.html';
+        }
 
         fetchAccountInfo();
     </script>

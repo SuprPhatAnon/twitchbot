@@ -11,8 +11,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -21,6 +20,18 @@ public class SecurityConfigTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Test
+    void overlayHtml_ShouldHaveCorrectCspHeader() throws Exception {
+        mockMvc.perform(get("/overlay.html"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Security-Policy", 
+                    org.hamcrest.Matchers.allOf(
+                        org.hamcrest.Matchers.containsString("https://cdnjs.cloudflare.com"),
+                        org.hamcrest.Matchers.containsString("connect-src 'self' ws: wss: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com;"),
+                        org.hamcrest.Matchers.containsString("form-action 'self' https://id.twitch.tv")
+                    )));
+    }
 
     @Test
     @WithMockUser

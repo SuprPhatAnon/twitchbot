@@ -25,6 +25,29 @@
         .nav { margin-bottom: 20px; }
         .nav a { color: #9146ff; text-decoration: none; margin-right: 15px; }
         .nav a:hover { text-decoration: underline; }
+        #auth-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .auth-card {
+            background: #1e1e1e;
+            padding: 30px;
+            border-radius: 8px;
+            width: 100%;
+            max-width: 400px;
+            border: 1px solid #333;
+        }
+        .text-muted { color: #888; }
+        .small { font-size: 0.85rem; }
+        .mb-3 { margin-bottom: 1rem; }
+        .mb-4 { margin-bottom: 1.5rem; }
+        .d-grid { display: grid; }
+        .gap-2 { gap: 0.5rem; }
     </style>
 </head>
 <body>
@@ -86,30 +109,48 @@
     </div>
 
     <script>
+        function getApiKey() {
+            return '';
+        }
+
+        function handleAuthError() {
+            window.location.href = '/login.html';
+        }
+
+        function logout() {
+            window.location.href = '/logout';
+        }
+
         const userTableBody = document.querySelector('#userTable tbody');
         const userModal = document.getElementById('userModal');
         const userForm = document.getElementById('userForm');
 
         async function fetchUsers() {
-            const res = await fetch('/api/users');
-            if (res.status === 403 || res.status === 401) {
-                window.location.href = '/login.html';
-                return;
+            try {
+                const res = await fetch('/api/users', {
+                    headers: { 'X-API-KEY': getApiKey() }
+                });
+                if (res.status === 403 || res.status === 401) {
+                    handleAuthError();
+                    return;
+                }
+                const users = await res.json();
+                userTableBody.innerHTML = '';
+                users.forEach(user => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${user.username}</td>
+                        <td>${user.roles.join(', ')}</td>
+                        <td>
+                            <button class="btn btn-primary btn-small" onclick='editUser(${JSON.stringify(user)})'>Edit</button>
+                            <button class="btn btn-danger btn-small" onclick="deleteUser(${user.id})">Delete</button>
+                        </td>
+                    `;
+                    userTableBody.appendChild(tr);
+                });
+            } catch (err) {
+                console.error('Error fetching users:', err);
             }
-            const users = await res.json();
-            userTableBody.innerHTML = '';
-            users.forEach(user => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${user.username}</td>
-                    <td>${user.roles.join(', ')}</td>
-                    <td>
-                        <button class="btn btn-primary btn-small" onclick='editUser(${JSON.stringify(user)})'>Edit</button>
-                        <button class="btn btn-danger btn-small" onclick="deleteUser(${user.id})">Delete</button>
-                    </td>
-                `;
-                userTableBody.appendChild(tr);
-            });
         }
 
         function openModal(user = null) {
@@ -141,7 +182,14 @@
 
         async function deleteUser(id) {
             if (confirm('Are you sure you want to delete this user?')) {
-                await fetch(`/api/users/${id}`, { method: 'DELETE' });
+                const res = await fetch(`/api/users/${id}`, { 
+                    method: 'DELETE',
+                    headers: { 'X-API-KEY': getApiKey() }
+                });
+                if (res.status === 401 || res.status === 403) {
+                    handleAuthError();
+                    return;
+                }
                 fetchUsers();
             }
         }
@@ -158,9 +206,17 @@
 
             const res = await fetch(url, {
                 method,
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-API-KEY': getApiKey()
+                },
                 body: JSON.stringify({ username, password, roles })
             });
+
+            if (res.status === 401 || res.status === 403) {
+                handleAuthError();
+                return;
+            }
 
             if (res.ok) {
                 closeModal();
@@ -170,6 +226,7 @@
             }
         };
 
+        checkAuth();
         fetchUsers();
     </script>
 </body>

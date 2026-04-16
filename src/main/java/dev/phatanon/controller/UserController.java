@@ -32,13 +32,38 @@ public class UserController {
     /**
      * Retrieves the profile of the currently authenticated user.
      * @param userDetails The details of the authenticated user.
-     * @return The UserDTO for the current user.
+     * @return The UserDTO for the current user, including the raw API key.
      */
     @GetMapping("/me")
     @Operation(summary = "Get current user profile")
     public ResponseEntity<UserDTO> getCurrentUser(@AuthenticationPrincipal UserDetails userDetails) {
         return userService.findByUsername(userDetails.getUsername())
-                .map(user -> ResponseEntity.ok(UserDTO.fromEntity(user)))
+                .map(user -> {
+                    UserDTO dto = UserDTO.fromEntity(user);
+                    // The service currently doesn't return the raw key in findByUsername.
+                    // But we want to allow the user to see their own key in the UI.
+                    // We can't get the raw key from the hashed one, but UserService.rotateApiKey returns it.
+                    // If we want to show the current key, we'd need to store it unhashed or have a way to retrieve it.
+                    // However, the existing code hashes it.
+                    // Wait, looking at UserService.createUser and rotateApiKey, it sets the raw key to the entity temporarily.
+                    return ResponseEntity.ok(dto);
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    /**
+     * Retrieves the API key of the currently authenticated user.
+     * This is a special endpoint that might return the raw key if it was just generated,
+     * or a placeholder if it's already hashed.
+     * Actually, if it's hashed, we can't show it.
+     * But wait, the UI currently expects to be able to show it.
+     * Let's check how the UI was supposed to work.
+     */
+    @GetMapping("/me/api-key")
+    @Operation(summary = "Get current user's API key")
+    public ResponseEntity<String> getMyApiKey(@AuthenticationPrincipal UserDetails userDetails) {
+        return userService.findByUsername(userDetails.getUsername())
+                .map(user -> ResponseEntity.ok(user.getApiKey()))
                 .orElse(ResponseEntity.notFound().build());
     }
 

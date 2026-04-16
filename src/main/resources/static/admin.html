@@ -106,6 +106,7 @@
         </div>
         <div>
             <button id="theme-toggle" class="btn btn-outline-light btn-sm me-2" onclick="toggleTheme()">🌙</button>
+            <a href="/status.html" class="btn btn-outline-light btn-sm me-2">Status</a>
             <a href="/account.html" class="btn btn-outline-light btn-sm me-2">Account</a>
             <a href="/song-management.html" class="btn btn-outline-light btn-sm me-2">Files</a>
             <a href="/user-management.html" class="btn btn-outline-light btn-sm me-2">Users</a>
@@ -409,6 +410,12 @@
     <script>
         let stompClient = null;
 
+        function getHeaders(contentType = 'application/json') {
+            const headers = {};
+            if (contentType) headers['Content-Type'] = contentType;
+            return headers;
+        }
+
         function connectWebSocket() {
             const socket = new SockJS('/ws');
             stompClient = Stomp.over(socket);
@@ -433,7 +440,9 @@
                     updateBotConnectionStatusDisplay(JSON.parse(response.body));
                 });
                 stompClient.subscribe('/topic/current-song', function (response) {
-                    updateCurrentSongDisplay(JSON.parse(response.body));
+                    const body = response.body;
+                    const song = (body && body !== 'null' && body !== '') ? JSON.parse(body) : null;
+                    updateCurrentSongDisplay(song);
                 });
                 stompClient.subscribe('/topic/songs', function (response) {
                     fetchSongs();
@@ -493,8 +502,13 @@
 
         async function fetchRecentRedeems() {
             try {
-                const response = await fetch('/api/twitch-config/redeems');
-                if (response.status === 401 || response.status === 403) return window.location.href = '/login.html';
+                const response = await fetch('/api/twitch-config/redeems', {
+                    headers: getHeaders()
+                });
+                if (response.status === 401 || response.status === 403) {
+                    window.location.href = '/login.html';
+                    return;
+                }
                 const redeems = await response.json();
                 const logEl = document.getElementById('redeem-log');
                 logEl.innerHTML = '';
@@ -509,7 +523,7 @@
         async function testTwitchConnection() {
             try {
                 const response = await fetch('/api/twitch-config/test-connection', {
-                    headers: { 'X-API-KEY': apiKey }
+                    headers: getHeaders()
                 });
                 const success = await response.json();
                 alert(success ? 'Connection successful!' : 'Connection failed. Check your credentials.');
@@ -523,7 +537,7 @@
             try {
                 const response = await fetch('/api/twitch-config/sync-eventsub', {
                     method: 'POST',
-                    headers: { 'X-API-KEY': apiKey }
+                    headers: getHeaders()
                 });
                 if (response.ok) alert('EventSub sync triggered.');
                 else alert('Failed to trigger EventSub sync.');
@@ -538,7 +552,7 @@
             try {
                 const response = await fetch('/api/twitch-config/refresh-tokens', {
                     method: 'POST',
-                    headers: { 'X-API-KEY': apiKey }
+                    headers: getHeaders()
                 });
                 if (response.ok) alert('Token refresh triggered.');
                 else alert('Failed to trigger token refresh.');
@@ -554,7 +568,7 @@
             try {
                 const response = await fetch(`/api/twitch-config/test-redeem?title=${encodeURIComponent(title)}`, {
                     method: 'POST',
-                    headers: { 'X-API-KEY': apiKey }
+                    headers: getHeaders()
                 });
                 if (response.ok) alert(`Simulated redeem: ${title}`);
                 else alert('Failed to simulate redeem.');
@@ -585,10 +599,6 @@
             document.addEventListener('DOMContentLoaded', () => updateThemeButton(savedTheme));
         })();
 
-        function checkAuth() {
-            const key = getApiKey();
-            document.getElementById('auth-overlay').style.display = key ? 'none' : 'flex';
-        }
 
         function updateQueueSizeDisplay(size) {
             document.getElementById('stat-queue').innerText = size;
@@ -623,7 +633,10 @@
 
         async function removeFromQueue(index) {
             try {
-                await fetch(`/api/songs/queue/${index}`, { method: 'DELETE' });
+                await fetch(`/api/songs/queue/${index}`, { 
+                    method: 'DELETE',
+                    headers: getHeaders()
+                });
             } catch (e) { console.error('Error removing from queue:', e); }
         }
 
@@ -645,6 +658,7 @@
             el.className = 'status-value ' + (isConnected ? 'status-online' : 'status-offline');
         }
 
+
         function updateCurrentSongDisplay(song) {
             const el = document.getElementById('stat-playing');
             if (song && song !== 'null') {
@@ -658,29 +672,31 @@
 
         async function refreshInitialStatus() {
             try {
-                // Stream status
-                let res = await fetch('/api/twitch-config/status');
-                if (res.status === 401 || res.status === 403) return window.location.href = '/login.html';
+                let res = await fetch('/api/twitch-config/status', { headers: getHeaders() });
+                if (res.status === 401 || res.status === 403) {
+                    window.location.href = '/login.html';
+                    return;
+                }
                 if (res.ok) updateStreamStatusDisplay(await res.json());
 
                 // Streamer connection status
-                res = await fetch('/api/twitch-config/connection/streamer');
+                res = await fetch('/api/twitch-config/connection/streamer', { headers: getHeaders() });
                 if (res.ok) updateStreamerConnectionStatusDisplay(await res.json());
 
                 // Bot connection status
-                res = await fetch('/api/twitch-config/connection/bot');
+                res = await fetch('/api/twitch-config/connection', { headers: getHeaders() });
                 if (res.ok) updateBotConnectionStatusDisplay(await res.json());
 
                 // Queue size
-                res = await fetch('/api/songs/queue-size');
+                res = await fetch('/api/songs/queue-size', { headers: getHeaders() });
                 if (res.ok) updateQueueSizeDisplay(await res.json());
 
                 // Queue
-                res = await fetch('/api/songs/queue');
+                res = await fetch('/api/songs/queue', { headers: getHeaders() });
                 if (res.ok) updateQueueDisplay(await res.json());
 
                 // Current song
-                res = await fetch('/api/songs/current');
+                res = await fetch('/api/songs/current', { headers: getHeaders() });
                 if (res.status === 200) updateCurrentSongDisplay(await res.json());
                 else updateCurrentSongDisplay(null);
 
@@ -691,8 +707,13 @@
 
         async function fetchSongs() {
             try {
-                const response = await fetch('/api/songs');
-                if (response.status === 401 || response.status === 403) return window.location.href = '/login.html';
+                const response = await fetch('/api/songs', {
+                    headers: getHeaders()
+                });
+                if (response.status === 401 || response.status === 403) {
+                    window.location.href = '/login.html';
+                    return;
+                }
                 allSongs = await response.json();
                 renderSongsTable();
                 
@@ -739,9 +760,11 @@
 
         async function clearQueue() {
             if (!confirm('Are you sure you want to clear the queue and stop all playback?')) return;
-            const key = getApiKey();
             try {
-                const response = await fetch('/api/songs/clear', { method: 'POST' });
+                const response = await fetch('/api/songs/clear', { 
+                    method: 'POST',
+                    headers: getHeaders()
+                });
                 if (response.ok) {
                     console.log('Queue cleared');
                 } else {
@@ -752,7 +775,9 @@
 
         async function fetchRecentPlays() {
             try {
-                const response = await fetch('/api/songs/plays/recent?limit=5');
+                const response = await fetch('/api/songs/plays/recent?limit=5', {
+                    headers: getHeaders()
+                });
                 if (!response.ok) return;
                 const plays = await response.json();
                 const container = document.getElementById('recent-plays-log');
@@ -788,8 +813,13 @@
 
         async function fetchRedeems() {
             try {
-                const response = await fetch('/api/redeems');
-                if (response.status === 401 || response.status === 403) return window.location.href = '/login.html';
+                const response = await fetch('/api/redeems', {
+                    headers: getHeaders()
+                });
+                if (response.status === 401 || response.status === 403) {
+                    window.location.href = '/login.html';
+                    return;
+                }
                 allRedeems = await response.json();
                 
                 // Update redeems list (badges with delete button)
@@ -830,12 +860,14 @@
 
         document.getElementById('add-redeem-form').onsubmit = async (e) => {
             e.preventDefault();
-            const key = getApiKey();
             const title = document.getElementById('new-redeem-title').value;
             try {
                 const response = await fetch('/api/redeems', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'X-API-KEY': getApiKey()
+                    },
                     body: JSON.stringify({ title: title })
                 });
                 if (response.ok) {
@@ -848,7 +880,10 @@
         async function deleteRedeem(id) {
             if (!confirm('Are you sure? Deleting a redeem might affect songs using it.')) return;
             try {
-                const response = await fetch(`/api/redeems/${id}`, { method: 'DELETE' });
+                const response = await fetch(`/api/redeems/${id}`, { 
+                    method: 'DELETE',
+                    headers: getHeaders()
+                });
                 if (response.ok) fetchRedeems();
             } catch (error) { console.error('Error deleting redeem:', error); }
         }
@@ -871,8 +906,13 @@
 
         async function fetchTwitchConfig() {
             try {
-                const response = await fetch('/api/twitch-config');
-                if (response.status === 401 || response.status === 403) return window.location.href = '/login.html';
+                const response = await fetch('/api/twitch-config', {
+                    headers: getHeaders()
+                });
+                if (response.status === 401 || response.status === 403) {
+                    window.location.href = '/login.html';
+                    return;
+                }
                 if (response.ok) {
                     const config = await response.json();
                     document.getElementById('twitch-client-id').value = config.clientId || '';
@@ -893,7 +933,9 @@
                     updateConfigStatus('status-bot-tokens', null);
                 }
 
-                const hostResponse = await fetch('/api/twitch-config/redirect-uri-host');
+                const hostResponse = await fetch('/api/twitch-config/redirect-uri-host', {
+                    headers: getHeaders()
+                });
                 if (hostResponse.ok) {
                     const host = await hostResponse.text();
                     document.getElementById('oauth-redirect-uri').value = host + '/api/twitch-config/callback';
@@ -912,7 +954,10 @@
             try {
                 const response = await fetch('/api/twitch-config', {
                     method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'X-API-KEY': getApiKey()
+                    },
                     body: JSON.stringify(config)
                 });
                 if (response.ok) { alert('Config updated!'); fetchTwitchConfig(); }
@@ -921,7 +966,10 @@
 
         async function playSong(id) {
             try {
-                const response = await fetch(`/api/songs/${id}/play`, { method: 'POST' });
+                const response = await fetch(`/api/songs/${id}/play`, { 
+                    method: 'POST',
+                    headers: getHeaders()
+                });
                 if (response.ok) { /* WebSocket will update queue size */ }
                 else { alert(await response.text()); }
             } catch (error) { console.error('Error playing song:', error); }
@@ -967,7 +1015,10 @@
         async function deleteSong(id) {
             if (!confirm('Are you sure?')) return;
             try {
-                const response = await fetch(`/api/songs/${id}`, { method: 'DELETE' });
+                const response = await fetch(`/api/songs/${id}`, { 
+                    method: 'DELETE',
+                    headers: getHeaders()
+                });
                 if (response.ok) fetchSongs();
             } catch (error) { console.error('Error deleting song:', error); }
         }
@@ -975,7 +1026,9 @@
         let editModal = null;
         async function openEditModal(id) {
             try {
-                const response = await fetch(`/api/songs/${id}`);
+                const response = await fetch(`/api/songs/${id}`, {
+                    headers: getHeaders()
+                });
                 if (!response.ok) return;
                 const song = await response.json();
                 
@@ -1020,6 +1073,7 @@
             try {
                 const response = await fetch(`/api/songs/${id}`, {
                     method: 'PUT',
+                    headers: getHeaders(false),
                     body: formData
                 });
                 if (response.ok) {
@@ -1044,7 +1098,10 @@
             try {
                 const response = await fetch('/api/songs', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'X-API-KEY': getApiKey()
+                    },
                     body: JSON.stringify(song)
                 });
                 if (response.ok) {
@@ -1078,7 +1135,8 @@
             if (!message) return;
             try {
                 const response = await fetch(`/api/twitch-config/chat?message=${encodeURIComponent(message)}`, {
-                    method: 'POST'
+                    method: 'POST',
+                    headers: getHeaders()
                 });
                 if (response.ok) {
                     messageEl.value = '';
@@ -1091,13 +1149,17 @@
             }
         };
 
-        refreshInitialStatus();
-        fetchRedeems();
-        fetchSongs();
-        fetchTwitchConfig();
-        fetchRecentRedeems();
-        connectWebSocket();
-        restoreCollapsedStates();
+        function init() {
+            refreshInitialStatus();
+            fetchRedeems();
+            fetchSongs();
+            fetchTwitchConfig();
+            fetchRecentRedeems();
+            connectWebSocket();
+            restoreCollapsedStates();
+        }
+
+        init();
     </script>
 </body>
 </html>

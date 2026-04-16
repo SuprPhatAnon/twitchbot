@@ -24,6 +24,7 @@ public class ChatMessageService {
     }
 
     public void processMessage(ChatMessageContext context) {
+        log.info("[CHAT] [{}] {}: {}", context.getSource(), context.getSenderName(), context.getMessage());
         for (ChatMessageHandler handler : handlers) {
             try {
                 if (handler.canHandle(context)) {

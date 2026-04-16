@@ -177,6 +177,18 @@
     <script>
         let stompClient = null;
 
+        function getApiKey() {
+            return '';
+        }
+
+        function handleAuthError() {
+            window.location.href = '/login.html';
+        }
+
+        function logout() {
+            window.location.href = '/logout';
+        }
+
         function connectWebSocket() {
             const socket = new SockJS('/ws');
             stompClient = Stomp.over(socket);
@@ -195,7 +207,9 @@
                     updateConnectionStatusDisplay(JSON.parse(response.body));
                 });
                 stompClient.subscribe('/topic/current-song', function (response) {
-                    updateCurrentSongDisplay(JSON.parse(response.body || 'null'));
+                    const body = response.body;
+                    const song = (body && body !== 'null' && body !== '') ? JSON.parse(body) : null;
+                    updateCurrentSongDisplay(song);
                 });
                 stompClient.subscribe('/topic/songs', function (response) {
                     fetchSongs();
@@ -224,8 +238,13 @@
 
         async function fetchRecentRedeems() {
             try {
-                const response = await fetch('/api/twitch-config/redeems');
-                if (response.status === 401 || response.status === 403) return window.location.href = '/login.html';
+                const response = await fetch('/api/twitch-config/redeems', {
+                    headers: { 'X-API-KEY': getApiKey() }
+                });
+                if (response.status === 401 || response.status === 403) {
+                    handleAuthError();
+                    return;
+                }
                 const redeems = await response.json();
                 const logEl = document.getElementById('redeem-log');
                 logEl.innerHTML = '';
@@ -234,7 +253,7 @@
         }
 
         function logout() {
-            window.location.href = '/api/logout';
+            window.location.href = '/logout';
         }
 
         function toggleTheme() {
@@ -257,11 +276,6 @@
             document.documentElement.setAttribute('data-bs-theme', savedTheme);
             document.addEventListener('DOMContentLoaded', () => updateThemeButton(savedTheme));
         })();
-
-        function checkAuth() {
-            const key = getApiKey();
-            document.getElementById('auth-overlay').style.display = key ? 'none' : 'flex';
-        }
 
         function updateQueueSizeDisplay(size) {
             document.getElementById('stat-queue').innerText = size;
@@ -299,21 +313,25 @@
 
         async function refreshInitialStatus() {
             try {
+                const headers = { 'X-API-KEY': getApiKey() };
                 // Stream status
-                let res = await fetch('/api/twitch-config/status');
-                if (res.status === 401 || res.status === 403) return window.location.href = '/login.html';
+                let res = await fetch('/api/twitch-config/status', { headers });
+                if (res.status === 401 || res.status === 403) {
+                    handleAuthError();
+                    return;
+                }
                 if (res.ok) updateStreamStatusDisplay(await res.json());
 
                 // Connection status
-                res = await fetch('/api/twitch-config/connection');
+                res = await fetch('/api/twitch-config/connection', { headers });
                 if (res.ok) updateConnectionStatusDisplay(await res.json());
 
                 // Queue size
-                res = await fetch('/api/songs/queue-size');
+                res = await fetch('/api/songs/queue-size', { headers });
                 if (res.ok) updateQueueSizeDisplay(await res.json());
 
                 // Current song
-                res = await fetch('/api/songs/current');
+                res = await fetch('/api/songs/current', { headers });
                 if (res.status === 200) updateCurrentSongDisplay(await res.json());
                 else updateCurrentSongDisplay(null);
 
@@ -324,8 +342,13 @@
 
         async function fetchSongs() {
             try {
-                const response = await fetch('/api/songs');
-                if (response.status === 401 || response.status === 403) return window.location.href = '/login.html';
+                const response = await fetch('/api/songs', {
+                    headers: { 'X-API-KEY': getApiKey() }
+                });
+                if (response.status === 401 || response.status === 403) {
+                    handleAuthError();
+                    return;
+                }
                 const songs = await response.json();
                 const tbody = document.getElementById('songs-table-body');
                 tbody.innerHTML = '';
@@ -386,7 +409,13 @@
 
         async function fetchRecentPlays() {
             try {
-                const response = await fetch('/api/songs/plays/recent?limit=5');
+                const response = await fetch('/api/songs/plays/recent?limit=5', {
+                    headers: { 'X-API-KEY': getApiKey() }
+                });
+                if (response.status === 401 || response.status === 403) {
+                    handleAuthError();
+                    return;
+                }
                 if (!response.ok) return;
                 const plays = await response.json();
                 const statsEl = document.getElementById('recent-plays-stats');
@@ -415,8 +444,13 @@
 
         async function fetchRedeems() {
             try {
-                const response = await fetch('/api/redeems');
-                if (response.status === 401 || response.status === 403) return window.location.href = '/login.html';
+                const response = await fetch('/api/redeems', {
+                    headers: { 'X-API-KEY': getApiKey() }
+                });
+                if (response.status === 401 || response.status === 403) {
+                    handleAuthError();
+                    return;
+                }
                 const allRedeems = await response.json();
                 
                 // Update redeems list
@@ -434,7 +468,14 @@
 
         async function playSong(id) {
             try {
-                const response = await fetch(`/api/songs/${id}/play?incrementStats=true`, { method: 'POST' });
+                const response = await fetch(`/api/songs/${id}/play?incrementStats=true`, { 
+                    method: 'POST',
+                    headers: { 'X-API-KEY': getApiKey() }
+                });
+                if (response.status === 401 || response.status === 403) {
+                    handleAuthError();
+                    return;
+                }
                 if (response.ok) { /* WebSocket will update queue size */ }
                 else { alert(await response.text()); }
             } catch (error) { console.error('Error playing song:', error); }
@@ -442,6 +483,7 @@
 
         refreshInitialStatus();
         fetchRecentRedeems();
+        fetchRecentPlays();
         connectWebSocket();
     </script>
 </body>

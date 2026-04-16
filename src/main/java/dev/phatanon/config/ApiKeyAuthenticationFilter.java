@@ -31,6 +31,13 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
 
+        // If already authenticated (e.g., via session from login), skip API key check
+        if (SecurityContextHolder.getContext().getAuthentication() != null &&
+            SecurityContextHolder.getContext().getAuthentication().isAuthenticated()) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         String apiKey = request.getHeader("X-API-KEY");
 
         if (apiKey != null && !apiKey.trim().isEmpty()) {

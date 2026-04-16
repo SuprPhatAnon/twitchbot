@@ -43,12 +43,13 @@ public class SecurityConfig {
             .headers(headers -> headers
                 .contentSecurityPolicy(csp -> csp
                     .policyDirectives("default-src 'self'; " +
-                                     "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; " +
+                                     "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; " +
                                      "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; " +
                                      "font-src 'self' https://fonts.gstatic.com; " +
                                      "img-src 'self' data: https://static-cdn.jtvnw.net; " +
-                                     "connect-src 'self' ws: wss:; " +
-                                     "frame-ancestors 'none';")
+                                     "connect-src 'self' ws: wss: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; " +
+                                     "form-action 'self' https://id.twitch.tv; " +
+                                     "frame-ancestors 'self';")
                 )
                 .frameOptions(org.springframework.security.config.annotation.web.configurers.HeadersConfigurer.FrameOptionsConfig::deny)
                 .httpStrictTransportSecurity(hsts -> hsts
@@ -68,8 +69,8 @@ public class SecurityConfig {
                 .requestMatchers("/*.mp3", "/playlist.m3u").permitAll() // Permit all access to songs and playlist
                 .requestMatchers("/api/songs/upload/**", "/upload.html").hasAnyRole("UPLOAD", "STREAMER", "ADMIN")
                 .requestMatchers("/streamer.html", "/api/songs/play/**", "/api/songs/queue/**").hasAnyRole("STREAMER", "ADMIN")
-                .requestMatchers("/api/users/me/**", "/account.html").authenticated()
-                .requestMatchers("/admin.html", "/song-management.html", "/api/users/**", "/api/twitch-config/**", "/api/redeems/**").hasRole("ADMIN")
+                .requestMatchers("/api/users/me/**", "/api/users/me/api-key", "/account.html").authenticated()
+                .requestMatchers("/admin.html", "/status.html", "/song-management.html", "/api/users/**", "/api/twitch-config/**", "/api/redeems/**").hasRole("ADMIN")
                 .requestMatchers("/api/songs/files/**").hasRole("ADMIN")
                 .anyRequest().authenticated()
             )

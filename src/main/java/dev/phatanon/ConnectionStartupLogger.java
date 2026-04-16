@@ -35,18 +35,10 @@ public class ConnectionStartupLogger implements CommandLineRunner {
         boolean isStreamerConnected();
 
         /**
-         * Checks if the bot's chat client is active.
+         * Checks if the bot's EventSub client is active.
          * @return true if connected, false otherwise
          */
         boolean isBotConnected();
-
-        /**
-         * Checks if the Twitch EventSub connection is active.
-         * @return true if connected, false otherwise
-         * @deprecated Use {@link #isStreamerConnected()} or {@link #isBotConnected()} instead.
-         */
-        @Deprecated
-        boolean isTwitchConnected();
     }
 
     private final JdbcOperations jdbcTemplate;
@@ -118,15 +110,15 @@ public class ConnectionStartupLogger implements CommandLineRunner {
             boolean botConnected = twitchBotService.isBotConnected();
             
             if (streamerConnected) {
-                logger.info("✅ Streamer EventSub: Connected.");
+                logger.info("✅ Twitch EventSub (Streamer): Connected.");
             } else {
-                logger.warn("⚠️ Streamer EventSub: Not yet connected.");
+                logger.warn("⚠️ Twitch EventSub (Streamer): Not yet connected.");
             }
             
             if (botConnected) {
-                logger.info("✅ Bot Chat: Connected.");
+                logger.info("✅ Twitch EventSub (Bot): Connected.");
             } else {
-                logger.warn("⚠️ Bot Chat: Not yet connected.");
+                logger.warn("⚠️ Twitch EventSub (Bot): Not yet connected.");
             }
             
             if (!streamerConnected || !botConnected) {

@@ -41,7 +41,7 @@ public class TwitchBotServiceWebSocketTest {
     void shouldBroadcastCurrentSong() {
         twitchBotService.handleSongFinished();
         
-        // Verification of broadcast on /topic/current-song with "null" string (as it clears it)
+        // Verification of broadcast on /topic/current-song with "null" (as it clears it)
         verify(messagingTemplate).convertAndSend(eq("/topic/current-song"), eq("null"));
     }
     

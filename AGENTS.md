@@ -14,6 +14,8 @@ This is a Spring Boot application that integrates with Twitch to play songs on a
 - **Frontend**: Simple HTML/JS/CSS served as static resources.
 - **External Integrations**: Twitch API (Helix) and Twitch EventSub (via `twitch4j`).
 
+**IMPORTANT**: The use of Twitch IRC is strictly forbidden and has been completely removed from the codebase. All chat-related functionality must use the Twitch Helix API (for sending messages) and Twitch EventSub (for receiving messages).
+
 ## Key Components
 
 ### Core Logic
@@ -82,6 +84,7 @@ The database is managed by Hibernate/JPA. Key tables:
 - **Maintain Kubernetes Configurations**: Keep all Kubernetes deployment files in the `k8s/` directory (including `base` and `overlays` for production, minikube, and k3s) up-to-date with any changes in the application's infrastructure or configuration requirements.
 - **Maintain OpenAPI documentation**: Ensure SpringDoc/OpenAPI annotations in controllers are accurate and up-to-date.
 - **Update Javadocs**: Provide or update Javadocs for new or modified public classes and methods.
+- **Maintain Security Directives**: Ensure Content Security Policy (CSP), HSTS, and other security-related headers are up-to-date in `SecurityConfig.java` when adding new external dependencies (CDNs, fonts, etc.).
 
 ### Adding a New Endpoint
 1. Create or update a controller in `src/main/java/dev/phatanon/controller/`.
@@ -92,7 +95,7 @@ The database is managed by Hibernate/JPA. Key tables:
 - Modify `TwitchBotService`. It uses `twitch4j` to interact with Twitch.
 - If adding new event listeners, look at how `registerEventListeners()` is implemented.
 - **Chat Command Handling**: To add or modify chat commands (e.g., `!music`), implement or modify `ChatMessageHandler` in `dev.phatanon.service.chat`. These are automatically picked up by `ChatMessageService`.
-- **IMPORTANT: The use of Twitch IRC is strictly forbidden.** All chat-related functionality must use the Twitch Helix API (for sending messages) and Twitch EventSub (for receiving messages and other events).
+- **IMPORTANT: The use of Twitch IRC is strictly forbidden.** All chat-related functionality must use the Twitch Helix API (for sending messages) and Twitch EventSub (for receiving messages and other events). IRC-related code and configurations have been permanently removed. Specifically, the use of `.withEnableChat(true)` in `TwitchClientBuilder` is strictly forbidden as it enables the legacy IRC interface.
 
 ### Modifying the Overlay
 - The main player overlay is `src/main/resources/static/overlay.html`.

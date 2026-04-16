@@ -1,6 +1,7 @@
 package dev.phatanon.controller;
 
 import dev.phatanon.dto.TwitchConfigDTO;
+import dev.phatanon.dto.TwitchStatusDTO;
 import dev.phatanon.entity.TwitchConfig;
 import dev.phatanon.repository.TwitchConfigRepository;
 import dev.phatanon.service.TwitchBotService;
@@ -35,6 +36,24 @@ class TwitchConfigControllerTest {
     }
 
     @Test
+    void getFullStatus_ReturnsStatus() {
+        when(twitchBotService.isStreamOnline()).thenReturn(true);
+        when(twitchBotService.getStreamerConnectionState()).thenReturn(com.github.twitch4j.client.websocket.domain.WebsocketConnectionState.CONNECTED);
+        when(twitchBotService.getBotConnectionState()).thenReturn(com.github.twitch4j.client.websocket.domain.WebsocketConnectionState.DISCONNECTED);
+        when(twitchBotService.getStreamerSubscriptionStatus()).thenReturn(java.util.Map.of("test", true));
+        when(twitchBotService.getBotSubscriptionStatus()).thenReturn(java.util.Map.of());
+
+        ResponseEntity<TwitchStatusDTO> response = twitchConfigController.getFullStatus();
+        
+        assertNotNull(response.getBody());
+        assertTrue(response.getBody().isStreamOnline());
+        assertEquals(com.github.twitch4j.client.websocket.domain.WebsocketConnectionState.CONNECTED, response.getBody().getStreamerConnectionState());
+        assertEquals(com.github.twitch4j.client.websocket.domain.WebsocketConnectionState.DISCONNECTED, response.getBody().getBotConnectionState());
+        assertEquals(1, response.getBody().getStreamerSubscriptionStatus().size());
+        assertTrue(response.getBody().getStreamerSubscriptionStatus().get("test"));
+    }
+
+    @Test
     void getRecentRedeems_CallsService() {
         twitchConfigController.getRecentRedeems();
         verify(twitchBotService).getRecentRedeems();
@@ -51,13 +70,6 @@ class TwitchConfigControllerTest {
     void getStreamerConnectionStatus_ReturnsStatus() {
         when(twitchBotService.isStreamerConnected()).thenReturn(true);
         ResponseEntity<Boolean> response = twitchConfigController.getStreamerConnectionStatus();
-        assertTrue(response.getBody());
-    }
-
-    @Test
-    void getBotConnectionStatus_ReturnsStatus() {
-        when(twitchBotService.isBotConnected()).thenReturn(true);
-        ResponseEntity<Boolean> response = twitchConfigController.getBotConnectionStatus();
         assertTrue(response.getBody());
     }
 

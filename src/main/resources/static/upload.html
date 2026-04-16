@@ -12,6 +12,23 @@
         .btn-primary { background-color: #9146FF; border-color: #9146FF; }
         .btn-primary:hover { background-color: #772ce8; border-color: #772ce8; }
         #status-message { margin-top: 20px; }
+        #auth-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .auth-card {
+            background: #1e1e1e;
+            padding: 30px;
+            border-radius: 8px;
+            width: 100%;
+            max-width: 400px;
+            border: 1px solid #333;
+        }
     </style>
 </head>
 <body>
@@ -52,6 +69,18 @@
     </div>
 
     <script>
+        function getApiKey() {
+            return '';
+        }
+
+        function handleAuthError() {
+            window.location.href = '/login.html';
+        }
+
+        function logout() {
+            window.location.href = '/logout';
+        }
+
         document.getElementById('upload-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             
@@ -78,11 +107,12 @@
             try {
                 const response = await fetch('/api/songs/upload', {
                     method: 'POST',
+                    headers: { 'X-API-KEY': getApiKey() },
                     body: formData
                 });
 
                 if (response.status === 401 || response.status === 403) {
-                    window.location.href = '/login.html';
+                    handleAuthError();
                     return;
                 }
 
@@ -109,7 +139,7 @@
             statusDiv.innerHTML = `
                 <div class="alert alert-${type} alert-dismissible fade show" role="alert">
                     ${message}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    <button type="button" class="btn-close" data-bs-alert="close" aria-label="Close"></button>
                 </div>
             `;
         }

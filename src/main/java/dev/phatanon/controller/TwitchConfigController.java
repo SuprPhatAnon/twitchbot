@@ -1,6 +1,7 @@
 package dev.phatanon.controller;
 
 import dev.phatanon.dto.TwitchConfigDTO;
+import dev.phatanon.dto.TwitchStatusDTO;
 import dev.phatanon.entity.TwitchConfig;
 import dev.phatanon.repository.TwitchConfigRepository;
 import dev.phatanon.service.TwitchBotService;
@@ -50,6 +51,19 @@ public class TwitchConfigController {
         return twitchBotService.getRecentRedeems();
     }
 
+    @GetMapping("/full-status")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Get full Twitch status (stream, connection, subscriptions)")
+    public ResponseEntity<TwitchStatusDTO> getFullStatus() {
+        TwitchStatusDTO status = new TwitchStatusDTO();
+        status.setStreamOnline(twitchBotService.isStreamOnline());
+        status.setStreamerConnectionState(twitchBotService.getStreamerConnectionState());
+        status.setBotConnectionState(twitchBotService.getBotConnectionState());
+        status.setStreamerSubscriptionStatus(twitchBotService.getStreamerSubscriptionStatus());
+        status.setBotSubscriptionStatus(twitchBotService.getBotSubscriptionStatus());
+        return ResponseEntity.ok(status);
+    }
+
     /**
      * Retrieves current stream status (online/offline) from the {@link TwitchBotService}.
      * The status is tracked via Twitch EventSub events.
@@ -72,23 +86,11 @@ public class TwitchConfigController {
     }
 
     /**
-     * Retrieves the current Bot connection status from the {@link TwitchBotService}.
-     * @return true if the Bot chat client is connected, false otherwise.
-     */
-    @GetMapping("/connection/bot")
-    @Operation(summary = "Get current Bot connection status")
-    public ResponseEntity<Boolean> getBotConnectionStatus() {
-        return ResponseEntity.ok(twitchBotService.isBotConnected());
-    }
-
-    /**
      * Retrieves the current Twitch connection status from the {@link TwitchBotService}.
      * @return true if the Twitch EventSub client is connected, false otherwise.
-     * @deprecated Use {@link #getStreamerConnectionStatus()} or {@link #getBotConnectionStatus()} instead.
      */
     @GetMapping("/connection")
     @Operation(summary = "Get current Twitch connection status")
-    @Deprecated
     public ResponseEntity<Boolean> getConnectionStatus() {
         return ResponseEntity.ok(twitchBotService.isTwitchConnected());
     }

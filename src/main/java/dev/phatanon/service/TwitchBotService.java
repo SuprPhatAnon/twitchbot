@@ -8,8 +8,10 @@ import com.github.twitch4j.TwitchClient;
 import com.github.twitch4j.auth.domain.TwitchScopes;
 import com.github.twitch4j.auth.providers.TwitchIdentityProvider;
 import com.github.twitch4j.TwitchClientBuilder;
-import com.github.twitch4j.chat.events.ChatConnectionStateEvent;
-import com.github.twitch4j.chat.events.channel.ChannelMessageEvent;
+import com.github.twitch4j.eventsub.socket.events.EventSocketSubscriptionFailureEvent;
+import com.github.twitch4j.eventsub.socket.events.EventSocketSubscriptionSuccessEvent;
+import com.github.twitch4j.eventsub.subscriptions.SubscriptionTypes;
+import com.github.twitch4j.eventsub.events.ChannelChatMessageEvent;
 import com.github.twitch4j.client.websocket.domain.WebsocketConnectionState;
 import com.github.twitch4j.common.events.domain.EventChannel;
 import com.github.twitch4j.events.ChannelGoLiveEvent;
@@ -77,6 +79,11 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
     private final List<RedeemLog> recentRedeems = new LinkedList<>();
     private static final int MAX_REDEEM_LOGS = 50;
 
+    private final Map<String, Boolean> streamerSubscriptionStatus = new java.util.concurrent.ConcurrentHashMap<>();
+    private final Map<String, Boolean> botSubscriptionStatus = new java.util.concurrent.ConcurrentHashMap<>();
+    private WebsocketConnectionState streamerConnectionState = WebsocketConnectionState.DISCONNECTED;
+    private WebsocketConnectionState botConnectionState = WebsocketConnectionState.DISCONNECTED;
+
     @Value("${twitch.api-key:default_secret_key}")
     private String apiKey;
 
@@ -92,6 +99,7 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
     private final SongPlayRepository songPlayRepository;
     private final TwitchConfigRepository twitchConfigRepository;
     private TwitchClient twitchClient;
+    private TwitchClient botTwitchClient;
     private CredentialManager credentialManager;
 
     private String currentAccessToken;
@@ -180,18 +188,19 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
         if (isTwitchConnected()) {
             try {
                 String token = currentBotAccessToken != null && !currentBotAccessToken.isBlank() ? currentBotAccessToken : currentAccessToken;
+                TwitchClient clientToUse = botTwitchClient != null ? botTwitchClient : twitchClient;
                 ChatMessage chatMessage = ChatMessage.builder()
                         .broadcasterId(broadcasterId)
                         .senderId(botUserId)
                         .message(message)
                         .build();
-                twitchClient.getHelix().sendChatMessage(token, chatMessage).execute();
+                clientToUse.getHelix().sendChatMessage(token, chatMessage).execute();
                 log.info("Sent chat message to {}: {}", currentChannelName, message);
             } catch (Exception e) {
                 log.error("Failed to send chat message via Helix: {}", e.getMessage());
             }
         } else {
-            log.warn("Cannot send chat message: Twitch EventSub is not connected.");
+            log.warn("Cannot send chat message: Twitch connection is not ready.");
         }
     }
 
@@ -199,27 +208,46 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
      * Checks if the streamer's EventSub client is connected.
      * @return true if connected, false otherwise
      */
+    @Override
     public synchronized boolean isStreamerConnected() {
-        return twitchClient != null && 
-               twitchClient.getEventSocket() != null;
+        return streamerConnectionState == WebsocketConnectionState.CONNECTED;
     }
 
     /**
-     * Checks if the bot's chat client is connected.
+     * Checks if the bot's EventSub client is connected.
      * @return true if connected, false otherwise
      */
+    @Override
     public synchronized boolean isBotConnected() {
-        return isBotConnected;
+        return botConnectionState == WebsocketConnectionState.CONNECTED;
+    }
+
+    public synchronized Map<String, Boolean> getStreamerSubscriptionStatus() {
+        return new java.util.HashMap<>(streamerSubscriptionStatus);
+    }
+
+    public synchronized Map<String, Boolean> getBotSubscriptionStatus() {
+        return new java.util.HashMap<>(botSubscriptionStatus);
+    }
+
+    public synchronized WebsocketConnectionState getStreamerConnectionState() {
+        return streamerConnectionState;
+    }
+
+    public synchronized WebsocketConnectionState getBotConnectionState() {
+        return botConnectionState;
     }
 
     /**
-     * Checks if the Twitch EventSub client is connected.
+     * Checks if both Twitch EventSub clients are connected (if configured).
      * @return true if connected, false otherwise
-     * @deprecated Use {@link #isStreamerConnected()} or {@link #isBotConnected()} instead.
      */
-    @Deprecated
     public synchronized boolean isTwitchConnected() {
-        return isStreamerConnected();
+        boolean streamerConnected = isStreamerConnected();
+        if (botTwitchClient != null) {
+            return streamerConnected && isBotConnected();
+        }
+        return streamerConnected;
     }
 
     /**
@@ -238,14 +266,22 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
      * Reconnects to Twitch by closing the existing client and re-initializing.
      */
     public synchronized void reconnect() {
-        log.info("Reconnection requested. Closing existing Twitch client...");
+        log.info("Reconnection requested. Closing existing Twitch clients...");
         if (twitchClient != null) {
             try {
                 twitchClient.close();
             } catch (Exception e) {
-                log.error("Error closing Twitch client: {}", e.getMessage());
+                log.error("Error closing streamer Twitch client: {}", e.getMessage());
             }
             twitchClient = null;
+        }
+        if (botTwitchClient != null) {
+            try {
+                botTwitchClient.close();
+            } catch (Exception e) {
+                log.error("Error closing bot Twitch client: {}", e.getMessage());
+            }
+            botTwitchClient = null;
         }
         if (tokenRefreshTask != null) {
             tokenRefreshTask.cancel(false);
@@ -313,24 +349,43 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
                     )
                     : streamerCredential;
             
-            log.info("Building TwitchClient...");
-            TwitchClientBuilder builder = TwitchClientBuilder.builder()
+            log.info("Building TwitchClients...");
+            TwitchClientBuilder streamerBuilder = TwitchClientBuilder.builder()
                     .withClientId(config.getClientId())
                     .withClientSecret(config.getClientSecret())
                     .withCredentialManager(credentialManager)
-                    .withEnableChat(true) // Ensure Chat is enabled if we want listeners
                     .withEnableEventSocket(true)
                     .withEnableHelix(true)
-                    .withDefaultAuthToken(streamerCredential)
-                    .withChatAccount(botCredential);
+                    .withDefaultAuthToken(streamerCredential);
 
             if (twitchClient == null) {
-                log.info("Creating new TwitchClient instance...");
-                twitchClient = builder.build();
+                log.info("Creating new streamer TwitchClient instance...");
+                twitchClient = streamerBuilder.build();
             } else {
-                log.info("TwitchClient instance already exists, but re-init was called.");
+                log.info("Streamer TwitchClient instance already exists, but re-init was called.");
             }
-            log.info("TwitchClient built successfully.");
+
+            if (config.getBotAccessToken() != null && !config.getBotAccessToken().isBlank()) {
+                TwitchClientBuilder botBuilder = TwitchClientBuilder.builder()
+                        .withClientId(config.getClientId())
+                        .withClientSecret(config.getClientSecret())
+                        .withCredentialManager(credentialManager)
+                        .withEnableEventSocket(true)
+                        .withEnableHelix(true)
+                        .withDefaultAuthToken(botCredential);
+                
+                if (botTwitchClient == null) {
+                    log.info("Creating new bot TwitchClient instance...");
+                    botTwitchClient = botBuilder.build();
+                } else {
+                    log.info("Bot TwitchClient instance already exists, but re-init was called.");
+                }
+            } else {
+                botTwitchClient = null;
+                log.info("No bot credentials provided. Using streamer client for all operations.");
+            }
+            
+            log.info("TwitchClients built successfully.");
 
             registerEventListeners();
 
@@ -371,25 +426,122 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
     }
 
     /**
+     * Registers explicit EventSub subscriptions for the broadcaster.
+     */
+    private void registerExplicitSubscriptions() {
+        if (broadcasterId == null) {
+            log.error("Cannot register explicit subscriptions: broadcasterId is null");
+            return;
+        }
+
+        log.info("Registering explicit EventSub subscriptions for broadcasterId: {}", broadcasterId);
+
+        // Streamer Client Subscriptions
+        try {
+            twitchClient.getEventSocket().register(SubscriptionTypes.CHANNEL_POINTS_CUSTOM_REWARD_REDEMPTION_ADD.prepareSubscription(
+                b -> b.broadcasterUserId(broadcasterId).build(), null));
+            log.info("Requested subscription: Channel Points Redemption");
+
+            twitchClient.getEventSocket().register(SubscriptionTypes.CHANNEL_CHEER.prepareSubscription(
+                b -> b.broadcasterUserId(broadcasterId).build(), null));
+            log.info("Requested subscription: Channel Cheer");
+
+//            twitchClient.getEventSocket().register(SubscriptionTypes.CHANNEL_FOLLOW_V2.prepareSubscription(
+//                b -> b.broadcasterUserId(broadcasterId).moderatorUserId(botUserId != null ? botUserId : broadcasterId).build(), null));
+//            log.info("Requested subscription: Channel Follow");
+
+            twitchClient.getEventSocket().register(SubscriptionTypes.CHANNEL_SUBSCRIBE.prepareSubscription(
+                b -> b.broadcasterUserId(broadcasterId).build(), null));
+            log.info("Requested subscription: Channel Subscribe");
+
+            twitchClient.getEventSocket().register(SubscriptionTypes.CHANNEL_SUBSCRIPTION_GIFT.prepareSubscription(
+                b -> b.broadcasterUserId(broadcasterId).build(), null));
+            log.info("Requested subscription: Channel Subscription Gift");
+
+            twitchClient.getEventSocket().register(SubscriptionTypes.CHANNEL_SUBSCRIPTION_MESSAGE.prepareSubscription(
+                b -> b.broadcasterUserId(broadcasterId).build(), null));
+            log.info("Requested subscription: Channel Subscription Message");
+
+            twitchClient.getEventSocket().register(SubscriptionTypes.STREAM_ONLINE.prepareSubscription(
+                b -> b.broadcasterUserId(broadcasterId).build(), null));
+            log.info("Requested subscription: Stream Online");
+
+            twitchClient.getEventSocket().register(SubscriptionTypes.STREAM_OFFLINE.prepareSubscription(
+                b -> b.broadcasterUserId(broadcasterId).build(), null));
+            log.info("Requested subscription: Stream Offline");
+
+//            twitchClient.getEventSocket().register(SubscriptionTypes.CHANNEL_CHAT_MESSAGE.prepareSubscription(
+//                b -> b.broadcasterUserId(broadcasterId).userId(broadcasterId).build(), null));
+//            log.info("Requested subscription: Channel Chat Message (Streamer)");
+        } catch (Exception e) {
+            log.error("Error registering explicit subscriptions for streamer client: {}", e.getMessage());
+        }
+
+        // Bot Client Subscriptions (for Chat)
+        if (botTwitchClient != null && botUserId != null) {
+            try {
+                botTwitchClient.getEventSocket().register(SubscriptionTypes.CHANNEL_CHAT_MESSAGE.prepareSubscription(
+                    b -> b.broadcasterUserId(broadcasterId).userId(botUserId).build(), null));
+                log.info("Requested subscription: Channel Chat Message (Bot)");
+            } catch (Exception e) {
+                log.error("Error registering explicit subscriptions for bot client: {}", e.getMessage());
+            }
+        }
+    }
+
+    /**
      * Registers EventSub event listeners with the Twitch client.
      */
     private void registerEventListeners() {
         log.info("Registering connection state listeners...");
         twitchClient.getEventManager().onEvent(EventSocketConnectionStateEvent.class, event -> {
             log.info("EventSub Socket Connection State Change (Streamer): {} -> {}", event.getPreviousState(), event.getState());
+            streamerConnectionState = event.getState();
             if (event.getState() == WebsocketConnectionState.DISCONNECTED || event.getState() == WebsocketConnectionState.LOST) {
-                log.warn("EventSub Socket disconnected! Reason: {}", event.getPreviousState());
+                log.warn("Streamer EventSub Socket disconnected! Reason: {}", event.getPreviousState());
+                streamerSubscriptionStatus.clear();
             }
             messagingTemplate.convertAndSend("/topic/streamer-connection-status", event.getState() == WebsocketConnectionState.CONNECTED);
+            if (botTwitchClient == null) {
+                botConnectionState = event.getState();
+                messagingTemplate.convertAndSend("/topic/bot-connection-status", event.getState() == WebsocketConnectionState.CONNECTED);
+            }
         });
 
-        twitchClient.getEventManager().onEvent(ChatConnectionStateEvent.class, event -> {
-            log.info("Chat Connection State Change (Bot): {} -> {}", event.getPreviousState(), event.getState());
-            isBotConnected = event.getState() == WebsocketConnectionState.CONNECTED;
-            if (!isBotConnected && (event.getState() == WebsocketConnectionState.DISCONNECTED || event.getState() == WebsocketConnectionState.LOST)) {
-                log.warn("Chat connection lost!");
-            }
-            messagingTemplate.convertAndSend("/topic/bot-connection-status", isBotConnected);
+        if (botTwitchClient != null) {
+            botTwitchClient.getEventManager().onEvent(EventSocketConnectionStateEvent.class, event -> {
+                log.info("EventSub Socket Connection State Change (Bot): {} -> {}", event.getPreviousState(), event.getState());
+                botConnectionState = event.getState();
+                if (event.getState() == WebsocketConnectionState.DISCONNECTED || event.getState() == WebsocketConnectionState.LOST) {
+                    log.warn("Bot EventSub Socket disconnected! Reason: {}", event.getPreviousState());
+                    botSubscriptionStatus.clear();
+                }
+                messagingTemplate.convertAndSend("/topic/bot-connection-status", event.getState() == WebsocketConnectionState.CONNECTED);
+            });
+
+            botTwitchClient.getEventManager().onEvent(EventSocketSubscriptionFailureEvent.class, event -> {
+                log.error("Bot EventSub Subscription Failed! Type: {}, Error: {}", 
+                    event.getSubscription().getType(), event.getError().getMessage());
+                botSubscriptionStatus.put(event.getSubscription().getType().getName(), false);
+            });
+
+            botTwitchClient.getEventManager().onEvent(EventSocketSubscriptionSuccessEvent.class, event -> {
+                log.info("Bot EventSub Subscription Successful: {} (ID: {})", 
+                    event.getSubscription().getType(), event.getSubscription().getId());
+                botSubscriptionStatus.put(event.getSubscription().getType().getName(), true);
+            });
+        }
+
+        twitchClient.getEventManager().onEvent(EventSocketSubscriptionFailureEvent.class, event -> {
+            log.error("Streamer EventSub Subscription Failed! Type: {}, Error: {}", 
+                event.getSubscription().getType(), event.getError().getMessage());
+            streamerSubscriptionStatus.put(event.getSubscription().getType().getName(), false);
+        });
+
+        twitchClient.getEventManager().onEvent(EventSocketSubscriptionSuccessEvent.class, event -> {
+            log.info("Streamer EventSub Subscription Successful: {} (ID: {})", 
+                event.getSubscription().getType(), event.getSubscription().getId());
+            streamerSubscriptionStatus.put(event.getSubscription().getType().getName(), true);
         });
 
         try {
@@ -421,6 +573,8 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
             if (isStreamOnline) {
                 scheduleThumboGreeting();
             }
+
+            registerExplicitSubscriptions();
         } catch (Exception e) {
             log.error("Error during Helix API calls in registerEventListeners: {}", e.getMessage(), e);
         }
@@ -538,14 +692,29 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
             }
         });
 
-        twitchClient.getEventManager().onEvent(ChannelMessageEvent.class, event -> {
+        twitchClient.getEventManager().onEvent(ChannelChatMessageEvent.class, event -> {
+            log.debug("Streamer Client received message: {}", event.getMessage().getText());
             ChatMessageContext context = ChatMessageContext.builder()
-                    .message(event.getMessage())
-                    .senderName(event.getUser().getName())
-                    .channelName(event.getChannel().getName())
+                    .message(event.getMessage().getText())
+                    .senderName(event.getChatterUserName())
+                    .channelName(event.getBroadcasterUserName())
+                    .source("Streamer")
                     .build();
             chatMessageService.processMessage(context);
         });
+
+        if (botTwitchClient != null) {
+            botTwitchClient.getEventManager().onEvent(ChannelChatMessageEvent.class, event -> {
+                log.debug("Bot Client received message: {}", event.getMessage().getText());
+                ChatMessageContext context = ChatMessageContext.builder()
+                        .message(event.getMessage().getText())
+                        .senderName(event.getChatterUserName())
+                        .channelName(event.getBroadcasterUserName())
+                        .source("Bot")
+                        .build();
+                chatMessageService.processMessage(context);
+            });
+        }
 
         log.info("Twitch bot initialized for channel: {}", currentChannelName);
     }
@@ -582,12 +751,13 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
                 log.info("Sending Thumbo greeting message.");
                 try {
                     String token = currentBotAccessToken != null && !currentBotAccessToken.isBlank() ? currentBotAccessToken : currentAccessToken;
+                    TwitchClient clientToUse = botTwitchClient != null ? botTwitchClient : twitchClient;
                     ChatMessage chatMessage = ChatMessage.builder()
                             .broadcasterId(broadcasterId)
                             .senderId(botUserId)
                             .message("Hi Thumbo <3")
                             .build();
-                    twitchClient.getHelix().sendChatMessage(token, chatMessage).execute();
+                    clientToUse.getHelix().sendChatMessage(token, chatMessage).execute();
                 } catch (Exception e) {
                     log.error("Failed to send Thumbo greeting via Helix: {}", e.getMessage());
                 }
