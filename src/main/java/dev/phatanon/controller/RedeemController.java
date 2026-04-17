@@ -20,7 +20,6 @@ import java.util.List;
 @RequestMapping("/api/redeems")
 @Tag(name = "Redeem Management", description = "Endpoints for managing Twitch channel point redeems")
 @SecurityRequirement(name = "apiKey")
-@SecurityRequirement(name = "basicAuth")
 public class RedeemController {
 
     private final RedeemRepository redeemRepository;

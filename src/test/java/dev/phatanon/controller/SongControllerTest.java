@@ -241,6 +241,15 @@ public class SongControllerTest {
     }
 
     @Test
+    void shouldPlayRandomSong() throws Exception {
+        mockMvc.perform(post("/api/songs/random/play"))
+                .andExpect(status().isOk())
+                .andExpect(content().string("Random song queued successfully."));
+
+        org.mockito.Mockito.verify(twitchBotService).playRandomSong();
+    }
+
+    @Test
     void shouldClearQueue() throws Exception {
         mockMvc.perform(post("/api/songs/clear")
                 .header("X-API-Key", "test_key"))
@@ -351,5 +360,28 @@ public class SongControllerTest {
                 .andExpect(jsonPath("$", hasSize(1)))
                 .andExpect(jsonPath("$[0].artist", is("Artist 1")))
                 .andExpect(jsonPath("$[0].playCount", is(10)));
+    }
+    @Test
+    void shouldListOnlyMp3Files() throws Exception {
+        java.nio.file.Path tempUploadDir = java.nio.file.Files.createTempDirectory("song-uploads-test");
+        java.nio.file.Files.createFile(tempUploadDir.resolve("song1.mp3"));
+        java.nio.file.Files.createFile(tempUploadDir.resolve("song2.MP3"));
+        java.nio.file.Files.createFile(tempUploadDir.resolve("not-a-song.txt"));
+        java.nio.file.Files.createFile(tempUploadDir.resolve("playlist.m3u"));
+        java.nio.file.Files.createDirectory(tempUploadDir.resolve("some-dir"));
+
+        when(songService.getUploadPath()).thenReturn(tempUploadDir.toString());
+
+        mockMvc.perform(get("/api/songs/files"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[0]", is("song1.mp3")))
+                .andExpect(jsonPath("$[1]", is("song2.MP3")));
+
+        // Cleanup
+        java.nio.file.Files.walk(tempUploadDir)
+                .sorted(java.util.Comparator.reverseOrder())
+                .map(java.nio.file.Path::toFile)
+                .forEach(java.io.File::delete);
     }
 }

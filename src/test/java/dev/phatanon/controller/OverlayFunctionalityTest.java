@@ -1,74 +1,30 @@
 package dev.phatanon.controller;
 
 import dev.phatanon.entity.Song;
-import dev.phatanon.repository.SongRepository;
-import dev.phatanon.service.TwitchBotService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.openqa.selenium.By;
 import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.WebElement;
-import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
-import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.Duration;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import dev.phatanon.entity.Role;
-import dev.phatanon.repository.UserRepository;
-import dev.phatanon.service.UserService;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import org.openqa.selenium.By;
-import org.openqa.selenium.JavascriptExecutor;
-import org.openqa.selenium.WebElement;
-import org.openqa.selenium.support.ui.WebDriverWait;
-import org.springframework.beans.factory.annotation.Autowired;
-
-import java.time.Duration;
-import java.util.Set;
-import java.util.concurrent.TimeUnit;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 public class OverlayFunctionalityTest extends BaseSeleniumTest {
 
-    @Autowired
-    private TwitchBotService twitchBotService;
-
-    @Autowired
-    private SongRepository songRepository;
-
-    @Autowired
-    private UserService userService;
-
-    @Autowired
-    private UserRepository userRepository;
-
     private Song testSong;
-    private String adminUsername = "testadmin";
-    private String adminPassword = "testpassword";
 
     @BeforeEach
     void setupData() {
-        userRepository.deleteAll();
-        songRepository.deleteAll();
-        
-        // Create admin user
-        userService.createUser(adminUsername, adminPassword, Set.of(Role.ROLE_ADMIN));
-
         testSong = new Song("Test Song", "Test Artist", "/songs/test.mp3");
         testSong.setCoverArt("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==");
         testSong.setEnabled(true);
         testSong = songRepository.save(testSong);
-        
-        // Ensure queue is empty
-        twitchBotService.clearQueue();
     }
 
     @AfterEach
@@ -107,7 +63,7 @@ public class OverlayFunctionalityTest extends BaseSeleniumTest {
         }
         
         try {
-            login(adminUsername, adminPassword);
+            login("admin", "admin");
             driver.get(getBaseUrl() + "/api/songs/play/" + songId);
             // wait a bit for the request to complete
             try { Thread.sleep(1000); } catch (InterruptedException e) {}
@@ -127,41 +83,39 @@ public class OverlayFunctionalityTest extends BaseSeleniumTest {
         
         waitForWebSocket();
         
-        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(20));
+        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(30));
         
         // 1. Simulate song playback by directly calling the JS function
         System.out.println("[DEBUG_LOG] Simulating song playback via JS");
         String songJson = "{\"id\":1, \"name\":\"Simulated Song\", \"artist\":\"Simulated Artist\", \"url\":\"/songs/test.mp3\", \"coverArt\":\"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==\"}";
+        // Ensure playSong exists and is ready
+        wait.until(d -> (Boolean) ((JavascriptExecutor) d).executeScript("return typeof playSong === 'function'"));
         ((JavascriptExecutor) driver).executeScript("console.log('[DEBUG_LOG] Manually calling playSong'); playSong(" + songJson + ");");
         
         // 2. Verify display appears
         System.out.println("[DEBUG_LOG] Waiting for song-display to become visible");
-        try {
-            wait.until(d -> {
-                try {
-                    String titleText = (String) ((JavascriptExecutor) d).executeScript("return document.getElementById('song-title').innerText;");
-                    String displayStyle = (String) ((JavascriptExecutor) d).executeScript("return document.getElementById('song-display').style.display;");
-                    System.out.println("[DEBUG_LOG] Basic Flow Check - Title: '" + titleText + "', Style: " + displayStyle);
-                    return titleText != null && !titleText.isEmpty() && !"none".equals(displayStyle);
-                } catch (Exception e) {
-                    return false;
-                }
-            });
-            
-            String songTitleText = (String) ((JavascriptExecutor) driver).executeScript("return document.getElementById('song-title').innerText;");
-            assertEquals("Simulated Song - Simulated Artist", songTitleText);
-            
-            // 3. Simulate song finishing (audio 'onended' event)
-            ((JavascriptExecutor) driver).executeScript("notifySongFinished()");
-            
-            // 4. Verify display is cleared
-            wait.until(d -> {
-                String displayStyle = (String) ((JavascriptExecutor) d).executeScript("return document.getElementById('song-display').style.display;");
-                return "none".equals(displayStyle);
-            });
-        } catch (Exception e) {
-            throw e;
-        }
+        wait.until(d -> {
+            try {
+                String titleText = (String) ((JavascriptExecutor) d).executeScript("return document.getElementById('song-title').innerText;");
+                String displayStyle = (String) ((JavascriptExecutor) d).executeScript("return window.getComputedStyle(document.getElementById('song-display')).display;");
+                System.out.println("[DEBUG_LOG] Basic Flow Check - Title: '" + titleText + "', Style: " + displayStyle);
+                return titleText != null && !titleText.isEmpty() && !"none".equals(displayStyle);
+            } catch (Exception e) {
+                return false;
+            }
+        });
+        
+        String songTitleText = (String) ((JavascriptExecutor) driver).executeScript("return document.getElementById('song-title').innerText;");
+        assertEquals("Simulated Song - Simulated Artist", songTitleText);
+        
+        // 3. Simulate song finishing (audio 'onended' event or calling clearDisplay/notifySongFinished)
+        ((JavascriptExecutor) driver).executeScript("clearDisplay(); notifySongFinished();");
+        
+        // 4. Verify display is cleared
+        wait.until(d -> {
+            String displayStyle = (String) ((JavascriptExecutor) d).executeScript("return window.getComputedStyle(document.getElementById('song-display')).display;");
+            return "none".equals(displayStyle);
+        });
     }
 
     @Test

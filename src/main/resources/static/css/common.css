@@ -1,0 +1,186 @@
+:root {
+    --twitch-purple: #9146ff;
+    --twitch-purple-hover: #772ce8;
+    --status-online: #28a745;
+    --status-offline: #dc3545;
+}
+
+body {
+    padding-top: 70px;
+    background-color: #f8f9fa;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+[data-bs-theme="dark"] body {
+    background-color: #121212;
+    color: #f8f9fa;
+}
+
+.status-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    background-color: #1e1e1e;
+    color: white;
+    z-index: 1030;
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    justify-content: space-between;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.status-item {
+    margin-right: 20px;
+    font-size: 0.9rem;
+}
+
+.status-label {
+    color: #adb5bd;
+    margin-right: 5px;
+}
+
+.status-value {
+    font-weight: bold;
+}
+
+.status-online {
+    color: var(--status-online);
+}
+
+.status-offline {
+    color: var(--status-offline);
+}
+
+.main-container {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    height: calc(100vh - 70px);
+}
+
+.left-panel {
+    flex: 7;
+    overflow-y: auto;
+    padding: 20px;
+    border-right: 1px solid #dee2e6;
+    height: 100%;
+}
+
+.right-panel {
+    flex: 3;
+    overflow-y: auto;
+    padding: 20px;
+    background-color: #fff;
+    height: 100%;
+}
+
+[data-bs-theme="dark"] .left-panel {
+    border-right-color: #333;
+}
+
+[data-bs-theme="dark"] .right-panel {
+    background-color: #1e1e1e;
+}
+
+.card {
+    margin-bottom: 20px;
+}
+
+[data-bs-theme="dark"] .card {
+    background-color: #1e1e1e;
+    border-color: #333;
+    color: #eee;
+}
+
+[data-bs-theme="dark"] .card-header {
+    background-color: #2a2a2a;
+    border-bottom-color: #333;
+    color: #eee;
+}
+
+.table-responsive {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+[data-bs-theme="dark"] .table {
+    color: #eee;
+}
+
+[data-bs-theme="dark"] .table th, [data-bs-theme="dark"] .table td {
+    border-color: #333;
+}
+
+/* Auth Overlay Styles */
+#auth-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.8);
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.auth-card {
+    background: white;
+    padding: 30px;
+    border-radius: 8px;
+    width: 100%;
+    max-width: 400px;
+}
+
+[data-bs-theme="dark"] .auth-card {
+    background: #1e1e1e;
+    color: white;
+    border: 1px solid #333;
+}
+
+/* Custom Twitch Buttons */
+.btn-twitch {
+    background-color: var(--twitch-purple);
+    color: white;
+}
+
+.btn-twitch:hover {
+    background-color: var(--twitch-purple-hover);
+    color: white;
+}
+
+/* Redeem Log Styles */
+#redeem-log {
+    font-family: monospace;
+    font-size: 0.85rem;
+}
+
+.redeem-entry {
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #f1f3f5;
+}
+
+[data-bs-theme="dark"] .redeem-entry {
+    border-bottom-color: #333;
+}
+
+.redeem-time {
+    color: #6c757d;
+    font-size: 0.75rem;
+}
+
+.redeem-user {
+    font-weight: bold;
+    color: var(--twitch-purple);
+}
+
+.redeem-reward {
+    color: var(--status-online);
+}

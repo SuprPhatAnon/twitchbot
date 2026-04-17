@@ -15,6 +15,11 @@ patches:
       - op: remove
         path: /metadata/annotations/kubernetes.io~1ingress.class
       - op: add
+        path: /metadata/annotations/traefik.ingress.kubernetes.io~1buffering
+        value: |
+          maxrequestbodybytes: 104857600
+          memrequestbodybytes: 20971520
+      - op: add
         path: /metadata/annotations/traefik.ingress.kubernetes.io~1router.entrypoints
         value: websecure
       - op: add
@@ -29,3 +34,10 @@ patches:
           - hosts:
               - music.phat.wtf
             secretName: music-phat-wtf-tls
+
+configMapGenerator:
+  - name: twitchbotapp-config
+    behavior: merge
+    literals:
+      - SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE=100MB
+      - SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE=100MB

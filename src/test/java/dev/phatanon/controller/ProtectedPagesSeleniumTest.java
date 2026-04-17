@@ -2,7 +2,6 @@ package dev.phatanon.controller;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.openqa.selenium.By;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 

@@ -2,257 +2,77 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Song Play Statistics</title>
-    <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            margin: 20px;
-            background-color: #f4f4f9;
-            transition: background-color 0.3s, color 0.3s;
-        }
-        [data-theme="dark"] body {
-            background-color: #1a1a1a;
-            color: #f4f4f9;
-        }
-        h1 { color: #333; }
-        [data-theme="dark"] h1 { color: #f4f4f9; }
-        .controls {
-            margin-bottom: 20px;
-            display: flex;
-            gap: 15px;
-            align-items: center;
-            background: white;
-            padding: 15px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        [data-theme="dark"] .controls {
-            background: #2b2b2b;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.5);
-            border: 1px solid #444;
-        }
-        [data-theme="dark"] label { color: #ccc; }
-        select, button {
-            padding: 8px;
-            border-radius: 4px;
-            border: 1px solid #ddd;
-        }
-        [data-theme="dark"] select {
-            background-color: #333;
-            color: white;
-            border-color: #555;
-        }
-        [data-theme="dark"] button {
-            background-color: #444;
-            color: white;
-            border-color: #555;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .table-container {
-            max-height: 70vh;
-            overflow-y: auto;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        [data-theme="dark"] table, [data-theme="dark"] .table-container {
-            background: #2b2b2b;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.5);
-        }
-        th, td {
-            text-align: left;
-            padding: 12px;
-            border-bottom: 1px solid #eee;
-        }
-        [data-theme="dark"] td {
-            border-bottom-color: #444;
-        }
-        th {
-            background-color: #6441a5;
-            color: white;
-        }
-        tr:hover { background-color: #f9f9f9; }
-        [data-theme="dark"] tr:hover { background-color: #333; }
-        .nav { 
-            margin-bottom: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .nav-links a {
-            text-decoration: none;
-            color: #6441a5;
-            font-weight: bold;
-            margin-right: 15px;
-        }
-        [data-theme="dark"] .nav-links a { color: #a970ff; }
-        #theme-toggle {
-            cursor: pointer;
-            padding: 5px 10px;
-            background: #eee;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-        }
-        [data-theme="dark"] #theme-toggle {
-            background: #444;
-            border-color: #555;
-            color: white;
-        }
-        #auth-overlay {
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.8);
-            z-index: 2000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .auth-card {
-            background: white;
-            padding: 30px;
-            border-radius: 8px;
-            width: 100%;
-            max-width: 400px;
-        }
-        [data-theme="dark"] .auth-card { background: #2b2b2b; color: white; }
-    </style>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/css/common.css" rel="stylesheet">
 </head>
 <body>
-    <div class="nav">
-        <!-- Auth Overlay for API Key -->
-        <div id="auth-overlay" style="display: none;">
-            <div class="auth-card">
-                <h3>API Key Required</h3>
-                <p style="font-size: 0.9rem; color: #666; margin-bottom: 20px;">
-                    To view statistics, please enter your API Key. 
-                    You can find or rotate your key in the <a href="/account.html" style="color: #6441a5;">Account</a> section.
-                </p>
-                <div style="margin-bottom: 15px;">
-                    <label for="api-key-input" style="display: block; font-size: 0.8rem; margin-bottom: 5px;">X-API-KEY</label>
-                    <input type="password" id="api-key-input" style="width: 100%; box-sizing: border-box;" placeholder="Enter your API key">
-                </div>
-                <div style="display: grid; gap: 10px;">
-                    <button onclick="saveApiKey()" style="background: #6441a5; color: white; border: none; padding: 10px; cursor: pointer; border-radius: 4px;">Authenticate</button>
-                    <button onclick="logout()" style="background: none; border: none; color: #666; cursor: pointer; font-size: 0.8rem;">Logout</button>
+    <div class="status-bar">
+        <div class="d-flex align-items-center">
+            <span class="h5 mb-0 me-4">Twitch Bot Statistics</span>
+        </div>
+        <div>
+            <button id="theme-toggle" class="btn btn-outline-light btn-sm me-2" onclick="toggleTheme()">🌙</button>
+            <a href="/admin.html" class="btn btn-outline-light btn-sm me-2" data-role="ROLE_ADMIN">Admin</a>
+            <a href="/streamer.html" class="btn btn-outline-light btn-sm me-2" data-role="ROLE_STREAMER">Streamer</a>
+            <a href="/song-management.html" class="btn btn-outline-light btn-sm me-2" data-role="ROLE_UPLOAD">Songs</a>
+            <a href="/status.html" class="btn btn-outline-light btn-sm me-2">Status</a>
+            <a href="/account.html" class="btn btn-outline-light btn-sm me-2">Account</a>
+            <a href="/logout" class="btn btn-outline-danger btn-sm">Logout</a>
+        </div>
+    </div>
+
+    <div class="container mt-4">
+        <h1>Song Play Statistics</h1>
+
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-4">
+                        <label for="range" class="form-label">Time Range</label>
+                        <select id="range" class="form-select">
+                            <option value="daily">Daily</option>
+                            <option value="weekly">Weekly</option>
+                            <option value="monthly">Monthly</option>
+                            <option value="yearly">Yearly</option>
+                            <option value="alltime" selected>All Time</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="groupBy" class="form-label">Group By</label>
+                        <select id="groupBy" class="form-select">
+                            <option value="song" selected>Song Name</option>
+                            <option value="artist">Artist</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <button class="btn btn-primary w-100" onclick="loadStatistics()">Refresh</button>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <div class="nav-links">
-            <a href="/account.html">Account</a>
-            <a href="/admin.html">Admin</a>
-            <a href="/streamer.html">Streamer View</a>
-            <a href="/overlay.html">Overlay</a>
+        <div class="card">
+            <div class="card-body p-0">
+                <div class="table-responsive" style="max-height: 70vh;">
+                    <table class="table table-hover mb-0" id="stats-table">
+                        <thead class="table-dark">
+                            <tr id="table-header">
+                                <!-- Headers will be dynamic -->
+                            </tr>
+                        </thead>
+                        <tbody id="stats-body">
+                            <!-- Data will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
-        <button id="theme-toggle" onclick="toggleTheme()">🌙</button>
     </div>
 
-    <h1>Song Play Statistics</h1>
-
-    <div class="controls">
-        <div>
-            <label for="range">Time Range:</label>
-            <select id="range">
-                <option value="daily">Daily</option>
-                <option value="weekly">Weekly</option>
-                <option value="monthly">Monthly</option>
-                <option value="yearly">Yearly</option>
-                <option value="alltime" selected>All Time</option>
-            </select>
-        </div>
-        <div>
-            <label for="groupBy">Group By:</label>
-            <select id="groupBy">
-                <option value="song" selected>Song Name</option>
-                <option value="artist">Artist</option>
-            </select>
-        </div>
-        <button onclick="loadStatistics()">Refresh</button>
-    </div>
-
-    <div class="table-container">
-        <table id="stats-table">
-            <thead>
-                <tr id="table-header">
-                    <!-- Headers will be dynamic -->
-                </tr>
-            </thead>
-            <tbody id="stats-body">
-                <!-- Data will be loaded here -->
-            </tbody>
-        </table>
-    </div>
-
+    <script src="/js/common.js"></script>
     <script>
-        let apiKey = localStorage.getItem('X-API-KEY') || '';
-
-        function getApiKey() {
-            return apiKey;
-        }
-
-        function saveApiKey() {
-            const input = document.getElementById('api-key-input');
-            const key = input.value.trim();
-            if (key) {
-                apiKey = key;
-                localStorage.setItem('X-API-KEY', key);
-                checkAuth();
-                loadStatistics();
-            } else {
-                alert('Please enter a valid API key.');
-            }
-        }
-
-        function checkAuth() {
-            const key = getApiKey();
-            const overlay = document.getElementById('auth-overlay');
-            if (overlay) {
-                overlay.style.display = key ? 'none' : 'flex';
-            }
-        }
-
-        function handleAuthError() {
-            if (getApiKey()) {
-                alert('API Key invalid or expired.');
-                localStorage.removeItem('X-API-KEY');
-                apiKey = '';
-                checkAuth();
-            } else {
-                window.location.href = '/login.html';
-            }
-        }
-
-        function logout() {
-            localStorage.removeItem('X-API-KEY');
-            window.location.href = '/logout';
-        }
-
-        function toggleTheme() {
-            const html = document.documentElement;
-            const currentTheme = html.getAttribute('data-theme');
-            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-            html.setAttribute('data-theme', newTheme);
-            localStorage.setItem('theme', newTheme);
-            updateThemeButton(newTheme);
-        }
-
-        function updateThemeButton(theme) {
-            const btn = document.getElementById('theme-toggle');
-            if (btn) btn.innerText = theme === 'dark' ? '☀️' : '🌙';
-        }
-
-        // Apply theme on load
-        (function() {
-            const savedTheme = localStorage.getItem('theme') || 'light';
-            document.documentElement.setAttribute('data-theme', savedTheme);
-            document.addEventListener('DOMContentLoaded', () => updateThemeButton(savedTheme));
-        })();
-
         async function loadStatistics() {
             const range = document.getElementById('range').value;
             const groupBy = document.getElementById('groupBy').value;
@@ -268,11 +88,8 @@
             }
 
             try {
-                const response = await fetch(`/api/songs/statistics?range=${range}&groupBy=${groupBy}`, {
-                    headers: { 'X-API-KEY': getApiKey() }
-                });
+                const response = await fetch(`/api/songs/statistics?range=${range}&groupBy=${groupBy}`);
                 if (response.status === 401 || response.status === 403) {
-                    handleAuthError();
                     return;
                 }
                 const stats = await response.json();
@@ -290,12 +107,11 @@
                 });
             } catch (error) {
                 console.error('Error loading statistics:', error);
-                body.innerHTML = '<tr><td colspan="3">Error loading statistics.</td></tr>';
+                body.innerHTML = '<tr><td colspan="4">Error loading statistics.</td></tr>';
             }
         }
 
         // Load default on startup
-        checkAuth();
         loadStatistics();
     </script>
 </body>

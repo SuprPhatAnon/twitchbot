@@ -13,7 +13,6 @@ import org.springframework.core.env.Environment;
 import org.springframework.http.ResponseEntity;
 
 import java.util.List;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -38,19 +37,18 @@ class TwitchConfigControllerTest {
     @Test
     void getFullStatus_ReturnsStatus() {
         when(twitchBotService.isStreamOnline()).thenReturn(true);
-        when(twitchBotService.getStreamerConnectionState()).thenReturn(com.github.twitch4j.client.websocket.domain.WebsocketConnectionState.CONNECTED);
-        when(twitchBotService.getBotConnectionState()).thenReturn(com.github.twitch4j.client.websocket.domain.WebsocketConnectionState.DISCONNECTED);
-        when(twitchBotService.getStreamerSubscriptionStatus()).thenReturn(java.util.Map.of("test", true));
-        when(twitchBotService.getBotSubscriptionStatus()).thenReturn(java.util.Map.of());
+        when(twitchBotService.isStreamerConnected()).thenReturn(true);
+        when(twitchBotService.isBotConnected()).thenReturn(false);
+        when(twitchBotService.getSubscriptionStatuses()).thenReturn(java.util.Map.of("test", "ENABLED"));
 
         ResponseEntity<TwitchStatusDTO> response = twitchConfigController.getFullStatus();
         
         assertNotNull(response.getBody());
         assertTrue(response.getBody().isStreamOnline());
-        assertEquals(com.github.twitch4j.client.websocket.domain.WebsocketConnectionState.CONNECTED, response.getBody().getStreamerConnectionState());
-        assertEquals(com.github.twitch4j.client.websocket.domain.WebsocketConnectionState.DISCONNECTED, response.getBody().getBotConnectionState());
-        assertEquals(1, response.getBody().getStreamerSubscriptionStatus().size());
-        assertTrue(response.getBody().getStreamerSubscriptionStatus().get("test"));
+        assertTrue(response.getBody().isStreamerConnected());
+        assertFalse(response.getBody().isBotConnected());
+        assertEquals(1, response.getBody().getSubscriptionStatuses().size());
+        assertEquals("ENABLED", response.getBody().getSubscriptionStatuses().get("test"));
     }
 
     @Test
@@ -222,6 +220,7 @@ class TwitchConfigControllerTest {
         assertEquals(302, response.getStatusCode().value());
         String location = response.getHeaders().getLocation().toString();
         assertTrue(location.contains("state=bot"));
+        assertTrue(location.contains("client_id=test-client-id"));
     }
 
     @Test

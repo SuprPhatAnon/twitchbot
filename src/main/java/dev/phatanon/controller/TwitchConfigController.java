@@ -8,6 +8,8 @@ import dev.phatanon.service.TwitchBotService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
 import org.springframework.http.ResponseEntity;
@@ -16,7 +18,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * REST controller for managing {@link TwitchConfig} entities and Twitch-related status.
@@ -30,6 +31,8 @@ public class TwitchConfigController {
 
     private final Environment environment;
     private final TwitchBotService twitchBotService;
+    private static final Logger log = LoggerFactory.getLogger(TwitchConfigController.class);
+
     private final TwitchConfigRepository twitchConfigRepository;
 
     @Value("${twitch.redirect-uri-host:https://music.phat.wtf}")
@@ -57,10 +60,9 @@ public class TwitchConfigController {
     public ResponseEntity<TwitchStatusDTO> getFullStatus() {
         TwitchStatusDTO status = new TwitchStatusDTO();
         status.setStreamOnline(twitchBotService.isStreamOnline());
-        status.setStreamerConnectionState(twitchBotService.getStreamerConnectionState());
-        status.setBotConnectionState(twitchBotService.getBotConnectionState());
-        status.setStreamerSubscriptionStatus(twitchBotService.getStreamerSubscriptionStatus());
-        status.setBotSubscriptionStatus(twitchBotService.getBotSubscriptionStatus());
+        status.setStreamerConnected(twitchBotService.isStreamerConnected());
+        status.setBotConnected(twitchBotService.isBotConnected());
+        status.setSubscriptionStatuses(twitchBotService.getSubscriptionStatuses());
         return ResponseEntity.ok(status);
     }
 
@@ -134,7 +136,7 @@ public class TwitchConfigController {
             // If they are null, preserve existing ones
             if (config.getClientSecret() != null && !"********".equals(config.getClientSecret())) 
                 existingConfig.setClientSecret(config.getClientSecret());
-                
+
             if (config.getAccessToken() != null && !"********".equals(config.getAccessToken())) 
                 existingConfig.setAccessToken(config.getAccessToken());
                 
@@ -146,6 +148,9 @@ public class TwitchConfigController {
                 
             if (config.getBotRefreshToken() != null && !"********".equals(config.getBotRefreshToken())) 
                 existingConfig.setBotRefreshToken(config.getBotRefreshToken());
+            
+            if (config.getWebhookSecret() != null && !"********".equals(config.getWebhookSecret()))
+                existingConfig.setWebhookSecret(config.getWebhookSecret());
             
             // Re-assign the config variable to the modified existingConfig for saving
             config = existingConfig;
@@ -231,9 +236,11 @@ public class TwitchConfigController {
 
         String scopes;
         if ("bot".equals(type)) {
-            scopes = "user:bot user:read:chat user:write:chat";
+            // Scopes for bot
+            scopes = "user:bot user:read:chat user:write:chat chat:read chat:edit";
         } else {
-            scopes = "channel:read:redemptions channel:read:subscriptions moderator:read:followers bits:read chat:read chat:edit channel:bot";
+            // Scopes for streamer
+            scopes = "channel:read:redemptions channel:read:subscriptions moderator:read:followers bits:read chat:read chat:edit channel:bot channel:manage:redemptions";
         }
 
         String redirectUri = redirectUriHost + "/api/twitch-config/callback";
@@ -274,13 +281,16 @@ public class TwitchConfigController {
 
             if (userCredential != null) {
                 if ("bot".equals(state)) {
+                    log.info("[AUTH] Received authorization code for bot account. Updating tokens.");
                     config.setBotAccessToken(userCredential.getAccessToken());
                     config.setBotRefreshToken(userCredential.getRefreshToken());
                 } else {
+                    log.info("[AUTH] Received authorization code for streamer account. Updating tokens.");
                     config.setAccessToken(userCredential.getAccessToken());
                     config.setRefreshToken(userCredential.getRefreshToken());
                 }
                 twitchConfigRepository.save(config);
+                log.info("[AUTH] Twitch configuration updated with new tokens and saved to database.");
                 twitchBotService.reconnect();
             }
 

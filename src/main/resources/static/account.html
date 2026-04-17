@@ -5,11 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Account Info - Twitch Song Overlay</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/css/common.css" rel="stylesheet">
     <style>
-        body { padding-top: 20px; background-color: #f8f9fa; }
-        [data-bs-theme="dark"] body { background-color: #212529; color: #f8f9fa; }
-        .container { max-width: 600px; }
-        .card { margin-bottom: 20px; }
+        .container { max-width: 600px; margin-top: 20px; }
         .api-key-container {
             background-color: #f1f3f5;
             padding: 10px;
@@ -23,26 +21,24 @@
             background-color: #2b3035;
             border-color: #495057;
         }
-        #auth-overlay {
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.8);
-            z-index: 2000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .auth-card {
-            background: white;
-            padding: 30px;
-            border-radius: 8px;
-            width: 100%;
-            max-width: 400px;
-        }
-        [data-bs-theme="dark"] .auth-card { background: #2b3035; color: white; }
     </style>
 </head>
 <body>
+    <div class="status-bar">
+        <div class="d-flex align-items-center">
+            <span class="h5 mb-0 me-4">Twitch Bot Account</span>
+        </div>
+        <div>
+            <button id="theme-toggle" class="btn btn-outline-light btn-sm me-2" onclick="toggleTheme()">🌙</button>
+            <a href="/admin.html" class="btn btn-outline-light btn-sm me-2" data-role="ROLE_ADMIN">Admin</a>
+            <a href="/streamer.html" class="btn btn-outline-light btn-sm me-2" data-role="ROLE_STREAMER">Streamer</a>
+            <a href="/song-management.html" class="btn btn-outline-light btn-sm me-2" data-role="ROLE_UPLOAD">Songs</a>
+            <a href="/status.html" class="btn btn-outline-light btn-sm me-2">Status</a>
+            <a href="/account.html" class="btn btn-outline-light btn-sm me-2">Account</a>
+            <a href="/logout" class="btn btn-outline-danger btn-sm">Logout</a>
+        </div>
+    </div>
+
     <div class="container">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h1>Account Information</h1>
@@ -95,20 +91,8 @@
         </div>
     </div>
 
+    <script src="/js/common.js"></script>
     <script>
-        // Apply theme from localStorage
-        if (localStorage.getItem('theme') === 'dark') {
-            document.documentElement.setAttribute('data-bs-theme', 'dark');
-        }
-
-        function getApiKey() {
-            return '';
-        }
-
-        function logout() {
-            window.location.href = '/logout';
-        }
-
         let currentApiKey = '';
         let isKeyVisible = false;
 
@@ -131,7 +115,6 @@
                     method: 'POST'
                 });
                 if (response.status === 401 || response.status === 403) {
-                    handleAuthError();
                     return;
                 }
                 if (response.ok) {
@@ -161,7 +144,6 @@
             try {
                 const res = await fetch('/api/users/me');
                 if (res.status === 401 || res.status === 403) {
-                    handleAuthError();
                     return;
                 }
                 const user = await res.json();
@@ -197,14 +179,12 @@
                 const res = await fetch('/api/users/me/change-password', {
                     method: 'POST',
                     headers: { 
-                        'Content-Type': 'application/json',
-                        'X-API-KEY': getApiKey()
+                        'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({ newPassword })
                 });
 
                 if (res.status === 401 || res.status === 403) {
-                    handleAuthError();
                     return;
                 }
 
@@ -219,10 +199,6 @@
                 alert('An error occurred while updating password.');
             }
         };
-
-        function handleAuthError() {
-            window.location.href = '/login.html';
-        }
 
         fetchAccountInfo();
     </script>

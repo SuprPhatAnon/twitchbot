@@ -11,7 +11,6 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.jdbc.core.JdbcOperations;
 import org.springframework.stereotype.Component;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
@@ -60,8 +59,10 @@ public class ConnectionStartupLogger implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
+        System.out.println("Application Build ID: " + buildId);
         logger.info("Application Build ID: {}", buildId);
         logger.info("Starting connection acquisition checks...");
+        System.out.println("Starting connection acquisition checks...");
 
         checkDatabaseConnection();
         checkTwitchConnection();
@@ -69,6 +70,7 @@ public class ConnectionStartupLogger implements CommandLineRunner {
         initializeAdminUser();
 
         logger.info("Startup connection checks completed.");
+        System.out.println("Startup connection checks completed.");
     }
 
     private void initializeAdminUser() {
@@ -106,6 +108,7 @@ public class ConnectionStartupLogger implements CommandLineRunner {
     private void checkTwitchConnection() {
         try {
             logger.info("Verifying Twitch connection status...");
+            System.out.println("Verifying Twitch connection status...");
             boolean streamerConnected = twitchBotService.isStreamerConnected();
             boolean botConnected = twitchBotService.isBotConnected();
             
@@ -132,14 +135,17 @@ public class ConnectionStartupLogger implements CommandLineRunner {
     private void checkDatabaseConnection() {
         try {
             logger.info("Attempting to acquire MariaDB connection...");
+            System.out.println("Attempting to acquire MariaDB connection...");
             Integer result = jdbcTemplate.queryForObject("SELECT 1", Integer.class);
             if (result != null && result == 1) {
                 logger.info("✅ Successfully connected to MariaDB.");
+                System.out.println("✅ Successfully connected to MariaDB.");
             } else {
                 logger.error("❌ Failed to verify MariaDB connection (unexpected result).");
             }
         } catch (Exception e) {
             logger.error("❌ Error acquiring MariaDB connection: {}", e.getMessage());
+            System.out.println("❌ Error acquiring MariaDB connection: " + e.getMessage());
         }
     }
 }

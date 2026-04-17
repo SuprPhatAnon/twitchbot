@@ -5,53 +5,29 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Song File Management - Twitch Bot</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/css/common.css" rel="stylesheet">
     <style>
-        body { padding-top: 70px; background-color: #f8f9fa; min-height: 100vh; }
-        [data-bs-theme="dark"] body { background-color: #212529; color: #f8f9fa; }
-        .navbar { position: fixed; top: 0; left: 0; right: 0; z-index: 1030; }
-        .card { margin-bottom: 20px; }
         .table-responsive { max-height: 60vh; overflow-y: auto; }
         .status-badge { font-size: 0.8rem; }
         .playing-indicator { color: #0d6efd; animation: pulse 1.5s infinite; }
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
-        
-        #auth-overlay {
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.8);
-            z-index: 2000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .auth-card {
-            background: white;
-            padding: 30px;
-            border-radius: 8px;
-            width: 100%;
-            max-width: 400px;
-        }
-        [data-bs-theme="dark"] .auth-card { background: #2b3035; color: white; }
     </style>
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="/admin.html">Twitch Bot Admin</a>
-            <div class="collapse navbar-collapse">
-                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-                    <li class="nav-item"><a class="nav-link" href="/admin.html">Dashboard</a></li>
-                    <li class="nav-item"><a class="nav-link active" href="/song-management.html">File Management</a></li>
-                    <li class="nav-item"><a class="nav-link" href="/user-management.html">Users</a></li>
-                    <li class="nav-item"><a class="nav-link" href="/statistics.html">Statistics</a></li>
-                </ul>
-                <div class="d-flex">
-                    <button id="theme-toggle" class="btn btn-outline-light btn-sm me-2" onclick="toggleTheme()">🌙</button>
-                    <button class="btn btn-outline-light btn-sm" onclick="logout()">Logout</button>
-                </div>
-            </div>
+    <div class="status-bar">
+        <div class="d-flex align-items-center">
+            <span class="h5 mb-0 me-4">Twitch Bot Songs</span>
         </div>
-    </nav>
+        <div>
+            <button id="theme-toggle" class="btn btn-outline-light btn-sm me-2" onclick="toggleTheme()">🌙</button>
+            <a href="/admin.html" class="btn btn-outline-light btn-sm me-2" data-role="ROLE_ADMIN">Admin</a>
+            <a href="/streamer.html" class="btn btn-outline-light btn-sm me-2" data-role="ROLE_STREAMER">Streamer</a>
+            <a href="/song-management.html" class="btn btn-outline-light btn-sm me-2" data-role="ROLE_UPLOAD">Songs</a>
+            <a href="/status.html" class="btn btn-outline-light btn-sm me-2">Status</a>
+            <a href="/account.html" class="btn btn-outline-light btn-sm me-2">Account</a>
+            <a href="/logout" class="btn btn-outline-danger btn-sm">Logout</a>
+        </div>
+    </div>
 
     <div class="container mt-4">
         <div class="row">
@@ -172,19 +148,8 @@
     <audio id="local-audio-player" style="display: none;"></audio>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/js/common.js"></script>
     <script>
-        function getApiKey() {
-            return '';
-        }
-
-        function handleAuthError() {
-            window.location.href = '/login.html';
-        }
-
-        function logout() {
-            window.location.href = '/logout';
-        }
-
         let songs = [];
         let files = [];
         let redeems = [];
@@ -195,18 +160,16 @@
 
         async function fetchData() {
             try {
-                const headers = { 'X-API-KEY': getApiKey() };
                 const [songsRes, filesRes, redeemsRes, ghostRes] = await Promise.all([
-                    fetch('/api/songs', { headers }),
-                    fetch('/api/songs/files', { headers }),
-                    fetch('/api/redeems', { headers }),
-                    fetch('/api/songs/ghost-records', { headers })
+                    fetch('/api/songs'),
+                    fetch('/api/songs/files'),
+                    fetch('/api/redeems'),
+                    fetch('/api/songs/ghost-records')
                 ]);
                 
                 if (songsRes.status === 401 || songsRes.status === 403 || 
                     filesRes.status === 401 || filesRes.status === 403 || 
                     redeemsRes.status === 401 || redeemsRes.status === 403) {
-                    handleAuthError();
                     return;
                 }
 
@@ -318,12 +281,12 @@
                     const isPlaying = currentPlayingFile === filename;
                     const actionButtons = `
                         <div class="btn-group btn-group-sm">
-                            ${filename !== 'playlist.m3u' ? `<button class="btn btn-sm ${isPlaying ? 'btn-danger' : 'btn-outline-primary'}" onclick="togglePlay('${filename}')">${isPlaying ? 'Stop' : 'Play'}</button>` : ''}
+                            ${filename !== 'playlist.m3u' ? `<button class="btn btn-sm ${isPlaying ? 'btn-danger' : 'btn-outline-primary'}" onclick="togglePlay(\`${filename.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`)">${isPlaying ? 'Stop' : 'Play'}</button>` : ''}
                             ${linkedSongs.length > 0 
                                 ? `<button class="btn btn-sm btn-outline-info" onclick="openEditModal(${linkedSongs[0].id})">Edit</button>`
-                                : (filename !== 'playlist.m3u' ? `<button class="btn btn-sm btn-outline-success" onclick="openAddModal('${filename}')">Add</button>` : '')
+                                : (filename !== 'playlist.m3u' ? `<button class="btn btn-sm btn-outline-success" onclick="openAddModal(\`${filename.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`)">Add</button>` : '')
                             }
-                            <button class="btn btn-sm btn-outline-danger" onclick="deleteFile('${filename}')" ${filename === 'playlist.m3u' ? 'disabled' : ''}>Delete File</button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="deleteFile(\`${filename.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`)" ${filename === 'playlist.m3u' ? 'disabled' : ''}>Delete File</button>
                             ${linkedSongs.length > 0 ? `<button class="btn btn-sm btn-outline-danger" onclick="deleteSongPermanently(${linkedSongs[0].id})">Full Del</button>` : ''}
                         </div>
                     `;
@@ -436,7 +399,6 @@
                     }
                     res = await fetch(`/api/songs/${id}`, {
                         method: 'PUT',
-                        headers: { 'X-API-KEY': getApiKey() },
                         body: formData
                     });
                 } else {
@@ -444,15 +406,13 @@
                     res = await fetch('/api/songs', {
                         method: 'POST',
                         headers: { 
-                            'Content-Type': 'application/json',
-                            'X-API-KEY': getApiKey()
+                            'Content-Type': 'application/json'
                         },
                         body: JSON.stringify(songData)
                     });
                 }
 
                 if (res.status === 401 || res.status === 403) {
-                    handleAuthError();
                     return;
                 }
 
@@ -467,6 +427,35 @@
                 console.error('Error saving song', err);
             }
         };
+
+        // Metadata pre-fill
+        document.getElementById('upload-file').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('/api/songs/upload/metadata', {
+                    method: 'POST',
+                    headers: { 'X-API-KEY': getApiKey() },
+                    body: formData
+                });
+
+                if (response.ok) {
+                    const metadata = await response.json();
+                    if (metadata.name && metadata.name !== 'Unknown Title') {
+                        document.getElementById('upload-name').value = metadata.name;
+                    }
+                    if (metadata.artist && metadata.artist !== 'Unknown Artist') {
+                        document.getElementById('upload-artist').value = metadata.artist;
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to extract metadata:', error);
+            }
+        });
 
         // Upload Form Logic
         document.getElementById('upload-form').onsubmit = async (e) => {
@@ -612,7 +601,7 @@
         }
 
         function logout() {
-            localStorage.removeItem('X-API-KEY');
+            localStorage.removeItem('apiKey');
             window.location.href = '/logout';
         }
 

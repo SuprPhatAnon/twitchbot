@@ -17,7 +17,6 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.springframework.http.MediaType;
@@ -34,7 +33,6 @@ import java.util.List;
 @RequestMapping("/api/songs")
 @Tag(name = "Song Management", description = "Endpoints for managing songs")
 @SecurityRequirement(name = "apiKey")
-@SecurityRequirement(name = "basicAuth")
 public class SongController {
 
     private static final Logger logger = LoggerFactory.getLogger(SongController.class);
@@ -172,6 +170,24 @@ public class SongController {
                     return ResponseEntity.ok().body("Song queued successfully.");
                 })
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    /**
+     * Queues a random song for playback.
+     * Requires an API key for authorization.
+     * @return A {@link ResponseEntity} indicating whether a random song was successfully queued.
+     */
+    @PostMapping("/random/play")
+    @PreAuthorize("hasAnyRole('STREAMER', 'ADMIN')")
+    @Operation(summary = "Play a random song")
+    public ResponseEntity<String> playRandomSong() {
+        /*
+        if (!twitchBotService.isStreamOnline()) {
+            return ResponseEntity.badRequest().body("Cannot queue song: Stream is offline.");
+        }
+        */
+        twitchBotService.playRandomSong();
+        return ResponseEntity.ok().body("Random song queued successfully.");
     }
 
     /**
@@ -334,7 +350,8 @@ public class SongController {
     }
 
     /**
-     * Lists all files in the song upload directory.
+     * Lists all song files in the upload directory.
+     * Only MP3 files are included.
      * @return A list of filenames in the upload directory.
      */
     @GetMapping("/files")
@@ -349,7 +366,7 @@ public class SongController {
                 List<String> files = stream
                         .filter(file -> !java.nio.file.Files.isDirectory(file))
                         .map(file -> file.getFileName().toString())
-                        .filter(name -> !name.equals("playlist.m3u"))
+                        .filter(name -> name.toLowerCase().endsWith(".mp3"))
                         .sorted()
                         .toList();
                 return ResponseEntity.ok(files);

@@ -12,9 +12,9 @@ This is a Spring Boot application that integrates with Twitch to play songs on a
 - **Database**: MariaDB
 - **Messaging**: WebSocket (STOMP) for real-time updates to the overlay.
 - **Frontend**: Simple HTML/JS/CSS served as static resources.
-- **External Integrations**: Twitch API (Helix) and Twitch EventSub (via `twitch4j`).
+- **External Integrations**: Twitch API (Helix) and Twitch EventSub (via `twitch4j`). Uses App Access Tokens for API interactions and webhook subscriptions.
 
-**IMPORTANT**: The use of Twitch IRC is strictly forbidden and has been completely removed from the codebase. All chat-related functionality must use the Twitch Helix API (for sending messages) and Twitch EventSub (for receiving messages).
+**IMPORTANT**: The use of Twitch IRC is strictly forbidden and has been completely removed from the codebase. All chat-related functionality must use the Twitch Helix API (for sending messages) and Twitch EventSub (for receiving messages). Furthermore, Twitch EventSub MUST use the **Webhook** transport method; the use of WebSockets for EventSub is strictly prohibited to ensure better scalability and avoid long-lived connection management issues.
 
 ## Key Components
 
@@ -57,7 +57,8 @@ This is a Spring Boot application that integrates with Twitch to play songs on a
    - `/topic/redeems-list`: Receives "refresh" messages when the redeems list changes.
 
 ### File Storage & Playlists
-- **Song Uploads**: Managed by `SongUploadController`. Files are stored in the directory specified by `SONG_UPLOAD_PATH` (default: `/uploads/songs`).
+- **Song Uploads**: Managed by `SongUploadController`. Only MP3 files are supported for upload. Files are stored in the directory specified by `SONG_UPLOAD_PATH` (default: `/uploads/songs`).
+- **Metadata Extraction Endpoint**: `POST /api/songs/upload/metadata` allows extracting metadata from an MP3 file without saving it, useful for pre-filling UI forms.
 - **M3U Playlist**: A `playlist.m3u` file is automatically generated and updated in the `SONG_UPLOAD_PATH` directory whenever songs are added, updated, or deleted. This file contains all enabled songs.
 - **Metadata Extraction**: `SongService` automatically extracts metadata (artist, title, and cover art) from uploaded MP3 files using the `mp3agic` library. Cover art is stored as a Base64-encoded Data URI in the `Song` entity.
 
@@ -82,58 +83,22 @@ The database is managed by Hibernate/JPA. Key tables:
 - `users`: `id`, `username`, `password`, `api_key` (hashed), `deleted`.
 - `user_roles`: (Join table for `users` and `Role` enum).
 
-## Common Development Tasks
+## Documentation for Agents
 
-### General Requirements
-- **Always keep documentation updated**: If you change functionality, update `README.md`, `AGENTS.md`, and any relevant K8s/Docker documentation (including `k8s/K3S.md` and `k8s/MINIKUBE.md`).
-- **Keep AGENTS.md current**: When adding new core services, entities, or significant architectural changes, ensure they are documented here for future AI agents.
-- **Maintain Kubernetes Configurations**: Keep all Kubernetes deployment files in the `k8s/` directory (including `base` and `overlays` for production, minikube, and k3s) up-to-date with any changes in the application's infrastructure or configuration requirements.
-- **Maintain OpenAPI documentation**: Ensure SpringDoc/OpenAPI annotations in controllers are accurate and up-to-date.
-- **Update Javadocs**: Provide or update Javadocs for new or modified public classes and methods.
-- **Maintain Security Directives**: Ensure Content Security Policy (CSP), HSTS, and other security-related headers are up-to-date in `SecurityConfig.java` when adding new external dependencies (CDNs, fonts, etc.).
+Agents should familiarize themselves with the project structure and subsystems by reading the comprehensive documentation in the `docs/` folder:
 
-### Adding a New Endpoint
-1. Create or update a controller in `src/main/java/dev/phatanon/controller/`.
-2. Use Spring Security annotations like `@PreAuthorize` to protect endpoints.
-3. Add the endpoint to `README.md`.
+- [**Twitch Integration**](docs/twitch-integration.md): Details on EventSub, scopes, and the strictly forbidden IRC usage.
+- [**REST API**](docs/api.md): Endpoint list, authentication (API Keys), and OpenAPI documentation.
+- [**User Interfaces & Overlay**](docs/ui.md): Roles, dashboard functionality, and OBS overlay behavior directives.
+- [**Deployment Guide**](docs/deployment.md): Docker, Kubernetes, and environment variable configuration.
+- [**Development & Contribution**](docs/development.md): Setup, testing procedures (including Selenium state isolation), and scripts.
 
-### Changing Twitch Integration Logic
-- Modify `TwitchBotService`. It uses `twitch4j` to interact with Twitch.
-- If adding new event listeners, look at how `registerEventListeners()` is implemented.
-- **Chat Command Handling**: To add or modify chat commands (e.g., `!music`), implement or modify `ChatMessageHandler` in `dev.phatanon.service.chat`. These are automatically picked up by `ChatMessageService`.
-- **IMPORTANT: The use of Twitch IRC is strictly forbidden.** All chat-related functionality must use the Twitch Helix API (for sending messages) and Twitch EventSub (for receiving messages and other events). IRC-related code and configurations have been permanently removed. Specifically, the use of `.withEnableChat(true)` in `TwitchClientBuilder` is strictly forbidden as it enables the legacy IRC interface.
-
-### Modifying the Overlay
-- The main player overlay is `src/main/resources/static/overlay.html`.
-- **Overlay Behavior Directives**:
-  - The overlay MUST play a song when it receives a message on `/topic/play`.
-  - It MUST display "Now Playing" information (title, artist, and cover art if available) while the song is playing.
-  - It MUST stop the song and REMOVE the "Now Playing" message immediately when the song finishes.
-  - It MUST stop the song and REMOVE the "Now Playing" message immediately when a "clear queue" instruction is received (via a `null` or empty message on `/topic/current-song`).
-- Other UIs:
-  - `admin.html`: Full management dashboard.
-  - `song-management.html`: Dedicated song file management (Admin only).
-  - `streamer.html`: Read-only/operational dashboard.
-  - `upload.html`: Song upload interface.
-  - `user-management.html`: User management interface (Admin only).
-  - `login.html`: Login page.
-  - `player.html`: Public player for manual playback.
-  - `statistics.html`: Song play statistics dashboard.
-- UIs use basic CSS, SockJS/STOMP, and use session-based authentication.
-
-## Testing Procedures
-
-### Automated Tests
-- Run tests using Maven: `mvn test`
-- Tests are located in `src/test/java/dev/phatanon/`.
-- **Maintain a minimum test coverage of 70%** for all new and modified code.
-
-### Headless Browser Testing
-The project supports headless browser testing using Selenium and Chrome. This is particularly useful for testing JavaScript functionality on the web pages.
-- **Local Execution**: Ensure you have Chrome installed and use `WebDriverManager` (included in `pom.xml`) to manage drivers.
-- **Docker Environment**: A dedicated Docker environment is provided for running these tests in a consistent, headless environment.
-  - Run tests with: `docker-compose -f docker-compose.test.yml up --build --exit-code-from test-runner`
-  - This setup uses a MariaDB container for the database and a Maven container with Chrome installed for running the tests.
+### General Requirements for Agents
+- **Always keep documentation updated**: If you change functionality, update `README.md`, `AGENTS.md`, and the relevant files in `docs/`.
+- **Maintain Kubernetes Configurations**: Keep all files in `k8s/` updated.
+- **Maintain OpenAPI documentation**: Ensure annotations in controllers are accurate.
+- **Maintain Security Directives**: Update CSP and other headers in `SecurityConfig.java` when needed.
+- **State Isolation in Tests**: When adding JPA entities, you MUST update `BaseSeleniumTest.resetDatabase()` to include the new repository and ensure proper deletion order.
 
 ## Environment Setup for Agents
 

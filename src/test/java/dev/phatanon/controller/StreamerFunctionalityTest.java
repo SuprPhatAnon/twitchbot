@@ -2,10 +2,7 @@ package dev.phatanon.controller;
 
 import dev.phatanon.entity.Role;
 import dev.phatanon.entity.Song;
-import dev.phatanon.repository.SongRepository;
-import dev.phatanon.repository.UserRepository;
-import dev.phatanon.service.TwitchBotService;
-import dev.phatanon.service.UserService;
+import dev.phatanon.entity.User;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -15,7 +12,6 @@ import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
-import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.Duration;
 import java.util.Set;
@@ -24,29 +20,15 @@ import static org.junit.jupiter.api.Assertions.*;
 
 public class StreamerFunctionalityTest extends BaseSeleniumTest {
 
-    @Autowired
-    private UserService userService;
-
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private SongRepository songRepository;
-
-    @Autowired
-    private TwitchBotService twitchBotService;
-
     private final String streamerUsername = "teststreamer";
     private final String streamerPassword = "testpassword";
+    private String streamerApiKey;
 
     @BeforeEach
     void setupData() {
-        userRepository.deleteAll();
-        songRepository.deleteAll();
-        twitchBotService.clearQueue();
-
         // Create streamer user
-        userService.createUser(streamerUsername, streamerPassword, Set.of(Role.ROLE_STREAMER));
+        User user = userService.createUser(streamerUsername, streamerPassword, Set.of(Role.ROLE_STREAMER));
+        streamerApiKey = user.getApiKey();
 
         // Create a test song
         Song song = new Song("Streamer Song", "Streamer Artist", "streamer.mp3");
@@ -75,6 +57,12 @@ public class StreamerFunctionalityTest extends BaseSeleniumTest {
             d.getCurrentUrl().contains("admin.html") || d.getCurrentUrl().contains("streamer.html")
         );
         driver.get(getBaseUrl() + "/streamer.html");
+
+        // Set API key in localStorage so fetch calls work
+        ((JavascriptExecutor) driver).executeScript("localStorage.setItem('apiKey', arguments[0]);", streamerApiKey);
+        
+        // Refresh to ensure the API key is picked up for initial calls
+        driver.navigate().refresh();
     }
 
     private void waitForWebSocket() {
@@ -109,6 +97,30 @@ public class StreamerFunctionalityTest extends BaseSeleniumTest {
         
         String persistedTheme = (String) js.executeScript("return document.documentElement.getAttribute('data-bs-theme')");
         assertEquals(newTheme, persistedTheme, "Theme should be persisted after refresh");
+    }
+
+    @Test
+    @DisplayName("Streamer page 'Play Random' button should add a random song to the queue")
+    void testPlayRandomSong() {
+        loginAsStreamer();
+        driver.get(getBaseUrl() + "/streamer.html");
+        waitForWebSocket();
+        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(10));
+
+        // Wait for status bar
+        wait.until(ExpectedConditions.presenceOfElementLocated(By.id("stat-queue")));
+        
+        assertEquals("0", driver.findElement(By.id("stat-queue")).getText());
+
+        WebElement playRandomBtn = driver.findElement(By.xpath("//button[text()='Play Random']"));
+        ((JavascriptExecutor) driver).executeScript("arguments[0].click();", playRandomBtn);
+
+        // Wait for queue to become 1 OR playing to become something else
+        wait.until(d -> {
+            String q = d.findElement(By.id("stat-queue")).getText();
+            String p = d.findElement(By.id("stat-playing")).getText();
+            return !q.equals("0") || !p.equals("None");
+        });
     }
 
     @Test

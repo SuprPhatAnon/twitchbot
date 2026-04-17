@@ -32,7 +32,6 @@ import java.util.UUID;
 @RequestMapping("/api/songs/upload")
 @Tag(name = "Song Upload", description = "Endpoints for uploading song files")
 @SecurityRequirement(name = "apiKey")
-@SecurityRequirement(name = "basicAuth")
 public class SongUploadController {
 
     private static final Logger logger = LoggerFactory.getLogger(SongUploadController.class);
@@ -50,6 +49,7 @@ public class SongUploadController {
 
     /**
      * Uploads a new song file and creates a corresponding Song entity.
+     * Only MP3 files are supported.
      * @param file The multipart file to upload.
      * @param name The name of the song.
      * @param artist The artist of the song.
@@ -109,11 +109,9 @@ public class SongUploadController {
             }
 
             // Additional extension check
-            if (originalFilename != null && !originalFilename.toLowerCase().endsWith(".mp3") && 
-                !originalFilename.toLowerCase().endsWith(".wav") && 
-                !originalFilename.toLowerCase().endsWith(".ogg")) {
+            if (originalFilename != null && !originalFilename.toLowerCase().endsWith(".mp3")) {
                 logger.error("Invalid file extension: {}", originalFilename);
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Unsupported file extension");
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Only MP3 files are supported");
             }
 
             // Save the file
@@ -152,6 +150,55 @@ public class SongUploadController {
             logger.error("Failed to store uploaded file", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Failed to store uploaded file: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Extracts metadata from an MP3 file without saving it.
+     * Useful for pre-filling the upload form.
+     * @param file The MP3 file to extract metadata from.
+     * @return A map containing artist, name, and coverArt (Base64) or an error message.
+     */
+    @Operation(summary = "Extract metadata from an MP3 file")
+    @PostMapping("/metadata")
+    @PreAuthorize("hasAnyRole('UPLOAD', 'STREAMER', 'ADMIN')")
+    public ResponseEntity<?> extractMetadata(@RequestParam("file") MultipartFile file) {
+        if (file.isEmpty()) {
+            return ResponseEntity.badRequest().body("Please select a file");
+        }
+
+        File tempFile = null;
+        try {
+            // Create a temporary file to analyze
+            String originalFilename = file.getOriginalFilename();
+            String suffix = ".mp3";
+            if (originalFilename != null && originalFilename.contains(".")) {
+                suffix = originalFilename.substring(originalFilename.lastIndexOf("."));
+            }
+            tempFile = File.createTempFile("upload-metadata-", suffix);
+            file.transferTo(tempFile);
+
+            Song song = new Song();
+            song.setUrl(tempFile.getAbsolutePath());
+            
+            songService.updateMetadata(song);
+
+            // Create a simple map or DTO to return only what's needed
+            java.util.Map<String, String> metadata = new java.util.HashMap<>();
+            metadata.put("name", song.getName() != null ? song.getName() : "Unknown Title");
+            metadata.put("artist", song.getArtist() != null ? song.getArtist() : "Unknown Artist");
+            
+            logger.info("Extracted metadata for prefill: {} - {}", metadata.get("name"), metadata.get("artist"));
+
+            return ResponseEntity.ok(metadata);
+        } catch (IOException e) {
+            logger.error("Failed to extract metadata from temporary file", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Failed to analyze file: " + e.getMessage());
+        } finally {
+            if (tempFile != null && tempFile.exists()) {
+                tempFile.delete();
+            }
         }
     }
 }

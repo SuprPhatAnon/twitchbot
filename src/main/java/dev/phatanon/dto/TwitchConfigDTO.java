@@ -1,6 +1,5 @@
 package dev.phatanon.dto;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import dev.phatanon.entity.TwitchConfig;
 
 /**
@@ -9,9 +8,7 @@ import dev.phatanon.entity.TwitchConfig;
 public class TwitchConfigDTO {
     private Long id;
     private String clientId;
-    
     private String clientSecret;
-    
     private String accessToken;
     
     private String refreshToken;
@@ -19,6 +16,8 @@ public class TwitchConfigDTO {
     private String botAccessToken;
     
     private String botRefreshToken;
+    
+    private String webhookSecret;
     
     private String channelName;
     private int songDelaySeconds;
@@ -34,6 +33,7 @@ public class TwitchConfigDTO {
         dto.setRefreshToken(mask(entity.getRefreshToken()));
         dto.setBotAccessToken(mask(entity.getBotAccessToken()));
         dto.setBotRefreshToken(mask(entity.getBotRefreshToken()));
+        dto.setWebhookSecret(mask(entity.getWebhookSecret()));
         dto.setChannelName(entity.getChannelName());
         dto.setSongDelaySeconds(entity.getSongDelaySeconds());
         return dto;
@@ -58,6 +58,8 @@ public class TwitchConfigDTO {
     public void setBotAccessToken(String botAccessToken) { this.botAccessToken = botAccessToken; }
     public String getBotRefreshToken() { return botRefreshToken; }
     public void setBotRefreshToken(String botRefreshToken) { this.botRefreshToken = botRefreshToken; }
+    public String getWebhookSecret() { return webhookSecret; }
+    public void setWebhookSecret(String webhookSecret) { this.webhookSecret = webhookSecret; }
     public String getChannelName() { return channelName; }
     public void setChannelName(String channelName) { this.channelName = channelName; }
     public int getSongDelaySeconds() { return songDelaySeconds; }

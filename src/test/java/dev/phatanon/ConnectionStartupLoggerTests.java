@@ -2,7 +2,6 @@ package dev.phatanon;
 
 import dev.phatanon.repository.SongRepository;
 import dev.phatanon.service.SongService;
-import dev.phatanon.service.TwitchBotService;
 import dev.phatanon.service.UserService;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;

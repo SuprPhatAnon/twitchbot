@@ -20,7 +20,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 class SongUploadControllerTest {
 
@@ -73,5 +73,51 @@ class SongUploadControllerTest {
                 .param("name", "Test")
                 .param("artist", "Test"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void uploadSong_LargeFile_ReturnsCreated() throws Exception {
+        // Create a 10MB dummy file
+        byte[] largeContent = new byte[10 * 1024 * 1024];
+        MockMultipartFile file = new MockMultipartFile("file", "large.mp3", "audio/mpeg", largeContent);
+
+        Song song = new Song();
+        song.setName("Large Song");
+        song.setArtist("Large Artist");
+        when(songRepository.save(any(Song.class))).thenReturn(song);
+
+        mockMvc.perform(multipart("/api/songs/upload")
+                .file(file)
+                .param("name", "Large Song")
+                .param("artist", "Large Artist"))
+                .andExpect(status().isCreated());
+
+        verify(songRepository).save(any(Song.class));
+        verify(songService).updateM3uFile();
+    }
+
+    @Test
+    void extractMetadata_ValidFile_ReturnsMetadata() throws Exception {
+        MockMultipartFile file = new MockMultipartFile("file", "test.mp3", "audio/mpeg", "fake mp3 content".getBytes());
+
+        mockMvc.perform(multipart("/api/songs/upload/metadata")
+                .file(file))
+                .andDo(result -> System.out.println("[DEBUG_LOG] Response: " + result.getResponse().getContentAsString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").exists())
+                .andExpect(jsonPath("$.artist").exists());
+
+        verify(songService).updateMetadata(any(Song.class));
+    }
+    @Test
+    void uploadSong_InvalidExtension_ReturnsBadRequest() throws Exception {
+        MockMultipartFile file = new MockMultipartFile("file", "test.wav", "audio/wav", "fake wav content".getBytes());
+
+        mockMvc.perform(multipart("/api/songs/upload")
+                .file(file)
+                .param("name", "Wav Song")
+                .param("artist", "Wav Artist"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string("Only MP3 files are supported"));
     }
 }

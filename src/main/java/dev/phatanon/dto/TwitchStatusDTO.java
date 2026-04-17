@@ -1,6 +1,5 @@
 package dev.phatanon.dto;
 
-import com.github.twitch4j.client.websocket.domain.WebsocketConnectionState;
 import java.util.Map;
 
 /**
@@ -8,25 +7,21 @@ import java.util.Map;
  */
 public class TwitchStatusDTO {
     private boolean streamOnline;
-    private WebsocketConnectionState streamerConnectionState;
-    private WebsocketConnectionState botConnectionState;
-    private Map<String, Boolean> streamerSubscriptionStatus;
-    private Map<String, Boolean> botSubscriptionStatus;
+    private boolean streamerConnected;
+    private boolean botConnected;
+    private Map<String, String> subscriptionStatuses;
 
     public TwitchStatusDTO() {}
 
     public boolean isStreamOnline() { return streamOnline; }
     public void setStreamOnline(boolean streamOnline) { this.streamOnline = streamOnline; }
 
-    public WebsocketConnectionState getStreamerConnectionState() { return streamerConnectionState; }
-    public void setStreamerConnectionState(WebsocketConnectionState streamerConnectionState) { this.streamerConnectionState = streamerConnectionState; }
+    public boolean isStreamerConnected() { return streamerConnected; }
+    public void setStreamerConnected(boolean streamerConnected) { this.streamerConnected = streamerConnected; }
 
-    public WebsocketConnectionState getBotConnectionState() { return botConnectionState; }
-    public void setBotConnectionState(WebsocketConnectionState botConnectionState) { this.botConnectionState = botConnectionState; }
+    public boolean isBotConnected() { return botConnected; }
+    public void setBotConnected(boolean botConnected) { this.botConnected = botConnected; }
 
-    public Map<String, Boolean> getStreamerSubscriptionStatus() { return streamerSubscriptionStatus; }
-    public void setStreamerSubscriptionStatus(Map<String, Boolean> streamerSubscriptionStatus) { this.streamerSubscriptionStatus = streamerSubscriptionStatus; }
-
-    public Map<String, Boolean> getBotSubscriptionStatus() { return botSubscriptionStatus; }
-    public void setBotSubscriptionStatus(Map<String, Boolean> botSubscriptionStatus) { this.botSubscriptionStatus = botSubscriptionStatus; }
+    public Map<String, String> getSubscriptionStatuses() { return subscriptionStatuses; }
+    public void setSubscriptionStatuses(Map<String, String> subscriptionStatuses) { this.subscriptionStatuses = subscriptionStatuses; }
 }

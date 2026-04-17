@@ -33,6 +33,8 @@ public class TwitchConfig {
     
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String botRefreshToken;
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
+    private String webhookSecret;
     private String channelName;
     private int songDelaySeconds;
 
@@ -93,6 +95,14 @@ public class TwitchConfig {
 
     public void setBotRefreshToken(String botRefreshToken) {
         this.botRefreshToken = botRefreshToken;
+    }
+
+    public String getWebhookSecret() {
+        return webhookSecret;
+    }
+
+    public void setWebhookSecret(String webhookSecret) {
+        this.webhookSecret = webhookSecret;
     }
 
     public String getChannelName() {

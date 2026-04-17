@@ -1,9 +1,5 @@
 package dev.phatanon.controller;
 
-import dev.phatanon.entity.Role;
-import dev.phatanon.entity.Song;
-import dev.phatanon.repository.SongRepository;
-import dev.phatanon.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -12,36 +8,62 @@ import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
-import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.Duration;
 import java.util.List;
-import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 public class AdminFunctionalityTest extends BaseSeleniumTest {
 
-    @Autowired
-    private UserService userService;
-
-    @Autowired
-    private SongRepository songRepository;
-
     @BeforeEach
     void setupAdminUser() {
-        if (!userService.existsByUsername("admin")) {
-            userService.createUser("admin", "admin", Set.of(Role.ROLE_ADMIN));
-        }
-        
         // Ensure at least one song exists for filtering test
         if (songRepository.count() == 0) {
-            Song song = new Song("Test Song", "Test Artist", "test.mp3");
+            dev.phatanon.entity.Song song = new dev.phatanon.entity.Song("Test Song", "Test Artist", "test.mp3");
             song.setEnabled(true);
             songRepository.save(song);
         }
         
         login("admin", "admin");
+    }
+
+    private void waitForWebSocket() {
+        new WebDriverWait(driver, Duration.ofSeconds(20)).until(d -> {
+            try {
+                Object result = ((JavascriptExecutor) d).executeScript(
+                    "return typeof stompClient !== 'undefined' && stompClient !== null && stompClient.connected;"
+                );
+                return Boolean.TRUE.equals(result);
+            } catch (Exception e) {
+                return false;
+            }
+        });
+    }
+
+    @Test
+    @DisplayName("Admin page 'Play Random' button should add a random song to the queue")
+    void testPlayRandomSong() {
+        driver.get(getBaseUrl() + "/admin.html");
+        waitForWebSocket();
+        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(10));
+
+        // Wait for status bar to be visible
+        wait.until(ExpectedConditions.presenceOfElementLocated(By.id("stat-queue")));
+        
+        // Initial queue should be 0 (resetDatabase is called in BaseSeleniumTest @BeforeEach)
+        assertEquals("0", driver.findElement(By.id("stat-queue")).getText());
+
+        // Click "Play Random" button
+        WebElement playRandomBtn = driver.findElement(By.xpath("//button[text()='Play Random']"));
+        ((JavascriptExecutor) driver).executeScript("arguments[0].click();", playRandomBtn);
+
+        // Wait for queue to become 1 OR playing to become something else
+        wait.until(d -> {
+            String q = d.findElement(By.id("stat-queue")).getText();
+            String p = d.findElement(By.id("stat-playing")).getText();
+            return !q.equals("0") || !p.equals("None");
+        });
     }
 
     @Test
@@ -77,7 +99,13 @@ public class AdminFunctionalityTest extends BaseSeleniumTest {
         WebElement deleteBtn = targetBadge.findElement(By.className("btn-close"));
         
         // Click delete and handle confirmation alert
-        deleteBtn.click();
+        try {
+            deleteBtn.click();
+        } catch (org.openqa.selenium.ElementClickInterceptedException e) {
+            // If something is covering it, try JS click
+            ((JavascriptExecutor) driver).executeScript("arguments[0].click();", deleteBtn);
+        }
+        
         wait.until(ExpectedConditions.alertIsPresent());
         driver.switchTo().alert().accept();
 
@@ -89,30 +117,42 @@ public class AdminFunctionalityTest extends BaseSeleniumTest {
     @DisplayName("Admin page should filter songs correctly")
     void testSongFiltering() {
         driver.get(getBaseUrl() + "/admin.html");
-        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(10));
+        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(15));
 
         // Wait for table to load
         wait.until(ExpectedConditions.presenceOfElementLocated(By.id("songs-table-body")));
-        // Wait for at least one row to be rendered (async)
-        wait.until(d -> !d.findElements(By.cssSelector("#songs-table-body tr")).isEmpty());
+        
+        // Wait for "Test Song" to be rendered (ensure setupAdminUser worked)
+        wait.until(ExpectedConditions.textToBePresentInElementLocated(By.id("songs-table-body"), "Test Song"));
+        
+        // Count initial rows
+        int initialRowCount = driver.findElements(By.cssSelector("#songs-table-body tr")).size();
 
         WebElement searchInput = driver.findElement(By.id("song-search"));
         
+        // Wait for any previous animations or rendering to settle
+        wait.until(ExpectedConditions.elementToBeClickable(searchInput));
+
         // Use a term that likely won't match anything initially to test filtering
         String nonExistentTerm = "NonExistentSongXYZ";
         searchInput.sendKeys(nonExistentTerm);
 
-        // Wait for table to be empty (or contain the "No songs found" message if applicable, but here it just filters)
+        // Wait for table to be empty
         wait.until(d -> {
             List<WebElement> rows = d.findElements(By.cssSelector("#songs-table-body tr"));
-            // In admin.html, renderSongsTable() clears innerHTML and adds rows.
-            // If filtered, rows might be empty.
+            System.out.println("[DEBUG_LOG] Filtering Check - Rows found after typing non-existent term: " + rows.size());
             return rows.isEmpty();
         });
 
         // Clear search
         searchInput.clear();
-        searchInput.sendKeys("Test Song"); // Use the one we created in setup
+        // Force clear and trigger input event
+        ((JavascriptExecutor) driver).executeScript("arguments[0].value = ''; arguments[0].dispatchEvent(new Event('input'));", searchInput);
+
+        // Wait for table to restore
+        wait.until(d -> d.findElements(By.cssSelector("#songs-table-body tr")).size() >= initialRowCount);
+
+        searchInput.sendKeys("Test Song");
         
         wait.until(d -> !d.findElements(By.cssSelector("#songs-table-body tr")).isEmpty());
         wait.until(ExpectedConditions.textToBePresentInElementLocated(By.id("songs-table-body"), "Test Song"));

@@ -20,7 +20,6 @@ import java.util.Set;
 @RequestMapping("/api/users")
 @Tag(name = "User Management", description = "Endpoints for managing users and their profiles")
 @SecurityRequirement(name = "apiKey")
-@SecurityRequirement(name = "basicAuth")
 public class UserController {
 
     private final UserService userService;

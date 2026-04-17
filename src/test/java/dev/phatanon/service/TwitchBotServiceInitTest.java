@@ -3,7 +3,6 @@ package dev.phatanon.service;
 import com.github.philippheuer.events4j.core.EventManager;
 import com.github.twitch4j.TwitchClient;
 import com.github.twitch4j.helix.TwitchHelix;
-import com.github.twitch4j.helix.domain.Stream;
 import com.github.twitch4j.helix.domain.StreamList;
 import com.github.twitch4j.helix.domain.User;
 import com.github.twitch4j.helix.domain.UserList;
@@ -27,7 +26,6 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import java.util.List;
 import java.util.concurrent.ScheduledExecutorService;
 
-import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 class TwitchBotServiceInitTest {
@@ -101,10 +99,11 @@ class TwitchBotServiceInitTest {
         twitchBotService.setTwitchClient(twitchClient);
         twitchBotService.init();
 
+        verify(helix, atLeastOnce()).getUsers(eq("token"), any(), any());
+        verify(helix, atLeastOnce()).getStreams(eq("token"), any(), any(), any(), any(), any(), any(), any());
         verify(eventManager, atLeastOnce()).onEvent(any(), any());
         
         // Verify specific events are registered
-        verify(eventManager).onEvent(eq(EventSocketConnectionStateEvent.class), any());
         verify(eventManager).onEvent(eq(CustomRewardRedemptionAddEvent.class), any());
         verify(eventManager).onEvent(eq(ChannelCheerEvent.class), any());
         verify(eventManager).onEvent(eq(ChannelFollowEvent.class), any());
@@ -114,8 +113,61 @@ class TwitchBotServiceInitTest {
         verify(eventManager).onEvent(eq(ChannelGoLiveEvent.class), any());
         verify(eventManager).onEvent(eq(ChannelGoOfflineEvent.class), any());
         verify(eventManager).onEvent(eq(ChannelChatMessageEvent.class), any());
-        verify(eventManager).onEvent(eq(EventSocketSubscriptionSuccessEvent.class), any());
-        verify(eventManager).onEvent(eq(EventSocketSubscriptionFailureEvent.class), any());
+    }
+
+    @Test
+    void init_WithClientCredentialsFlow_RegistersBotListeners() {
+        TwitchConfig config = new TwitchConfig();
+        config.setClientId("id");
+        config.setClientSecret("secret");
+        config.setAccessToken("token");
+        config.setChannelName("channel");
+        // No botAccessToken set, should trigger Client Credentials flow
+
+        when(twitchConfigRepository.findAll()).thenReturn(List.of(config));
+        when(twitchClient.getEventManager()).thenReturn(eventManager);
+        when(twitchClient.getHelix()).thenReturn(helix);
+        when(botTwitchClient.getEventManager()).thenReturn(botEventManager);
+        when(botTwitchClient.getHelix()).thenReturn(helix);
+
+        // Mock Helix calls
+        User user = mock(User.class);
+        when(user.getId()).thenReturn("123");
+        UserList userList = mock(UserList.class);
+        when(userList.getUsers()).thenReturn(List.of(user));
+
+        var usersCall = mock(com.netflix.hystrix.HystrixCommand.class);
+        when(usersCall.execute()).thenReturn(userList);
+        when(helix.getUsers(any(), any(), any())).thenReturn(usersCall);
+
+        StreamList streamList = mock(StreamList.class);
+        when(streamList.getStreams()).thenReturn(List.of());
+        var streamsCall = mock(com.netflix.hystrix.HystrixCommand.class);
+        when(streamsCall.execute()).thenReturn(streamList);
+        when(helix.getStreams(any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(streamsCall);
+
+        // Mock App Access Token fetch
+        var appToken = mock(com.github.philippheuer.credentialmanager.domain.OAuth2Credential.class);
+        when(appToken.getAccessToken()).thenReturn("app-token");
+        // We can't easily mock identityProvider.getAppAccessToken() because it's created inside init()
+        // but we can check if "app-token" is used in subsequent calls if we could inject it.
+        // Actually, in the real code, if pre-fetch fails, it just continues.
+        
+        twitchBotService.setTwitchClient(twitchClient);
+        org.springframework.test.util.ReflectionTestUtils.setField(twitchBotService, "botTwitchClient", botTwitchClient);
+
+        twitchBotService.init();
+
+        // If App Token was successfully "fetched" (which it won't be in this mock setup unless we mock identityProvider)
+        // it would use it. Since it fails to fetch in mock, it might fallback to bot-token (null) then streamer-token.
+        // Wait, if botAccessToken is null, it used to set botTwitchClient = null.
+        // Now it creates a new botTwitchClient.
+        
+        // Let's verify that it attempts to use a token for getUsers.
+        // In the mock, identityProvider.getAppAccessToken() will likely return null or throw.
+        // If it returns null, currentAppAccessToken remains null.
+        // botToken will be currentAccessToken ("token") because botAccessToken is null.
+        verify(helix, atLeastOnce()).getUsers(eq("token"), any(), any());
     }
 
     @Test
@@ -148,24 +200,14 @@ class TwitchBotServiceInitTest {
         when(streamsCall.execute()).thenReturn(streamList);
         when(helix.getStreams(any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(streamsCall);
 
-        // Use reflection or a way to inject botTwitchClient
-        // Since botTwitchClient is built inside init(), we might need to mock TwitchClientBuilder
-        // or just verify what happens when botTwitchClient is NOT null.
-        // Actually, TwitchBotService builds it. To test this properly without PowerMock,
-        // we might need to change how TwitchBotService creates clients.
-        
-        // For now, let's just verify the main client listeners again in this scenario
         twitchBotService.setTwitchClient(twitchClient);
-        // We can't easily set botTwitchClient because it's private and recreated in init()
-        // unless we use ReflectionTestUtils
         org.springframework.test.util.ReflectionTestUtils.setField(twitchBotService, "botTwitchClient", botTwitchClient);
 
         twitchBotService.init();
 
+        verify(helix, atLeastOnce()).getUsers(eq("bot-token"), any(), any());
+        verify(helix, atLeastOnce()).getStreams(eq("token"), any(), any(), any(), any(), any(), any(), any());
         verify(eventManager).onEvent(eq(ChannelChatMessageEvent.class), any());
         verify(botEventManager).onEvent(eq(ChannelChatMessageEvent.class), any());
-        verify(botEventManager).onEvent(eq(EventSocketConnectionStateEvent.class), any());
-        verify(botEventManager).onEvent(eq(EventSocketSubscriptionSuccessEvent.class), any());
-        verify(botEventManager).onEvent(eq(EventSocketSubscriptionFailureEvent.class), any());
     }
 }

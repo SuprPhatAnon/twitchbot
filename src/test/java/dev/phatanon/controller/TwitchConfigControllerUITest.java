@@ -11,7 +11,6 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.hamcrest.Matchers.hasSize;
@@ -135,14 +134,36 @@ public class TwitchConfigControllerUITest {
     }
 
     @Test
-    void shouldGetActiveProfiles() throws Exception {
-        when(environment.getActiveProfiles()).thenReturn(new String[]{"prod", "mysql"});
+    void shouldGetFullStatus() throws Exception {
+        when(twitchBotService.isStreamOnline()).thenReturn(true);
+        when(twitchBotService.isStreamerConnected()).thenReturn(true);
+        when(twitchBotService.isBotConnected()).thenReturn(false);
+        when(twitchBotService.getSubscriptionStatuses()).thenReturn(java.util.Map.of("test", "ENABLED"));
 
-        mockMvc.perform(get("/api/twitch-config/profiles"))
+        mockMvc.perform(get("/api/twitch-config/full-status"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(2)))
-                .andExpect(jsonPath("$[0]", is("prod")))
-                .andExpect(jsonPath("$[1]", is("mysql")));
+                .andExpect(jsonPath("$.streamOnline", is(true)))
+                .andExpect(jsonPath("$.streamerConnected", is(true)))
+                .andExpect(jsonPath("$.botConnected", is(false)))
+                .andExpect(jsonPath("$.subscriptionStatuses.test", is("ENABLED")));
+    }
+
+    @Test
+    void shouldUpdateConfigWithWebhookSecret() throws Exception {
+        TwitchConfig existing = new TwitchConfig();
+        existing.setId(1L);
+
+        when(twitchConfigRepository.findAll()).thenReturn(List.of(existing));
+        when(twitchConfigRepository.save(any(TwitchConfig.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        mockMvc.perform(put("/api/twitch-config")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"clientId\": \"new-id\", \"webhookSecret\": \"new-secret\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.clientId", is("new-id")))
+                .andExpect(jsonPath("$.webhookSecret", is("********")));
+
+        verify(twitchBotService).reconnect();
     }
 
     @Test

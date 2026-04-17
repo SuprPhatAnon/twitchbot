@@ -1,13 +1,11 @@
 package dev.phatanon.service.chat;
 
-import com.github.twitch4j.chat.events.channel.ChannelMessageEvent;
 import dev.phatanon.model.ChatMessageContext;
 import dev.phatanon.service.TwitchBotService;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.Mockito.*;
 
 class MusicCommandHandlerTest {
