@@ -161,7 +161,7 @@
         async function fetchData() {
             try {
                 const [songsRes, filesRes, redeemsRes, ghostRes] = await Promise.all([
-                    fetch('/api/songs'),
+                    fetch('/api/songs?includeDisabled=true'),
                     fetch('/api/songs/files'),
                     fetch('/api/redeems'),
                     fetch('/api/songs/ghost-records')
@@ -176,7 +176,7 @@
                 songs = await songsRes.json();
                 files = await filesRes.json();
                 redeems = await redeemsRes.json();
-                ghostRecords = await ghostRes.json();
+                ghostRecords = (await ghostRes.json()).filter(s => s.enabled);
                 
                 updateRedeemsSelect();
                 renderTable();
@@ -227,7 +227,7 @@
             // Map files to their songs
             const fileMap = {};
             files.forEach(filename => {
-                const linkedSongs = songs.filter(s => s.url === '/' + filename);
+                const linkedSongs = songs.filter(s => s.url === '/' + filename && s.enabled);
                 fileMap[filename] = linkedSongs;
             });
 

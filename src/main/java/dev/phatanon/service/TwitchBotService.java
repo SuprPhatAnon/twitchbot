@@ -843,6 +843,10 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
         }
         */
         songRepository.findById(id).ifPresent(song -> {
+            if (!song.isEnabled()) {
+                log.warn("Attempted to play disabled song ID: {}. Ignoring.", id);
+                return;
+            }
             log.info("Manually queueing song: {} by {} (incrementStats: {})", song.getName(), song.getArtist(), incrementStats);
             if (!isSongPlaying) {
                 playSong(song, "manual", incrementStats);

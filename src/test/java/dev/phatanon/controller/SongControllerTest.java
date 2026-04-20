@@ -64,7 +64,7 @@ public class SongControllerTest {
 
     @Test
     void shouldGetAllSongs() throws Exception {
-        when(songRepository.findAllByOrderBySortNameAsc()).thenReturn(java.util.List.of(
+        when(songRepository.findAllByEnabledTrueOrderBySortNameAsc()).thenReturn(java.util.List.of(
                 new Song("Song 1", "Artist 1", "url1"),
                 new Song("Song 2", "Artist 2", "url2")
         ));
@@ -196,6 +196,43 @@ public class SongControllerTest {
 
         org.mockito.Mockito.verify(songRepository).save(song);
         org.junit.jupiter.api.Assertions.assertFalse(song.isEnabled());
+    }
+
+    @Test
+    void shouldNotReturnDisabledSongsInGetAllSongs() throws Exception {
+        Song song1 = new Song("Song 1", "Artist 1", "url1");
+        song1.setEnabled(true);
+        Song song2 = new Song("Song 2", "Artist 2", "url2");
+        song2.setEnabled(false);
+
+        when(songRepository.findAllByEnabledTrueOrderBySortNameAsc()).thenReturn(List.of(song1));
+
+        mockMvc.perform(get("/api/songs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].name", is("Song 1")));
+    }
+
+    @Test
+    void shouldNotGetDisabledSongById() throws Exception {
+        Song song = new Song("Disabled Song", "Artist", "url");
+        song.setEnabled(false);
+        song.setId(1L);
+        when(songRepository.findById(1L)).thenReturn(Optional.of(song));
+
+        mockMvc.perform(get("/api/songs/1"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldNotPlayDisabledSong() throws Exception {
+        Song song = new Song("Disabled Song", "Artist", "url");
+        song.setEnabled(false);
+        song.setId(1L);
+        when(songRepository.findById(1L)).thenReturn(Optional.of(song));
+
+        mockMvc.perform(post("/api/songs/1/play"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test

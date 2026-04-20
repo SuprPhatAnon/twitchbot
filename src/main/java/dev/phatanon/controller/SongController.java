@@ -54,15 +54,29 @@ public class SongController {
     /**
      * Retrieves all available songs from the {@link SongRepository}, ordered by their sort name or created date.
      * @param sort The sorting criteria: "name" (default) or "newest".
+     * @param includeDisabled Whether to include disabled (soft-deleted) songs (default: false).
      * @return A list of all {@link Song} entities.
      */
     @GetMapping
     @Operation(summary = "Get all songs")
-    public List<Song> getAllSongs(@RequestParam(required = false, defaultValue = "name") String sort) {
+    public List<Song> getAllSongs(@RequestParam(required = false, defaultValue = "name") String sort,
+                                  @RequestParam(required = false, defaultValue = "false") boolean includeDisabled) {
         if ("newest".equalsIgnoreCase(sort)) {
-            return songRepository.findAllByOrderByCreatedTimestampDesc();
+            if (includeDisabled) {
+                return songRepository.findAllByOrderByCreatedTimestampDesc();
+            }
+            // There is no findAllByEnabledTrueOrderByCreatedTimestampDesc in repository yet, but we can filter or add it.
+            // Let's stick to what we have or add it to repository if needed.
+            // For now, filtering is fine as the number of songs is likely small.
+            return songRepository.findAllByOrderByCreatedTimestampDesc().stream()
+                    .filter(Song::isEnabled)
+                    .toList();
         }
-        return songRepository.findAllByOrderBySortNameAsc();
+        
+        if (includeDisabled) {
+            return songRepository.findAllByOrderBySortNameAsc();
+        }
+        return songRepository.findAllByEnabledTrueOrderBySortNameAsc();
     }
 
     /**
@@ -72,8 +86,10 @@ public class SongController {
      */
     @GetMapping("/{id}")
     @Operation(summary = "Get a song by ID")
-    public ResponseEntity<Song> getSongById(@PathVariable Long id) {
+    public ResponseEntity<Song> getSongById(@PathVariable Long id,
+                                            @RequestParam(required = false, defaultValue = "false") boolean includeDisabled) {
         return songRepository.findById(id)
+                .filter(song -> includeDisabled || song.isEnabled())
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -166,6 +182,9 @@ public class SongController {
         */
         return songRepository.findById(id)
                 .map(song -> {
+                    if (!song.isEnabled()) {
+                        return ResponseEntity.badRequest().body("Cannot play a disabled song.");
+                    }
                     twitchBotService.playSongById(id, incrementStats);
                     return ResponseEntity.ok().body("Song queued successfully.");
                 })
