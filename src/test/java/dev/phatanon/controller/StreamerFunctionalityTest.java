@@ -236,4 +236,50 @@ public class StreamerFunctionalityTest extends BaseSeleniumTest {
         );
         assertTrue(twitchStat.getAttribute("class").contains("status-online"));
     }
+
+    @Test
+    @DisplayName("Streamer page should have a volume control that persists in localStorage")
+    void testVolumeControl() {
+        loginAsStreamer();
+        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(10));
+        
+        WebElement volumeInput = wait.until(ExpectedConditions.presenceOfElementLocated(By.id("player-volume")));
+        
+        // Change volume via JS to 0.75
+        ((JavascriptExecutor) driver).executeScript("arguments[0].value = 0.75; arguments[0].dispatchEvent(new Event('input'))", volumeInput);
+        
+        // Verify audio element volume
+        Double audioVolume = (Double) ((JavascriptExecutor) driver).executeScript("return document.getElementById('audio-player').volume");
+        assertEquals(0.75, audioVolume, 0.01);
+        
+        // Verify localStorage
+        String storedVolume = (String) ((JavascriptExecutor) driver).executeScript("return localStorage.getItem('player-volume')");
+        assertEquals("0.75", storedVolume);
+        
+        // Refresh page and check if it persists
+        driver.navigate().refresh();
+        volumeInput = wait.until(ExpectedConditions.presenceOfElementLocated(By.id("player-volume")));
+        assertEquals("0.75", volumeInput.getAttribute("value"));
+        audioVolume = (Double) ((JavascriptExecutor) driver).executeScript("return document.getElementById('audio-player').volume");
+        assertEquals(0.75, audioVolume, 0.01);
+    }
+
+    @Test
+    @DisplayName("Streamer page should play audio when a song starts but NOT notify finished")
+    void testAudioPlayback() {
+        loginAsStreamer();
+        waitForWebSocket();
+        
+        // Mock play event via JS
+        String songJson = "{\"name\":\"Test Song\", \"artist\":\"Test Artist\", \"url\":\"/test.mp3\"}";
+        ((JavascriptExecutor) driver).executeScript("playAudio(" + songJson + ")");
+        
+        WebElement audioPlayer = driver.findElement(By.id("audio-player"));
+        assertTrue(audioPlayer.getAttribute("src").contains("/test.mp3"));
+        
+        // Verify it doesn't have an onended handler that sends /app/song-finished
+        // In the streamer view, we didn't add audioPlayer.onended.
+        Object onended = ((JavascriptExecutor) driver).executeScript("return document.getElementById('audio-player').onended");
+        assertNull(onended, "Streamer audio player should NOT have an onended handler");
+    }
 }

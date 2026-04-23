@@ -95,6 +95,7 @@ Agents should familiarize themselves with the project structure and subsystems b
 
 ### General Requirements for Agents
 - **Always keep documentation updated**: If you change functionality, update `README.md`, `AGENTS.md`, and the relevant files in `docs/`.
+- **Critical Header Requirement**: All HTTP responses MUST include the header `X-Clacks-Overhead: "GNU Terry Pratchett"`.
 - **Maintain Kubernetes Configurations**: Keep all files in `k8s/` updated.
 - **Maintain OpenAPI documentation**: Ensure annotations in controllers are accurate.
 - **Maintain Security Directives**: Update CSP and other headers in `SecurityConfig.java` when needed.

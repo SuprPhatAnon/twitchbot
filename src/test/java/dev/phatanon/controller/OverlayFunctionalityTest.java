@@ -89,8 +89,8 @@ public class OverlayFunctionalityTest extends BaseSeleniumTest {
         System.out.println("[DEBUG_LOG] Simulating song playback via JS");
         String songJson = "{\"id\":1, \"name\":\"Simulated Song\", \"artist\":\"Simulated Artist\", \"url\":\"/songs/test.mp3\", \"coverArt\":\"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==\"}";
         // Ensure playSong exists and is ready
-        wait.until(d -> (Boolean) ((JavascriptExecutor) d).executeScript("return typeof playSong === 'function'"));
-        ((JavascriptExecutor) driver).executeScript("console.log('[DEBUG_LOG] Manually calling playSong'); playSong(" + songJson + ");");
+        wait.until(d -> (Boolean) ((JavascriptExecutor) d).executeScript("return typeof updateDisplay === 'function'"));
+        ((JavascriptExecutor) driver).executeScript("console.log('[DEBUG_LOG] Manually calling updateDisplay'); updateDisplay(" + songJson + ");");
         
         // 2. Verify display appears
         System.out.println("[DEBUG_LOG] Waiting for song-display to become visible");
