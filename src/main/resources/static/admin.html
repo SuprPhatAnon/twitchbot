@@ -132,6 +132,7 @@
                         <table class="table table-hover mb-0">
                             <thead class="table-light">
                                 <tr>
+                                    <th><input type="checkbox" id="select-all-songs" onclick="toggleSelectAllSongs(this)"></th>
                                     <th>ID</th>
                                     <th>Art</th>
                                     <th>Name</th>
@@ -190,6 +191,26 @@
                                 <button type="submit" class="btn btn-primary">Save Changes</button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" id="card-bulk-actions" style="display: none;">
+                <div class="card-header d-flex justify-content-between align-items-center" onclick="toggleCard('card-bulk-actions')">
+                    Bulk Actions (<span id="selected-songs-count">0</span> selected)
+                    <span class="collapse-toggle"></span>
+                </div>
+                <div class="card-body collapse show">
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <label class="form-label small">Assign Redeems</label>
+                            <select class="form-select form-select-sm" id="bulk-song-redeems" multiple>
+                                <!-- Options loaded from redeems -->
+                            </select>
+                        </div>
+                        <div class="col-md-4 d-flex align-items-end">
+                            <button class="btn btn-warning btn-sm w-100" onclick="bulkUpdateRedeems()">Update Redeems</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -708,6 +729,7 @@
                 const redeemTitles = song.redeems.map(r => r.title).join(', ');
                 const artImg = song.coverArt ? `<img src="${song.coverArt}" alt="Art" style="width: 30px; height: 30px; object-fit: cover; border-radius: 2px;">` : '';
                 tr.innerHTML = `
+                    <td><input type="checkbox" class="song-checkbox" value="${song.id}" onclick="updateBulkActionsVisibility()"></td>
                     <td>${song.id}</td>
                     <td>${artImg}</td>
                     <td>${song.name}</td>
@@ -722,6 +744,55 @@
                 `;
                 tbody.appendChild(tr);
             });
+            updateBulkActionsVisibility();
+        }
+
+        function toggleSelectAllSongs(checkbox) {
+            document.querySelectorAll('.song-checkbox').forEach(cb => {
+                cb.checked = checkbox.checked;
+            });
+            updateBulkActionsVisibility();
+        }
+
+        function updateBulkActionsVisibility() {
+            const selectedCheckboxes = document.querySelectorAll('.song-checkbox:checked');
+            const bulkActionsCard = document.getElementById('card-bulk-actions');
+            const countEl = document.getElementById('selected-songs-count');
+            
+            if (selectedCheckboxes.length > 0) {
+                bulkActionsCard.style.display = 'block';
+                countEl.innerText = selectedCheckboxes.length;
+            } else {
+                bulkActionsCard.style.display = 'none';
+                document.getElementById('select-all-songs').checked = false;
+            }
+        }
+
+        async function bulkUpdateRedeems() {
+            const selectedSongIds = Array.from(document.querySelectorAll('.song-checkbox:checked')).map(cb => parseInt(cb.value));
+            const selectedRedeemIds = Array.from(document.getElementById('bulk-song-redeems').selectedOptions).map(o => parseInt(o.value));
+            
+            if (selectedSongIds.length === 0) return;
+            if (!confirm(`Are you sure you want to update ${selectedSongIds.length} songs?`)) return;
+
+            const request = {
+                songIds: selectedSongIds,
+                redeems: selectedRedeemIds.map(id => ({ id: id }))
+            };
+
+            try {
+                const response = await fetch('/api/songs/bulk-update-redeems', {
+                    method: 'PUT',
+                    headers: getHeaders(),
+                    body: JSON.stringify(request)
+                });
+                if (response.ok) {
+                    alert('Songs updated successfully!');
+                    fetchSongs();
+                } else {
+                    alert('Failed to update songs');
+                }
+            } catch (error) { console.error('Error bulk updating songs:', error); }
         }
 
         async function clearQueue() {
@@ -804,11 +875,14 @@
                 // Update song form dropdown
                 const selectEl = document.getElementById('song-redeems');
                 const editSelectEl = document.getElementById('edit-song-redeems');
+                const bulkSelectEl = document.getElementById('bulk-song-redeems');
                 const selectedValues = Array.from(selectEl.selectedOptions).map(o => o.value);
                 const editSelectedValues = Array.from(editSelectEl.selectedOptions).map(o => o.value);
+                const bulkSelectedValues = Array.from(bulkSelectEl.selectedOptions).map(o => o.value);
                 
                 selectEl.innerHTML = '';
                 editSelectEl.innerHTML = '';
+                bulkSelectEl.innerHTML = '';
                 
                 allRedeems.forEach(redeem => {
                     const option = document.createElement('option');
@@ -820,6 +894,10 @@
                     const editOption = option.cloneNode(true);
                     if (editSelectedValues.includes(redeem.id.toString())) editOption.selected = true;
                     editSelectEl.appendChild(editOption);
+
+                    const bulkOption = option.cloneNode(true);
+                    if (bulkSelectedValues.includes(redeem.id.toString())) bulkOption.selected = true;
+                    bulkSelectEl.appendChild(bulkOption);
                 });
             } catch (error) { console.error('Error fetching redeems:', error); }
         }

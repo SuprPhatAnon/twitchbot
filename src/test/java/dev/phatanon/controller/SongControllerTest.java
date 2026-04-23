@@ -27,7 +27,8 @@ import java.util.Optional;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -398,6 +399,33 @@ public class SongControllerTest {
                 .andExpect(jsonPath("$[0].artist", is("Artist 1")))
                 .andExpect(jsonPath("$[0].playCount", is(10)));
     }
+    @Test
+    void shouldBulkUpdateRedeems() throws Exception {
+        Song song1 = new Song("Song 1", "Artist 1", "/song1.mp3");
+        Song song2 = new Song("Song 2", "Artist 2", "/song2.mp3");
+        song1.setId(1L);
+        song2.setId(2L);
+        Redeem redeem = new Redeem("Redeem 1");
+        redeem.setId(10L);
+
+        when(songRepository.findAllById(List.of(1L, 2L))).thenReturn(List.of(song1, song2));
+
+        String requestBody = """
+                {
+                    "songIds": [1, 2],
+                    "redeems": [{"id": 10}]
+                }
+                """;
+
+        mockMvc.perform(put("/api/songs/bulk-update-redeems")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isOk());
+
+        verify(songRepository, times(2)).save(any(Song.class));
+        verify(messagingTemplate).convertAndSend(eq("/topic/songs"), eq("refresh"));
+    }
+
     @Test
     void shouldListOnlyMp3Files() throws Exception {
         java.nio.file.Path tempUploadDir = java.nio.file.Files.createTempDirectory("song-uploads-test");

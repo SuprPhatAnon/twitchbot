@@ -59,6 +59,25 @@
                     </div>
                 </div>
 
+                <div class="card shadow-sm mb-4" id="card-bulk-actions" style="display: none;">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Bulk Actions (<span id="selected-songs-count">0</span> selected)</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-8">
+                                <label class="form-label small">Assign Redeems to Selected Songs</label>
+                                <select class="form-select form-select-sm" id="bulk-song-redeems" multiple>
+                                    <!-- Options loaded from redeems -->
+                                </select>
+                            </div>
+                            <div class="col-md-4 d-flex align-items-end">
+                                <button class="btn btn-warning btn-sm w-100" onclick="bulkUpdateRedeems()">Update Redeems</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="card shadow-sm">
                     <div class="card-header d-flex justify-content-between align-items-center bg-white">
                         <h5 class="mb-0">Song File Management</h5>
@@ -83,6 +102,7 @@
                             <table class="table table-hover align-middle">
                                 <thead class="table-light">
                                     <tr>
+                                        <th><input type="checkbox" id="select-all-songs" onclick="toggleSelectAllSongs(this)"></th>
                                         <th>Filename</th>
                                         <th>Linked Song</th>
                                         <th>Status</th>
@@ -187,12 +207,23 @@
 
         function updateRedeemsSelect() {
             const select = document.getElementById('modal-song-redeems');
+            const bulkSelect = document.getElementById('bulk-song-redeems');
+            const selectedValues = Array.from(select.selectedOptions).map(o => o.value);
+            const bulkSelectedValues = Array.from(bulkSelect.selectedOptions).map(o => o.value);
+
             select.innerHTML = '';
+            bulkSelect.innerHTML = '';
+
             redeems.forEach(r => {
                 const option = document.createElement('option');
                 option.value = r.id;
                 option.textContent = r.title;
+                if (selectedValues.includes(r.id.toString())) option.selected = true;
                 select.appendChild(option);
+
+                const bulkOption = option.cloneNode(true);
+                if (bulkSelectedValues.includes(r.id.toString())) bulkOption.selected = true;
+                bulkSelect.appendChild(bulkOption);
             });
         }
 
@@ -256,7 +287,7 @@
             });
 
             if (displayItems.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="4" class="text-center">No ${currentFilter === 'all' ? '' : currentFilter} items found matching your search.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="5" class="text-center">No ${currentFilter === 'all' ? '' : currentFilter} items found matching your search.</td></tr>`;
                 return;
             }
 
@@ -268,10 +299,12 @@
                     const linkedSongs = item.linkedSongs;
                     let songCell = '<span class="text-muted small">No record</span>';
                     let statusBadge = '<span class="badge bg-danger status-badge">Orphan</span>';
+                    let checkbox = '';
                     
                     if (linkedSongs.length > 0) {
                         songCell = linkedSongs.map(s => `<div><strong>${s.name}</strong><br><small class="text-muted">by ${s.artist} (ID: ${s.id})</small></div>`).join('');
                         statusBadge = '<span class="badge bg-success status-badge">Linked</span>';
+                        checkbox = `<input type="checkbox" class="song-checkbox" value="${linkedSongs[0].id}" onclick="updateBulkActionsVisibility()">`;
                     }
 
                     if (filename === 'playlist.m3u') {
@@ -292,6 +325,7 @@
                     `;
 
                     tr.innerHTML = `
+                        <td>${checkbox}</td>
                         <td class="text-break">${isPlaying ? '<span class="playing-indicator me-1">▶</span>' : ''}${filename}</td>
                         <td>${songCell}</td>
                         <td>${statusBadge}</td>
@@ -302,6 +336,7 @@
                     const s = item.song;
                     tr.classList.add('table-warning');
                     tr.innerHTML = `
+                        <td><input type="checkbox" class="song-checkbox" value="${s.id}" onclick="updateBulkActionsVisibility()"></td>
                         <td class="text-break text-danger"><i class="small">Missing: ${s.url}</i></td>
                         <td><strong>${s.name}</strong><br><small class="text-muted">by ${s.artist} (ID: ${s.id})</small></td>
                         <td><span class="badge bg-warning text-dark status-badge">Ghost Record</span></td>
@@ -315,6 +350,56 @@
                 }
                 tbody.appendChild(tr);
             });
+            updateBulkActionsVisibility();
+        }
+
+        function toggleSelectAllSongs(checkbox) {
+            document.querySelectorAll('.song-checkbox').forEach(cb => {
+                cb.checked = checkbox.checked;
+            });
+            updateBulkActionsVisibility();
+        }
+
+        function updateBulkActionsVisibility() {
+            const selectedCheckboxes = document.querySelectorAll('.song-checkbox:checked');
+            const bulkActionsCard = document.getElementById('card-bulk-actions');
+            const countEl = document.getElementById('selected-songs-count');
+            
+            if (selectedCheckboxes.length > 0) {
+                bulkActionsCard.style.display = 'block';
+                countEl.innerText = selectedCheckboxes.length;
+            } else {
+                bulkActionsCard.style.display = 'none';
+                const selectAll = document.getElementById('select-all-songs');
+                if (selectAll) selectAll.checked = false;
+            }
+        }
+
+        async function bulkUpdateRedeems() {
+            const selectedSongIds = Array.from(document.querySelectorAll('.song-checkbox:checked')).map(cb => parseInt(cb.value));
+            const selectedRedeemIds = Array.from(document.getElementById('bulk-song-redeems').selectedOptions).map(o => parseInt(o.value));
+            
+            if (selectedSongIds.length === 0) return;
+            if (!confirm(`Are you sure you want to update ${selectedSongIds.length} songs?`)) return;
+
+            const request = {
+                songIds: selectedSongIds,
+                redeems: selectedRedeemIds.map(id => ({ id: id }))
+            };
+
+            try {
+                const response = await fetch('/api/songs/bulk-update-redeems', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(request)
+                });
+                if (response.ok) {
+                    alert('Songs updated successfully!');
+                    fetchData();
+                } else {
+                    alert('Failed to update songs');
+                }
+            } catch (error) { console.error('Error bulk updating songs:', error); }
         }
 
         function togglePlay(filename) {

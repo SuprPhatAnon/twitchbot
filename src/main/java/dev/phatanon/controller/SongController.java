@@ -112,6 +112,21 @@ public class SongController {
         return savedSong;
     }
 
+    @PutMapping("/bulk-update-redeems")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Bulk update redeems for multiple songs")
+    public ResponseEntity<Void> bulkUpdateRedeems(@RequestBody BulkRedeemUpdateRequest request) {
+        List<Song> songs = songRepository.findAllById(request.songIds());
+        for (Song song : songs) {
+            song.setRedeems(request.redeems());
+            songRepository.save(song);
+        }
+        messagingTemplate.convertAndSend("/topic/songs", "refresh");
+        return ResponseEntity.ok().build();
+    }
+
+    public record BulkRedeemUpdateRequest(List<Long> songIds, java.util.Set<dev.phatanon.entity.Redeem> redeems) {}
+
     /**
      * Updates an existing song's details and broadcasts a refresh message to WebSocket subscribers.
      * Optionally updates the cover art if a new image file is provided.
