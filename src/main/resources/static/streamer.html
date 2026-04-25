@@ -18,6 +18,18 @@
         .stat-title { font-weight: bold; }
         .stat-count { float: right; color: #0d6efd; font-weight: bold; }
         [data-bs-theme="dark"] .stat-count { color: #3d8bfd; }
+
+        /* Mimic player.html styles */
+        .player-display-container {
+            padding: 20px;
+            border-radius: 8px;
+            background: #f8f9fa;
+            margin-bottom: 20px;
+        }
+        [data-bs-theme="dark"] .player-display-container { background: #2b3035; }
+        .player-art { width: 100%; max-width: 250px; aspect-ratio: 1; object-fit: cover; border-radius: 8px; margin-bottom: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .no-art-placeholder { width: 100%; max-width: 250px; aspect-ratio: 1; background: #eee; border-radius: 8px; margin-bottom: 15px; display: flex; align-items: center; justify-content: center; font-size: 2.5rem; color: #ccc; }
+        [data-bs-theme="dark"] .no-art-placeholder { background: #343a40; color: #495057; }
     </style>
 </head>
 <body>
@@ -62,29 +74,16 @@
 
     <div class="main-container">
         <div class="left-panel">
-            <div class="row">
-                <div class="col-md-6">
-                    <div class="card">
-                        <div class="card-header">Top 5 Songs (All Time)</div>
-                        <div id="top-songs-stats" class="card-body">
-                            <!-- Stats here -->
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-6">
-                    <div class="card">
-                        <div class="card-header">Recent Plays</div>
-                        <div id="recent-plays-stats" class="card-body">
-                            <!-- Recent plays here -->
-                        </div>
-                    </div>
-                </div>
-            </div>
-
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    Songs Database
-                    <button class="btn btn-sm btn-outline-secondary" onclick="fetchSongs()">Refresh</button>
+                    <span>Songs Database</span>
+                    <div class="d-flex gap-2">
+                        <select id="song-sort" class="form-select form-select-sm" style="width: auto;" onchange="renderSongsTable()">
+                            <option value="name">Sort by Name</option>
+                            <option value="date" selected>Sort by Date (Newest)</option>
+                        </select>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="fetchSongs()">Refresh</button>
+                    </div>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
@@ -107,10 +106,30 @@
                     </div>
                 </div>
             </div>
-
         </div>
 
         <div class="right-panel">
+            <div id="player-display" class="player-display-container text-center">
+                <div id="no-song-selected" class="py-4">
+                    <div class="display-4 text-muted mb-3">🎵</div>
+                    <h5>No song playing</h5>
+                </div>
+
+                <div id="active-player-ui" style="display: none;">
+                    <div id="player-art-container" class="d-flex justify-content-center">
+                        <!-- Art or placeholder will be here -->
+                    </div>
+                    <h3 id="display-song-name" class="mb-1"></h3>
+                    <h5 id="display-song-artist" class="text-muted mb-3"></h5>
+                    
+                    <div class="d-flex justify-content-center gap-3">
+                        <button class="btn btn-outline-primary" onclick="playNextSong()">
+                            Skip Song ⏭️
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <h5 class="mb-3">Event Log (Redeems, Subs, Follows)</h5>
             <div id="redeem-log">
                 <!-- Redeems added here -->
@@ -123,16 +142,17 @@
     <script src="/js/common.js"></script>
     <script>
         let stompClient = null;
+        let allSongs = [];
         const audioPlayer = document.getElementById('audio-player');
         const volumeControl = document.getElementById('player-volume');
 
         // Volume control
-        const savedVolume = localStorage.getItem('player-volume') || 0.5;
+        const savedVolume = parseFloat(localStorage.getItem('player-volume') || 0.5);
         audioPlayer.volume = savedVolume;
         if (volumeControl) {
             volumeControl.value = savedVolume;
             volumeControl.addEventListener('input', (e) => {
-                const vol = e.target.value;
+                const vol = parseFloat(e.target.value);
                 audioPlayer.volume = vol;
                 localStorage.setItem('player-volume', vol);
             });
@@ -179,6 +199,10 @@
         function playAudio(song) {
             if (!song || !song.url) return;
             audioPlayer.src = song.url;
+            // Ensure volume is applied
+            if (volumeControl) {
+                audioPlayer.volume = parseFloat(volumeControl.value);
+            }
             audioPlayer.play().catch(error => {
                 console.warn("Audio playback failed (possibly due to browser policy):", error);
             });
@@ -266,17 +290,38 @@
         function updateCurrentSongDisplay(song) {
             const el = document.getElementById('stat-playing');
             const statusEl = document.getElementById('stat-play-status');
+            const noSongSelected = document.getElementById('no-song-selected');
+            const activePlayerUi = document.getElementById('active-player-ui');
+            const playerArtContainer = document.getElementById('player-art-container');
+            const displaySongName = document.getElementById('display-song-name');
+            const displaySongArtist = document.getElementById('display-song-artist');
+
             if (song) {
                 const text = `${song.name} - ${song.artist}`;
                 el.innerText = text;
                 el.classList.add('text-info');
                 statusEl.innerText = "Playing";
                 statusEl.className = "stat-count text-info";
+
+                // Update right panel player UI
+                noSongSelected.style.display = 'none';
+                activePlayerUi.style.display = 'block';
+                if (song.coverArt) {
+                    playerArtContainer.innerHTML = `<img src="${song.coverArt}" alt="Art" class="player-art">`;
+                } else {
+                    playerArtContainer.innerHTML = `<div class="no-art-placeholder">🎵</div>`;
+                }
+                displaySongName.textContent = song.name;
+                displaySongArtist.textContent = song.artist;
             } else {
                 el.innerText = 'None';
                 el.classList.remove('text-info');
                 statusEl.innerText = "Idle";
                 statusEl.className = "stat-count";
+
+                // Reset right panel player UI
+                noSongSelected.style.display = 'block';
+                activePlayerUi.style.display = 'none';
             }
         }
 
@@ -318,31 +363,45 @@
                     handleAuthError();
                     return;
                 }
-                const songs = await response.json();
-                const tbody = document.getElementById('songs-table-body');
-                tbody.innerHTML = '';
+                allSongs = await response.json();
                 
-                // Update stats
-                updateTopSongs(songs);
-
-                songs.forEach(song => {
-                    const tr = document.createElement('tr');
-                    const redeemTitles = song.redeems.map(r => r.title).join(', ');
-                    const artImg = song.coverArt ? `<img src="${song.coverArt}" alt="Art" style="width: 30px; height: 30px; object-fit: cover; border-radius: 2px;">` : '';
-                    tr.innerHTML = `
-                        <td>${song.id}</td>
-                        <td>${artImg}</td>
-                        <td>${song.name}</td>
-                        <td>${song.artist}</td>
-                        <td><span class="badge bg-light text-dark">${song.playCount || 0}</span></td>
-                        <td>${redeemTitles}</td>
-                        <td>
-                            <button class="btn btn-sm btn-success" onclick="playSong(${song.id})">Play</button>
-                        </td>
-                    `;
-                    tbody.appendChild(tr);
-                });
+                renderSongsTable();
             } catch (error) { console.error('Error fetching songs:', error); }
+        }
+
+        function renderSongsTable() {
+            const tbody = document.getElementById('songs-table-body');
+            const sortMode = document.getElementById('song-sort').value;
+            
+            let sortedSongs = [...allSongs];
+            if (sortMode === 'name') {
+                sortedSongs.sort((a, b) => a.name.localeCompare(b.name));
+            } else if (sortMode === 'date') {
+                sortedSongs.sort((a, b) => {
+                    const dateA = a.createdTimestamp ? new Date(a.createdTimestamp) : new Date(0);
+                    const dateB = b.createdTimestamp ? new Date(b.createdTimestamp) : new Date(0);
+                    return dateB - dateA; // Newest first
+                });
+            }
+
+            tbody.innerHTML = '';
+            sortedSongs.forEach(song => {
+                const tr = document.createElement('tr');
+                const redeemTitles = song.redeems.map(r => r.title).join(', ');
+                const artImg = song.coverArt ? `<img src="${song.coverArt}" alt="Art" style="width: 30px; height: 30px; object-fit: cover; border-radius: 2px;">` : '';
+                tr.innerHTML = `
+                    <td>${song.id}</td>
+                    <td>${artImg}</td>
+                    <td>${song.name}</td>
+                    <td>${song.artist}</td>
+                    <td><span class="badge bg-light text-dark">${song.playCount || 0}</span></td>
+                    <td>${redeemTitles}</td>
+                    <td>
+                        <button class="btn btn-sm btn-success" onclick="playSong(${song.id})">Play</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
         }
 
         function updateTopSongs(songs) {
@@ -455,9 +514,21 @@
             } catch (error) { console.error('Error playing random song:', error); }
         }
 
+        async function playNextSong() {
+            try {
+                const response = await fetch('/api/songs/skip', { 
+                    method: 'POST'
+                });
+                if (response.status === 401 || response.status === 403) {
+                    return;
+                }
+                if (response.ok) { /* WebSocket will update current song */ }
+                else { alert(await response.text()); }
+            } catch (error) { console.error('Error skipping song:', error); }
+        }
+
         refreshInitialStatus();
         fetchRecentRedeems();
-        fetchRecentPlays();
         connectWebSocket();
     </script>
 </body>

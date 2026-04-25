@@ -64,7 +64,7 @@ public class SecurityConfig {
             .addFilterBefore(new ApiKeyAuthenticationFilter(userService), UsernamePasswordAuthenticationFilter.class)
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/", "/overlay.html", "/player.html", "/statistics.html", "/css/**", "/js/**", "/ws/**").permitAll()
-                .requestMatchers("/login.html", "/api/login").permitAll()
+                .requestMatchers("/login.html", "/api/login", "/api/twitch/callback").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/**").permitAll() // Permit all GET requests to API
                 .requestMatchers("/*.mp3", "/playlist.m3u").permitAll() // Permit all access to songs and playlist
                 .requestMatchers("/api/songs/upload/**", "/upload.html").hasAnyRole("UPLOAD", "STREAMER", "ADMIN")
@@ -77,7 +77,7 @@ public class SecurityConfig {
             .formLogin(form -> form
                 .loginPage("/login.html")
                 .loginProcessingUrl("/api/login")
-                .defaultSuccessUrl("/admin.html", true)
+                .successHandler(new CustomAuthenticationSuccessHandler())
                 .permitAll()
             )
             .logout(logout -> logout

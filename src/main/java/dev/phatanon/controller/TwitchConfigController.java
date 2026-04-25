@@ -62,6 +62,10 @@ public class TwitchConfigController {
         status.setStreamOnline(twitchBotService.isStreamOnline());
         status.setStreamerConnected(twitchBotService.isStreamerConnected());
         status.setBotConnected(twitchBotService.isBotConnected());
+        status.setChannelName(twitchBotService.getChannelName());
+        status.setBroadcasterId(twitchBotService.getBroadcasterId());
+        status.setBotUserId(twitchBotService.getBotUserId());
+        status.setQueueSize(twitchBotService.getQueueSize());
         status.setSubscriptionStatuses(twitchBotService.getSubscriptionStatuses());
         return ResponseEntity.ok(status);
     }
@@ -284,10 +288,12 @@ public class TwitchConfigController {
                     log.info("[AUTH] Received authorization code for bot account. Updating tokens.");
                     config.setBotAccessToken(userCredential.getAccessToken());
                     config.setBotRefreshToken(userCredential.getRefreshToken());
+                    config.setBotExpiresIn(userCredential.getExpiresIn());
                 } else {
                     log.info("[AUTH] Received authorization code for streamer account. Updating tokens.");
                     config.setAccessToken(userCredential.getAccessToken());
                     config.setRefreshToken(userCredential.getRefreshToken());
+                    config.setExpiresIn(userCredential.getExpiresIn());
                 }
                 twitchConfigRepository.save(config);
                 log.info("[AUTH] Twitch configuration updated with new tokens and saved to database.");

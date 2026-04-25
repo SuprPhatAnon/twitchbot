@@ -1,6 +1,7 @@
 package dev.phatanon.controller;
 
 import com.github.twitch4j.TwitchClient;
+import com.github.twitch4j.common.util.TypeConvert;
 import com.github.twitch4j.eventsub.EventSubNotification;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.phatanon.entity.TwitchConfig;
@@ -48,7 +49,7 @@ public class TwitchWebhookController {
             @RequestHeader(value = MESSAGE_TYPE, required = false) String messageType,
             @RequestBody String body) {
 
-        log.debug("Received Twitch Webhook: ID={}, Type={}, Timestamp={}", messageId, messageType, timestamp);
+       // log.info("Received Twitch Webhook: ID={}, Type={}, Timestamp={}, body={}", messageId, messageType, timestamp,body);
 
         if (messageId == null || timestamp == null || signature == null || messageType == null) {
             log.warn("Missing required Twitch EventSub headers");
@@ -110,13 +111,16 @@ public class TwitchWebhookController {
 
         try {
             // twitch4j provides a way to parse the notification
-            EventSubNotification notification = objectMapper.readValue(body, EventSubNotification.class);
+            // Use TypeConvert.getObjectMapper() which has Twitch4JModule registered for polymorphic events
+            EventSubNotification notification = TypeConvert.getObjectMapper().readValue(body, EventSubNotification.class);
             if (notification != null && notification.getEvent() != null) {
                 // Dispatch to twitch4j event manager
                 client.getEventManager().publish(notification.getEvent());
-                log.debug("Processed Twitch notification: {}", notification.getSubscription().getType());
+                //log.info("Processed Twitch notification: {}", notification.getSubscription().getType());
+            } else {
+                log.warn("Received invalid notification: {}", body);
             }
-        } catch (Exception e) {
+        } catch (Throwable e) {
             log.error("Error processing Twitch notification: {}", e.getMessage(), e);
             // Return 200 anyway to stop Twitch from retrying if it's a permanent parsing error
         }

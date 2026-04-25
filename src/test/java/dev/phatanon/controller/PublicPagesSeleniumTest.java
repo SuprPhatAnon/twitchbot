@@ -35,4 +35,31 @@ public class PublicPagesSeleniumTest extends BaseSeleniumTest {
         driver.get(getBaseUrl() + "/login.html");
         assertTrue(driver.findElement(By.id("loginForm")).isDisplayed(), "Login form should be visible");
     }
+    @Test
+    @DisplayName("Player page should have a volume control that persists in localStorage")
+    void testPlayerVolumeControl() {
+        driver.get(getBaseUrl() + "/player.html");
+        
+        // Wait for player-volume to be present
+        org.openqa.selenium.support.ui.WebDriverWait wait = new org.openqa.selenium.support.ui.WebDriverWait(driver, java.time.Duration.ofSeconds(10));
+        org.openqa.selenium.WebElement volumeInput = wait.until(org.openqa.selenium.support.ui.ExpectedConditions.presenceOfElementLocated(By.id("player-volume")));
+        
+        // Change volume via JS to 0.25
+        ((org.openqa.selenium.JavascriptExecutor) driver).executeScript("arguments[0].value = 0.25; arguments[0].dispatchEvent(new Event('input'))", volumeInput);
+        
+        // Verify audio element volume
+        Double audioVolume = (Double) ((org.openqa.selenium.JavascriptExecutor) driver).executeScript("return document.getElementById('audio-player').volume");
+        org.junit.jupiter.api.Assertions.assertEquals(0.25, audioVolume, 0.01);
+        
+        // Verify localStorage
+        String storedVolume = (String) ((org.openqa.selenium.JavascriptExecutor) driver).executeScript("return localStorage.getItem('player-volume')");
+        org.junit.jupiter.api.Assertions.assertEquals("0.25", storedVolume);
+        
+        // Refresh page and check if it persists
+        driver.navigate().refresh();
+        volumeInput = wait.until(org.openqa.selenium.support.ui.ExpectedConditions.presenceOfElementLocated(By.id("player-volume")));
+        org.junit.jupiter.api.Assertions.assertEquals("0.25", volumeInput.getAttribute("value"));
+        audioVolume = (Double) ((org.openqa.selenium.JavascriptExecutor) driver).executeScript("return document.getElementById('audio-player').volume");
+        org.junit.jupiter.api.Assertions.assertEquals(0.25, audioVolume, 0.01);
+    }
 }

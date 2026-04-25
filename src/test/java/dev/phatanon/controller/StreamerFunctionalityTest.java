@@ -49,14 +49,10 @@ public class StreamerFunctionalityTest extends BaseSeleniumTest {
         driver.findElement(By.id("password")).sendKeys(streamerPassword);
         driver.findElement(By.cssSelector("button[type='submit']")).click();
         
-        // Streamer is redirected to streamer.html (actually default is admin.html, but they don't have access, 
-        // but SecurityConfig has defaultSuccessUrl("/admin.html", true). 
-        // Let's see what happens when a streamer logs in. They might get 403 on admin.html.
-        // For the test, we'll just navigate to streamer.html after login.
+        // Streamer is redirected to streamer.html
         new WebDriverWait(driver, Duration.ofSeconds(5)).until(d -> 
-            d.getCurrentUrl().contains("admin.html") || d.getCurrentUrl().contains("streamer.html")
+            d.getCurrentUrl().contains("streamer.html")
         );
-        driver.get(getBaseUrl() + "/streamer.html");
 
         // Set API key in localStorage so fetch calls work
         ((JavascriptExecutor) driver).executeScript("localStorage.setItem('apiKey', arguments[0]);", streamerApiKey);
@@ -238,7 +234,7 @@ public class StreamerFunctionalityTest extends BaseSeleniumTest {
     }
 
     @Test
-    @DisplayName("Streamer page should have a volume control that persists in localStorage")
+    @DisplayName("Streamer page should have a volume control that persists in localStorage and applies to new songs")
     void testVolumeControl() {
         loginAsStreamer();
         WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(10));
@@ -256,6 +252,13 @@ public class StreamerFunctionalityTest extends BaseSeleniumTest {
         String storedVolume = (String) ((JavascriptExecutor) driver).executeScript("return localStorage.getItem('player-volume')");
         assertEquals("0.75", storedVolume);
         
+        // Mock play event via JS and check if volume is still 0.75
+        String songJson = "{\"name\":\"Test Song\", \"artist\":\"Test Artist\", \"url\":\"/test.mp3\"}";
+        ((JavascriptExecutor) driver).executeScript("playAudio(" + songJson + ")");
+        
+        audioVolume = (Double) ((JavascriptExecutor) driver).executeScript("return document.getElementById('audio-player').volume");
+        assertEquals(0.75, audioVolume, 0.01, "Volume should persist after playAudio is called");
+
         // Refresh page and check if it persists
         driver.navigate().refresh();
         volumeInput = wait.until(ExpectedConditions.presenceOfElementLocated(By.id("player-volume")));

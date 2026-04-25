@@ -6,8 +6,6 @@ import com.github.twitch4j.helix.TwitchHelix;
 import com.github.twitch4j.helix.domain.StreamList;
 import com.github.twitch4j.helix.domain.User;
 import com.github.twitch4j.helix.domain.UserList;
-import com.github.twitch4j.events.ChannelGoLiveEvent;
-import com.github.twitch4j.events.ChannelGoOfflineEvent;
 import com.github.twitch4j.eventsub.events.*;
 import com.github.twitch4j.eventsub.socket.events.EventSocketConnectionStateEvent;
 import com.github.twitch4j.eventsub.socket.events.EventSocketSubscriptionFailureEvent;
@@ -110,8 +108,8 @@ class TwitchBotServiceInitTest {
         verify(eventManager).onEvent(eq(ChannelSubscribeEvent.class), any());
         verify(eventManager).onEvent(eq(ChannelSubscriptionGiftEvent.class), any());
         verify(eventManager).onEvent(eq(ChannelSubscriptionMessageEvent.class), any());
-        verify(eventManager).onEvent(eq(ChannelGoLiveEvent.class), any());
-        verify(eventManager).onEvent(eq(ChannelGoOfflineEvent.class), any());
+        verify(eventManager).onEvent(eq(StreamOnlineEvent.class), any());
+        verify(eventManager).onEvent(eq(StreamOfflineEvent.class), any());
         verify(eventManager).onEvent(eq(ChannelChatMessageEvent.class), any());
     }
 

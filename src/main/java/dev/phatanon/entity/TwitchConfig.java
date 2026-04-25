@@ -33,6 +33,8 @@ public class TwitchConfig {
     
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String botRefreshToken;
+    private Integer expiresIn;
+    private Integer botExpiresIn;
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String webhookSecret;
     private String channelName;
@@ -95,6 +97,22 @@ public class TwitchConfig {
 
     public void setBotRefreshToken(String botRefreshToken) {
         this.botRefreshToken = botRefreshToken;
+    }
+
+    public Integer getExpiresIn() {
+        return expiresIn;
+    }
+
+    public void setExpiresIn(Integer expiresIn) {
+        this.expiresIn = expiresIn;
+    }
+
+    public Integer getBotExpiresIn() {
+        return botExpiresIn;
+    }
+
+    public void setBotExpiresIn(Integer botExpiresIn) {
+        this.botExpiresIn = botExpiresIn;
     }
 
     public String getWebhookSecret() {

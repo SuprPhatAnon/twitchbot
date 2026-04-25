@@ -37,8 +37,37 @@
         </div>
 
         <div class="row">
+            <!-- Channel Info -->
+            <div class="col-md-12 mb-4">
+                <div class="card status-card">
+                    <div class="card-header bg-dark text-white">Channel Information</div>
+                    <div class="card-body">
+                        <div class="row text-center">
+                            <div class="col-md-3">
+                                <h6>Channel Name</h6>
+                                <p id="info-channel-name" class="h5">-</p>
+                            </div>
+                            <div class="col-md-3">
+                                <h6>Broadcaster ID</h6>
+                                <p id="info-broadcaster-id" class="text-muted">-</p>
+                            </div>
+                            <div class="col-md-3">
+                                <h6>Bot User ID</h6>
+                                <p id="info-bot-user-id" class="text-muted">-</p>
+                            </div>
+                            <div class="col-md-3">
+                                <h6>Queue Size</h6>
+                                <p id="info-queue-size" class="h5">-</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
             <!-- Stream Status -->
-            <div class="col-md-4">
+            <div class="col-md-12">
                 <div class="card status-card">
                     <div class="card-header bg-dark text-white">Stream Status</div>
                     <div class="card-body text-center">
@@ -47,9 +76,11 @@
                     </div>
                 </div>
             </div>
+        </div>
 
+        <div class="row">
             <!-- EventSub Connection (Streamer) -->
-            <div class="col-md-4">
+            <div class="col-md-6">
                 <div class="card status-card">
                     <div class="card-header bg-dark text-white">EventSub (Streamer)</div>
                     <div class="card-body text-center">
@@ -60,7 +91,7 @@
             </div>
 
             <!-- EventSub Connection (Bot) -->
-            <div class="col-md-4">
+            <div class="col-md-6">
                 <div class="card status-card">
                     <div class="card-header bg-dark text-white">EventSub (Bot)</div>
                     <div class="card-body text-center">
@@ -112,18 +143,26 @@
         }
 
         function updateUI(data) {
+            // Channel Info
+            document.getElementById('info-channel-name').innerText = data.channelName || 'N/A';
+            document.getElementById('info-broadcaster-id').innerText = data.broadcasterId || 'N/A';
+            document.getElementById('info-bot-user-id').innerText = data.botUserId || 'N/A';
+            document.getElementById('info-queue-size').innerText = data.queueSize !== undefined ? data.queueSize : '0';
+
             // Stream Status
             const streamEl = document.getElementById('stream-status');
             streamEl.innerText = data.streamOnline ? 'ONLINE' : 'OFFLINE';
             streamEl.className = data.streamOnline ? 'text-success' : 'text-danger';
 
             // Connection States
-            updateConnectionStatus('streamer-connection', data.streamerConnectionState);
-            updateConnectionStatus('bot-connection', data.botConnectionState);
+            updateConnectionStatus('streamer-connection', data.streamerConnected ? 'CONNECTED' : 'DISCONNECTED');
+            updateConnectionStatus('bot-connection', data.botConnected ? 'CONNECTED' : 'DISCONNECTED');
 
             // Subscriptions
-            renderSubscriptions('streamer-subscriptions', data.streamerSubscriptionStatus);
-            renderSubscriptions('bot-subscriptions', data.botSubscriptionStatus);
+            renderSubscriptions('streamer-subscriptions', data.subscriptionStatuses);
+            
+            // For now, we only have one set of subscriptions in the DTO
+            document.getElementById('bot-subscriptions').innerHTML = '<div class="text-center text-muted">Subscriptions are shared or managed by streamer client</div>';
         }
 
         function updateConnectionStatus(id, state) {

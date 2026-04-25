@@ -6,16 +6,21 @@ import com.github.philippheuer.credentialmanager.domain.OAuth2Credential;
 import com.github.twitch4j.TwitchClient;
 import com.github.twitch4j.auth.providers.TwitchIdentityProvider;
 import com.github.twitch4j.TwitchClientBuilder;
+import com.github.twitch4j.eventsub.EventSubSubscription;
+import com.github.twitch4j.eventsub.EventSubSubscriptionStatus;
+import com.github.twitch4j.eventsub.EventSubTransport;
+import com.github.twitch4j.eventsub.subscriptions.SubscriptionType;
 import com.github.twitch4j.eventsub.subscriptions.SubscriptionTypes;
+import com.github.twitch4j.eventsub.events.StreamOnlineEvent;
+import com.github.twitch4j.eventsub.events.StreamOfflineEvent;
 import com.github.twitch4j.eventsub.events.ChannelChatMessageEvent;
-import com.github.twitch4j.events.ChannelGoLiveEvent;
-import com.github.twitch4j.events.ChannelGoOfflineEvent;
 import com.github.twitch4j.eventsub.events.ChannelCheerEvent;
 import com.github.twitch4j.eventsub.events.ChannelFollowEvent;
 import com.github.twitch4j.eventsub.events.ChannelSubscribeEvent;
 import com.github.twitch4j.eventsub.events.ChannelSubscriptionGiftEvent;
 import com.github.twitch4j.eventsub.events.ChannelSubscriptionMessageEvent;
 import com.github.twitch4j.eventsub.events.CustomRewardRedemptionAddEvent;
+import com.github.twitch4j.helix.domain.EventSubSubscriptionList;
 import com.github.twitch4j.helix.domain.UserList;
 import com.github.twitch4j.helix.domain.ChatMessage;
 import com.github.twitch4j.helix.domain.StreamList;
@@ -183,7 +188,8 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
                 clientToUse.getHelix().sendChatMessage(token, chatMessage).execute();
                 log.info("Sent chat message to {}: {}", currentChannelName, message);
             } catch (Exception e) {
-                log.error("Failed to send chat message via Helix: {}", e.getMessage());
+                log.error("Failed to send chat message via Helix: {}", e.getMessage(), e);
+                refreshTokens();
             }
         } else {
             log.warn("Cannot send chat message: Twitch connection is not ready.");
@@ -218,6 +224,18 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
      */
     public synchronized boolean isTwitchConnected() {
         return twitchClient != null;
+    }
+
+    public synchronized String getChannelName() {
+        return currentChannelName;
+    }
+
+    public synchronized String getBroadcasterId() {
+        return broadcasterId;
+    }
+
+    public synchronized String getBotUserId() {
+        return botUserId;
     }
 
     /**
@@ -295,7 +313,7 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
             log.info("Has Streamer Access Token: {}", config.getAccessToken() != null && !config.getAccessToken().isBlank());
             log.info("Has Bot Access Token: {}", config.getBotAccessToken() != null && !config.getBotAccessToken().isBlank());
             
-            CredentialManager credentialManager = CredentialManagerBuilder.builder().build();
+            this.credentialManager = CredentialManagerBuilder.builder().build();
             TwitchIdentityProvider identityProvider = new TwitchIdentityProvider(config.getClientId(), config.getClientSecret(), null);
             credentialManager.registerIdentityProvider(identityProvider);
             
@@ -305,21 +323,62 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
                     config.getRefreshToken(),
                     null,
                     null,
-                    null,
+                    config.getExpiresIn(),
                     null
             );
+            log.info("Streamer credential scopes: {}", streamerCredential.getScopes());
             
-            OAuth2Credential botCredential = (config.getBotAccessToken() != null && !config.getBotAccessToken().isBlank())
-                    ? new OAuth2Credential(
-                            TwitchIdentityProvider.PROVIDER_NAME,
-                            config.getBotAccessToken(),
-                            config.getBotRefreshToken(),
-                            null,
-                            null,
-                            null,
-                            null
-                    )
-                    : streamerCredential;
+            // Force refresh streamer token on startup
+            try {
+                log.info("Refreshing streamer token on startup...");
+                identityProvider.refreshCredential(streamerCredential).ifPresent(newCredential -> {
+                    if (!config.getAccessToken().equals(newCredential.getAccessToken())) {
+                        log.info("Streamer token refreshed. Saving to database.");
+                        log.info("Refreshed streamer credential scopes: {}", newCredential.getScopes());
+                        config.setAccessToken(newCredential.getAccessToken());
+                        config.setRefreshToken(newCredential.getRefreshToken());
+                        config.setExpiresIn(newCredential.getExpiresIn());
+                        twitchConfigRepository.save(config);
+                        currentAccessToken = config.getAccessToken();
+                    }
+                });
+            } catch (Exception e) {
+                log.warn("Failed to refresh streamer token on startup: {}", e.getMessage());
+            }
+
+            OAuth2Credential botCredential;
+            if (config.getBotAccessToken() != null && !config.getBotAccessToken().isBlank()) {
+                botCredential = new OAuth2Credential(
+                        TwitchIdentityProvider.PROVIDER_NAME,
+                        config.getBotAccessToken(),
+                        config.getBotRefreshToken(),
+                        null,
+                        null,
+                        config.getBotExpiresIn(),
+                        null
+                );
+                log.info("Bot credential scopes: {}", botCredential.getScopes());
+
+                // Force refresh bot token on startup
+                try {
+                    log.info("Refreshing bot token on startup...");
+                    identityProvider.refreshCredential(botCredential).ifPresent(newCredential -> {
+                        if (!config.getBotAccessToken().equals(newCredential.getAccessToken())) {
+                            log.info("Bot token refreshed. Saving to database.");
+                            log.info("Refreshed bot credential scopes: {}", newCredential.getScopes());
+                            config.setBotAccessToken(newCredential.getAccessToken());
+                            config.setBotRefreshToken(newCredential.getRefreshToken());
+                            config.setBotExpiresIn(newCredential.getExpiresIn());
+                            twitchConfigRepository.save(config);
+                            currentBotAccessToken = config.getBotAccessToken();
+                        }
+                    });
+                } catch (Exception e) {
+                    log.warn("Failed to refresh bot token on startup: {}", e.getMessage());
+                }
+            } else {
+                botCredential = streamerCredential;
+            }
             
             log.info("Building TwitchClients...");
             TwitchClientBuilder streamerBuilder = TwitchClientBuilder.builder()
@@ -384,6 +443,8 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
 
             registerEventListeners();
 
+            // Refresh tokens if they are close to expiring
+            long initialDelay = 1; // Start almost immediately to check current status
             tokenRefreshTask = scheduler.scheduleAtFixedRate(() -> {
                 try {
                     List<TwitchConfig> currentConfigs = twitchConfigRepository.findAll();
@@ -391,18 +452,44 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
                         TwitchConfig currentConfig = currentConfigs.get(0);
                         boolean updated = false;
 
-                        if (streamerCredential.getAccessToken() != null && !streamerCredential.getAccessToken().equals(currentConfig.getAccessToken())) {
-                            log.info("[TOKEN] Streamer access token refreshed. Saving new tokens to database.");
+                        // Check streamer token
+                        if (streamerCredential.getExpiresIn() != null && streamerCredential.getExpiresIn() < 600) {
+                            log.info("[TOKEN] Streamer token expiring soon ({}s). Refreshing...", streamerCredential.getExpiresIn());
+                            identityProvider.refreshCredential(streamerCredential).ifPresent(newCredential -> {
+                                currentConfig.setAccessToken(newCredential.getAccessToken());
+                                currentConfig.setRefreshToken(newCredential.getRefreshToken());
+                                currentConfig.setExpiresIn(newCredential.getExpiresIn());
+                                currentAccessToken = currentConfig.getAccessToken();
+                            });
+                            updated = true;
+                        } else if (streamerCredential.getAccessToken() != null && !streamerCredential.getAccessToken().equals(currentConfig.getAccessToken())) {
+                            log.info("[TOKEN] Streamer access token refreshed background. Saving new tokens to database.");
                             currentConfig.setAccessToken(streamerCredential.getAccessToken());
                             currentConfig.setRefreshToken(streamerCredential.getRefreshToken());
+                            currentConfig.setExpiresIn(streamerCredential.getExpiresIn());
+                            currentAccessToken = currentConfig.getAccessToken();
                             updated = true;
                         }
 
-                        if (botCredential != streamerCredential && botCredential.getAccessToken() != null && !botCredential.getAccessToken().equals(currentConfig.getBotAccessToken())) {
-                            log.info("[TOKEN] Bot access token refreshed. Saving new tokens to database.");
-                            currentConfig.setBotAccessToken(botCredential.getAccessToken());
-                            currentConfig.setBotRefreshToken(botCredential.getRefreshToken());
-                            updated = true;
+                        // Check bot token
+                        if (botCredential != streamerCredential) {
+                            if (botCredential.getExpiresIn() != null && botCredential.getExpiresIn() < 600) {
+                                log.info("[TOKEN] Bot token expiring soon ({}s). Refreshing...", botCredential.getExpiresIn());
+                                identityProvider.refreshCredential(botCredential).ifPresent(newCredential -> {
+                                    currentConfig.setBotAccessToken(newCredential.getAccessToken());
+                                    currentConfig.setBotRefreshToken(newCredential.getRefreshToken());
+                                    currentConfig.setBotExpiresIn(newCredential.getExpiresIn());
+                                    currentBotAccessToken = currentConfig.getBotAccessToken();
+                                });
+                                updated = true;
+                            } else if (botCredential.getAccessToken() != null && !botCredential.getAccessToken().equals(currentConfig.getBotAccessToken())) {
+                                log.info("[TOKEN] Bot access token refreshed background. Saving new tokens to database.");
+                                currentConfig.setBotAccessToken(botCredential.getAccessToken());
+                                currentConfig.setBotRefreshToken(botCredential.getRefreshToken());
+                                currentConfig.setBotExpiresIn(botCredential.getExpiresIn());
+                                currentBotAccessToken = currentConfig.getBotAccessToken();
+                                updated = true;
+                            }
                         }
 
                         if (updated) {
@@ -412,7 +499,7 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
                 } catch (Exception e) {
                     log.error("Error checking for token refreshes: {}", e.getMessage());
                 }
-            }, 5, 5, TimeUnit.MINUTES);
+            }, initialDelay, 5, TimeUnit.MINUTES);
 
         } catch (Exception e) {
             log.error("Failed to initialize Twitch bot: {}", e.getMessage());
@@ -448,21 +535,27 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
             log.info("Checking existing EventSub subscriptions at startup...");
             String helixToken = currentAppAccessToken != null ? currentAppAccessToken : currentAccessToken;
             
-            var helix = twitchClient.getHelix();
-            var getSubsCall = helix.getClass().getMethod("getEventSubSubscriptions", String.class, String.class, String.class, String.class, String.class, String.class, String.class, String.class);
-            var hystrixCommand = (com.netflix.hystrix.HystrixCommand<?>) getSubsCall.invoke(helix, helixToken, null, null, null, null, null, null, null);
-            var existingSubsList = hystrixCommand.execute();
+            EventSubSubscriptionList subsList = twitchClient.getHelix().getEventSubSubscriptions(helixToken, null, null, null, null, null).execute();
             
             java.util.Set<String> activeSubs = new java.util.HashSet<>();
-            java.util.List<?> subsList = (java.util.List<?>) existingSubsList.getClass().getMethod("getSubscriptions").invoke(existingSubsList);
-            
-            for (Object s : subsList) {
-                String status = s.getClass().getMethod("getStatus").invoke(s).toString();
-                Object sTransport = s.getClass().getMethod("getTransport").invoke(s);
-                String sCallback = sTransport.getClass().getMethod("getCallback").invoke(sTransport).toString();
+
+            for (EventSubSubscription s : subsList.getSubscriptions()) {
+                log.info(
+                        "Found subscription: ID={}, Type={}, Status={}, Callback={}",
+                        s.getId(),
+                        s.getType()
+                         .getName(),
+                        s.getStatus(),
+                        s.getTransport()
+                         .getCallback()
+                        );
+
+                EventSubSubscriptionStatus status = s.getStatus();
+                EventSubTransport sTransport = s.getTransport();
+                String sCallback = sTransport.getCallback();
                 
-                if ("enabled".equalsIgnoreCase(status) && callbackUrl.equals(sCallback)) {
-                    String type = s.getClass().getMethod("getType").invoke(s).toString();
+                if (EventSubSubscriptionStatus.ENABLED.equals(status) && callbackUrl.equals(sCallback)) {
+                    String type = s.getType().getName();
                     activeSubs.add(type);
                 }
             }
@@ -476,7 +569,7 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
             subscribeIfMissing(SubscriptionTypes.CHANNEL_SUBSCRIPTION_MESSAGE, b -> b.broadcasterUserId(broadcasterId).build(), transport, activeSubs);
             subscribeIfMissing(SubscriptionTypes.STREAM_ONLINE, b -> b.broadcasterUserId(broadcasterId).build(), transport, activeSubs);
             subscribeIfMissing(SubscriptionTypes.STREAM_OFFLINE, b -> b.broadcasterUserId(broadcasterId).build(), transport, activeSubs);
-            
+
             if (botUserId != null) {
                 subscribeIfMissing(SubscriptionTypes.CHANNEL_CHAT_MESSAGE, b -> b.broadcasterUserId(broadcasterId).userId(botUserId).build(), transport, activeSubs);
             }
@@ -640,15 +733,15 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
             messagingTemplate.convertAndSend("/topic/redeems", redeemLog);
         });
 
-        twitchClient.getEventManager().onEvent(ChannelGoLiveEvent.class, event -> {
-            log.info("[EVENT] Stream started for channel: {}", event.getChannel().getName());
+        twitchClient.getEventManager().onEvent(StreamOnlineEvent.class, event -> {
+            log.info("[EVENT] Stream started for channel: {}", event.getBroadcasterUserName());
             isStreamOnline = true;
             messagingTemplate.convertAndSend("/topic/stream-status", true);
             scheduleThumboGreeting();
         });
 
-        twitchClient.getEventManager().onEvent(ChannelGoOfflineEvent.class, event -> {
-            log.info("[EVENT] Stream ended for channel: {}", event.getChannel().getName());
+        twitchClient.getEventManager().onEvent(StreamOfflineEvent.class, event -> {
+            log.info("[EVENT] Stream ended for channel: {}", event.getBroadcasterUserName());
             isStreamOnline = false;
             messagingTemplate.convertAndSend("/topic/stream-status", false);
             greetingSentThisSession.set(false);
@@ -660,7 +753,7 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
         });
 
         twitchClient.getEventManager().onEvent(ChannelChatMessageEvent.class, event -> {
-            log.debug("[EVENT] [CHAT] Streamer Client received message: {}", event.getMessage().getText());
+            //log.debug("[EVENT] [CHAT] Streamer Client received message: {}", event.getMessage().getText());
             ChatMessageContext context = ChatMessageContext.builder()
                     .message(event.getMessage().getText())
                     .senderName(event.getChatterUserName())
@@ -672,7 +765,7 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
 
         if (botTwitchClient != null) {
             botTwitchClient.getEventManager().onEvent(ChannelChatMessageEvent.class, event -> {
-                log.debug("[EVENT] [CHAT] Bot Client received message: {}", event.getMessage().getText());
+            //    log.debug("[EVENT] [CHAT] Bot Client received message: {}", event.getMessage().getText());
                 ChatMessageContext context = ChatMessageContext.builder()
                         .message(event.getMessage().getText())
                         .senderName(event.getChatterUserName())
@@ -688,7 +781,7 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
 
     /**
      * Checks if the stream is currently online.
-     * Stream status is updated via {@link ChannelGoLiveEvent} and {@link ChannelGoOfflineEvent}.
+     * Stream status is updated via {@link StreamOnlineEvent} and {@link StreamOfflineEvent}.
      * @return true if online, false otherwise
      */
     public synchronized boolean isStreamOnline() {

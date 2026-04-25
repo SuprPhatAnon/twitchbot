@@ -50,3 +50,5 @@ build/
 /git_diff.txt
 /logs/twitchbot**
 
+/current_changes.diff
+/test_output.txt

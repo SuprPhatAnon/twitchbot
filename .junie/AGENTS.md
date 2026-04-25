@@ -9,3 +9,4 @@ Adhere to everything in the AGENTS.md file.
 - Ask before changing more than 3 files in one task.
 
 - At the end of every task.  Run the full test suite.  DO NOT FIX UNLESS CODE WAS CHANGED
+- NEVER USE REFLECTION unless you are absolutely cannot do anything else.

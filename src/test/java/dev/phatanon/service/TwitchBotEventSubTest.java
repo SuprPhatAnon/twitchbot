@@ -3,8 +3,6 @@ package dev.phatanon.service;
 import com.github.philippheuer.events4j.core.EventManager;
 import com.github.twitch4j.TwitchClient;
 import com.github.twitch4j.common.enums.SubscriptionPlan;
-import com.github.twitch4j.events.ChannelGoLiveEvent;
-import com.github.twitch4j.events.ChannelGoOfflineEvent;
 import com.github.twitch4j.eventsub.events.*;
 import com.github.twitch4j.helix.TwitchHelix;
 import com.github.twitch4j.helix.domain.StreamList;
@@ -205,20 +203,18 @@ class TwitchBotEventSubTest {
     }
 
     @Test
-    void testChannelGoLiveAndOffline_UpdatesStatus() {
+    void testStreamOnlineAndOffline_UpdatesStatus() {
         // Go Live
-        ChannelGoLiveEvent liveEvent = mock(ChannelGoLiveEvent.class);
-        com.github.twitch4j.common.events.domain.EventChannel channel = mock(com.github.twitch4j.common.events.domain.EventChannel.class);
-        when(liveEvent.getChannel()).thenReturn(channel);
-        when(channel.getName()).thenReturn("testchannel");
+        StreamOnlineEvent liveEvent = mock(StreamOnlineEvent.class);
+        when(liveEvent.getBroadcasterUserName()).thenReturn("testchannel");
 
         triggerEvent(liveEvent);
 
         assertTrue(twitchBotService.isStreamOnline());
 
         // Go Offline
-        ChannelGoOfflineEvent offlineEvent = mock(ChannelGoOfflineEvent.class);
-        when(offlineEvent.getChannel()).thenReturn(channel);
+        StreamOfflineEvent offlineEvent = mock(StreamOfflineEvent.class);
+        when(offlineEvent.getBroadcasterUserName()).thenReturn("testchannel");
 
         triggerEvent(offlineEvent);
 
