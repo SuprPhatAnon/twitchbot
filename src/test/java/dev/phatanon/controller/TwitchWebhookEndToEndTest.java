@@ -3,7 +3,6 @@ package dev.phatanon.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.philippheuer.events4j.core.EventManager;
 import com.github.twitch4j.TwitchClient;
-import dev.phatanon.entity.Song;
 import dev.phatanon.entity.TwitchConfig;
 import dev.phatanon.repository.SongRepository;
 import dev.phatanon.repository.TwitchConfigRepository;
@@ -21,7 +20,6 @@ import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;

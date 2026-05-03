@@ -1,10 +1,14 @@
 package dev.phatanon.dto;
 
 import dev.phatanon.entity.TwitchConfig;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 /**
  * Data Transfer Object for Twitch configuration, masking sensitive data.
  */
+@Data
+@NoArgsConstructor
 public class TwitchConfigDTO {
     private Long id;
     private String clientId;
@@ -21,8 +25,6 @@ public class TwitchConfigDTO {
     
     private String channelName;
     private int songDelaySeconds;
-
-    public TwitchConfigDTO() {}
 
     public static TwitchConfigDTO fromEntity(TwitchConfig entity) {
         TwitchConfigDTO dto = new TwitchConfigDTO();
@@ -43,25 +45,4 @@ public class TwitchConfigDTO {
         if (value == null || value.isBlank()) return null;
         return "********";
     }
-
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-    public String getClientId() { return clientId; }
-    public void setClientId(String clientId) { this.clientId = clientId; }
-    public String getClientSecret() { return clientSecret; }
-    public void setClientSecret(String clientSecret) { this.clientSecret = clientSecret; }
-    public String getAccessToken() { return accessToken; }
-    public void setAccessToken(String accessToken) { this.accessToken = accessToken; }
-    public String getRefreshToken() { return refreshToken; }
-    public void setRefreshToken(String refreshToken) { this.refreshToken = refreshToken; }
-    public String getBotAccessToken() { return botAccessToken; }
-    public void setBotAccessToken(String botAccessToken) { this.botAccessToken = botAccessToken; }
-    public String getBotRefreshToken() { return botRefreshToken; }
-    public void setBotRefreshToken(String botRefreshToken) { this.botRefreshToken = botRefreshToken; }
-    public String getWebhookSecret() { return webhookSecret; }
-    public void setWebhookSecret(String webhookSecret) { this.webhookSecret = webhookSecret; }
-    public String getChannelName() { return channelName; }
-    public void setChannelName(String channelName) { this.channelName = channelName; }
-    public int getSongDelaySeconds() { return songDelaySeconds; }
-    public void setSongDelaySeconds(int songDelaySeconds) { this.songDelaySeconds = songDelaySeconds; }
 }

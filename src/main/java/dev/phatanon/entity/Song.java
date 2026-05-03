@@ -6,6 +6,9 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import org.springframework.data.annotation.CreatedBy;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedBy;
@@ -20,6 +23,9 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "songs")
 @EntityListeners(AuditingEntityListener.class)
+@Getter
+@Setter
+@NoArgsConstructor
 public class Song {
 
     @Id
@@ -82,9 +88,6 @@ public class Song {
     @LastModifiedDate
     private LocalDateTime lastUpdatedTimestamp;
 
-    public Song() {
-    }
-
     public Song(String name, String artist, String url) {
         this.name = name;
         this.artist = artist;
@@ -108,98 +111,6 @@ public class Song {
             this.redeems.add(redeem);
         }
         this.enabled = enabled;
-    }
-
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public String getArtist() {
-        return artist;
-    }
-
-    public void setArtist(String artist) {
-        this.artist = artist;
-    }
-
-    public String getUrl() {
-        return url;
-    }
-
-    public void setUrl(String url) {
-        this.url = url;
-    }
-
-    public String getCoverArt() {
-        return coverArt;
-    }
-
-    public void setCoverArt(String coverArt) {
-        this.coverArt = coverArt;
-    }
-
-    public Integer getDurationSeconds() {
-        return durationSeconds;
-    }
-
-    public void setDurationSeconds(Integer durationSeconds) {
-        this.durationSeconds = durationSeconds;
-    }
-
-    public java.util.Set<Redeem> getRedeems() {
-        return redeems;
-    }
-
-    public void setRedeems(java.util.Set<Redeem> redeems) {
-        this.redeems = redeems;
-    }
-
-    public boolean isEnabled() {
-        return enabled;
-    }
-
-    public void setEnabled(boolean enabled) {
-        this.enabled = enabled;
-    }
-
-    public String getCreatedBy() {
-        return createdBy;
-    }
-
-    public void setCreatedBy(String createdBy) {
-        this.createdBy = createdBy;
-    }
-
-    public LocalDateTime getCreatedTimestamp() {
-        return createdTimestamp;
-    }
-
-    public void setCreatedTimestamp(LocalDateTime createdTimestamp) {
-        this.createdTimestamp = createdTimestamp;
-    }
-
-    public String getLastUpdatedBy() {
-        return lastUpdatedBy;
-    }
-
-    public void setLastUpdatedBy(String lastUpdatedBy) {
-        this.lastUpdatedBy = lastUpdatedBy;
-    }
-
-    public LocalDateTime getLastUpdatedTimestamp() {
-        return lastUpdatedTimestamp;
     }
 
     public void setLastUpdatedTimestamp(LocalDateTime lastUpdatedTimestamp) {

@@ -1,6 +1,7 @@
 package dev.phatanon.controller;
 
 import dev.phatanon.entity.Song;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -11,9 +12,8 @@ import org.openqa.selenium.support.ui.WebDriverWait;
 
 import java.time.Duration;
 
-import static org.junit.jupiter.api.Assertions.*;
-
-import org.junit.jupiter.api.AfterEach;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class OverlayFunctionalityTest extends BaseSeleniumTest {
 

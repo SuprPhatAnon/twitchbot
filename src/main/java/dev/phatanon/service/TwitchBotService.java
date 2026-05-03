@@ -9,7 +9,6 @@ import com.github.twitch4j.TwitchClientBuilder;
 import com.github.twitch4j.eventsub.EventSubSubscription;
 import com.github.twitch4j.eventsub.EventSubSubscriptionStatus;
 import com.github.twitch4j.eventsub.EventSubTransport;
-import com.github.twitch4j.eventsub.subscriptions.SubscriptionType;
 import com.github.twitch4j.eventsub.subscriptions.SubscriptionTypes;
 import com.github.twitch4j.eventsub.events.StreamOnlineEvent;
 import com.github.twitch4j.eventsub.events.StreamOfflineEvent;
