@@ -10,17 +10,19 @@ public class SongStatsDTO {
     private String artist;
     private String coverArt;
     private String url;
+    private Integer durationSeconds;
     private long playCount;
     private String sortName;
     private java.time.LocalDateTime createdTimestamp;
     private java.util.List<dev.phatanon.entity.Redeem> redeems;
 
-    public SongStatsDTO(Long id, String name, String artist, String coverArt, String url, long playCount, String sortName, java.time.LocalDateTime createdTimestamp) {
+    public SongStatsDTO(Long id, String name, String artist, String coverArt, String url, Integer durationSeconds, long playCount, String sortName, java.time.LocalDateTime createdTimestamp) {
         this.id = id;
         this.name = name;
         this.artist = artist;
         this.coverArt = coverArt;
         this.url = url;
+        this.durationSeconds = durationSeconds;
         this.playCount = playCount;
         this.sortName = sortName;
         this.createdTimestamp = createdTimestamp;
@@ -33,6 +35,7 @@ public class SongStatsDTO {
         this.artist = song.getArtist();
         this.coverArt = song.getCoverArt();
         this.url = song.getUrl();
+        this.durationSeconds = song.getDurationSeconds();
         this.playCount = playCount;
         this.sortName = song.getSortName();
         this.createdTimestamp = song.getCreatedTimestamp();
@@ -91,6 +94,14 @@ public class SongStatsDTO {
 
     public void setUrl(String url) {
         this.url = url;
+    }
+
+    public Integer getDurationSeconds() {
+        return durationSeconds;
+    }
+
+    public void setDurationSeconds(Integer durationSeconds) {
+        this.durationSeconds = durationSeconds;
     }
 
     public long getPlayCount() {
