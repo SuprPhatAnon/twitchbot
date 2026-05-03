@@ -115,6 +115,8 @@
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
     <script src="/js/common.js"></script>
     <script>
         let allSongs = [];
@@ -124,6 +126,8 @@
         let isShuffle = false;
         let shuffleQueue = [];
         let currentSort = 'name';
+
+        let stompClient = null;
 
         const audioPlayer = document.getElementById('audio-player');
         const songsContainer = document.getElementById('songs-container');
@@ -158,6 +162,38 @@
                 }
             });
         })();
+
+        function connectWebSocket() {
+            const socket = new SockJS('/ws');
+            stompClient = Stomp.over(socket);
+            stompClient.debug = null;
+            stompClient.connect({}, function (frame) {
+                stompClient.subscribe('/topic/current-song', function (response) {
+                    const body = response.body;
+                    const song = (body && body !== 'null' && body !== '') ? JSON.parse(body) : null;
+                    if (song) {
+                         playSong(song.id);
+                    }
+                });
+                stompClient.subscribe('/topic/play', function (message) {
+                    const song = JSON.parse(message.body);
+                    playSong(song.id);
+                });
+                stompClient.subscribe('/topic/pause-status', function (response) {
+                    const isPaused = JSON.parse(response.body);
+                    if (isPaused) {
+                        audioPlayer.pause();
+                    } else {
+                        if (audioPlayer.src && audioPlayer.src !== window.location.href) {
+                            audioPlayer.play().catch(e => console.warn("Auto-resume failed:", e));
+                        }
+                    }
+                });
+            }, function (error) {
+                console.error('WebSocket Error: ' + error);
+                setTimeout(connectWebSocket, 5000);
+            });
+        }
 
         async function fetchSongs() {
             try {
@@ -319,6 +355,7 @@
         }
 
         fetchSongs();
+        connectWebSocket();
     </script>
 </body>
 </html>

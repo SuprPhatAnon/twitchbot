@@ -56,12 +56,13 @@ public class AdminFunctionalityTest extends BaseSeleniumTest {
 
         // Click "Play Random" button
         WebElement playRandomBtn = driver.findElement(By.xpath("//button[text()='Play Random']"));
-        ((JavascriptExecutor) driver).executeScript("arguments[0].click();", playRandomBtn);
+        playRandomBtn.click();
 
         // Wait for queue to become 1 OR playing to become something else
         wait.until(d -> {
             String q = d.findElement(By.id("stat-queue")).getText();
-            String p = d.findElement(By.id("stat-playing")).getText();
+            String p = (String) ((JavascriptExecutor) d).executeScript("return document.getElementById('stat-playing').textContent;");
+            System.out.println("[DEBUG_LOG] Queue size: " + q + ", Playing: " + p);
             return !q.equals("0") || !p.equals("None");
         });
     }

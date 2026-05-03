@@ -65,9 +65,9 @@ public class SongControllerTest {
 
     @Test
     void shouldGetAllSongs() throws Exception {
-        when(songRepository.findAllByEnabledTrueOrderBySortNameAsc()).thenReturn(java.util.List.of(
-                new Song("Song 1", "Artist 1", "url1"),
-                new Song("Song 2", "Artist 2", "url2")
+        when(songRepository.findAllEnabledWithPlayCount()).thenReturn(java.util.List.of(
+                new SongStatsDTO(new Song("Song 1", "Artist 1", "url1"), 0L),
+                new SongStatsDTO(new Song("Song 2", "Artist 2", "url2"), 0L)
         ));
 
         mockMvc.perform(get("/api/songs"))
@@ -79,9 +79,14 @@ public class SongControllerTest {
 
     @Test
     void shouldGetAllSongsSortedByNewest() throws Exception {
-        when(songRepository.findAllByOrderByCreatedTimestampDesc()).thenReturn(java.util.List.of(
-                new Song("Song 2", "Artist 2", "url2"),
-                new Song("Song 1", "Artist 1", "url1")
+        Song s1 = new Song("Song 1", "Artist 1", "url1");
+        s1.setCreatedTimestamp(LocalDateTime.now().minusDays(1));
+        Song s2 = new Song("Song 2", "Artist 2", "url2");
+        s2.setCreatedTimestamp(LocalDateTime.now());
+
+        when(songRepository.findAllEnabledWithPlayCount()).thenReturn(java.util.List.of(
+                new SongStatsDTO(s1, 0L),
+                new SongStatsDTO(s2, 0L)
         ));
 
         mockMvc.perform(get("/api/songs").param("sort", "newest"))
@@ -203,10 +208,8 @@ public class SongControllerTest {
     void shouldNotReturnDisabledSongsInGetAllSongs() throws Exception {
         Song song1 = new Song("Song 1", "Artist 1", "url1");
         song1.setEnabled(true);
-        Song song2 = new Song("Song 2", "Artist 2", "url2");
-        song2.setEnabled(false);
 
-        when(songRepository.findAllByEnabledTrueOrderBySortNameAsc()).thenReturn(List.of(song1));
+        when(songRepository.findAllEnabledWithPlayCount()).thenReturn(List.of(new SongStatsDTO(song1, 0L)));
 
         mockMvc.perform(get("/api/songs"))
                 .andExpect(status().isOk())
@@ -325,6 +328,35 @@ public class SongControllerTest {
     }
 
     @Test
+    void shouldPausePlayback() throws Exception {
+        mockMvc.perform(post("/api/songs/pause"))
+                .andExpect(status().isOk());
+        verify(twitchBotService).pausePlayback();
+    }
+
+    @Test
+    void shouldResumePlayback() throws Exception {
+        mockMvc.perform(post("/api/songs/resume"))
+                .andExpect(status().isOk());
+        verify(twitchBotService).resumePlayback();
+    }
+
+    @Test
+    void shouldSkipSong() throws Exception {
+        mockMvc.perform(post("/api/songs/skip"))
+                .andExpect(status().isOk());
+        verify(twitchBotService).skipSong();
+    }
+
+    @Test
+    void shouldCheckIfPaused() throws Exception {
+        when(twitchBotService.isPaused()).thenReturn(true);
+        mockMvc.perform(get("/api/songs/paused"))
+                .andExpect(status().isOk())
+                .andExpect(content().string("true"));
+    }
+
+    @Test
     void shouldDeleteSongPermanently() throws Exception {
         Song song = new Song("Delete Me Forever", "Artist", "/testfile.mp3");
         song.setId(1L);
@@ -372,7 +404,7 @@ public class SongControllerTest {
 
     @Test
     void shouldGetStatisticsBySong() throws Exception {
-        SongStatsDTO stat = new SongStatsDTO("Song 1", "Artist 1", 5);
+        SongStatsDTO stat = new SongStatsDTO("Song 1", "Artist 1", null, 5L);
         when(songPlayRepository.getStatsBySong(any(LocalDateTime.class)))
                 .thenReturn(List.of(stat));
 
@@ -387,7 +419,7 @@ public class SongControllerTest {
 
     @Test
     void shouldGetStatisticsByArtist() throws Exception {
-        SongStatsDTO stat = new SongStatsDTO(null, "Artist 1", 10);
+        SongStatsDTO stat = new SongStatsDTO("Artist 1", 10L);
         when(songPlayRepository.getStatsByArtist(any(LocalDateTime.class)))
                 .thenReturn(List.of(stat));
 

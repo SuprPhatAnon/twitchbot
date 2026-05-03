@@ -32,6 +32,8 @@ management:
 server:
   port: 8080
   servlet:
+    session:
+      timeout: 30d
     multipart:
       max-file-size: 20MB
       max-request-size: 20MB

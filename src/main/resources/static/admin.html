@@ -39,12 +39,9 @@
                 <span class="status-label">Queue:</span>
                 <span id="stat-queue" class="status-value">0</span>
             </div>
-            <div class="status-item">
-                <span class="status-label">Playing:</span>
-                <span id="stat-playing" class="status-value text-info">None</span>
-            </div>
             <button class="btn btn-primary btn-sm ms-2" onclick="playRandomSong()" title="Play a random song">Play Random</button>
             <button class="btn btn-danger btn-sm ms-2" onclick="clearQueue()" title="Stop all songs and clear queue">Clear Queue</button>
+            <span id="stat-playing" style="display: none;">None</span>
         </div>
         <div>
             <button id="theme-toggle" class="btn btn-outline-light btn-sm me-2" onclick="toggleTheme()">🌙</button>
@@ -648,6 +645,7 @@
 
         function updateCurrentSongDisplay(song) {
             const el = document.getElementById('stat-playing');
+            if (!el) return;
             if (song && song !== 'null') {
                 el.innerText = `${song.name} - ${song.artist}`;
                 el.classList.add('text-info');

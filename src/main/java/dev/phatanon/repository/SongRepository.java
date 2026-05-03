@@ -1,7 +1,9 @@
 package dev.phatanon.repository;
 
+import dev.phatanon.dto.SongStatsDTO;
 import dev.phatanon.entity.Song;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -11,6 +13,20 @@ import java.util.List;
  */
 @Repository
 public interface SongRepository extends JpaRepository<Song, Long> {
+    /**
+     * Finds all songs with their total play counts.
+     * @return A list of songs with play counts.
+     */
+    @Query("SELECT new dev.phatanon.dto.SongStatsDTO(s, (SELECT COUNT(sp) FROM SongPlay sp WHERE sp.song = s)) FROM Song s")
+    List<SongStatsDTO> findAllWithPlayCount();
+
+    /**
+     * Finds all enabled songs with their total play counts.
+     * @return A list of enabled songs with play counts.
+     */
+    @Query("SELECT new dev.phatanon.dto.SongStatsDTO(s, (SELECT COUNT(sp) FROM SongPlay sp WHERE sp.song = s)) FROM Song s WHERE s.enabled = true")
+    List<SongStatsDTO> findAllEnabledWithPlayCount();
+
     /**
      * Finds all songs sorted by sortName.
      * @return A list of all songs sorted by sortName.

@@ -31,6 +31,7 @@ public class Song {
     private String artist;
     private String url;
     private String coverArt;
+    private Integer durationSeconds;
 
     @jakarta.persistence.PrePersist
     @jakarta.persistence.PreUpdate
@@ -68,7 +69,6 @@ public class Song {
     private java.util.Set<Redeem> redeems = new java.util.HashSet<>();
 
     private boolean enabled = true;
-    private int playCount = 0;
 
     @CreatedBy
     private String createdBy;
@@ -150,6 +150,14 @@ public class Song {
         this.coverArt = coverArt;
     }
 
+    public Integer getDurationSeconds() {
+        return durationSeconds;
+    }
+
+    public void setDurationSeconds(Integer durationSeconds) {
+        this.durationSeconds = durationSeconds;
+    }
+
     public java.util.Set<Redeem> getRedeems() {
         return redeems;
     }
@@ -164,14 +172,6 @@ public class Song {
 
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
-    }
-
-    public int getPlayCount() {
-        return playCount;
-    }
-
-    public void setPlayCount(int playCount) {
-        this.playCount = playCount;
     }
 
     public String getCreatedBy() {
@@ -204,9 +204,5 @@ public class Song {
 
     public void setLastUpdatedTimestamp(LocalDateTime lastUpdatedTimestamp) {
         this.lastUpdatedTimestamp = lastUpdatedTimestamp;
-    }
-
-    public void incrementPlayCount() {
-        this.playCount++;
     }
 }

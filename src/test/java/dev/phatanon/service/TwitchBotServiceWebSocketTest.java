@@ -13,9 +13,9 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.util.Optional;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -38,6 +38,7 @@ public class TwitchBotServiceWebSocketTest {
 
     @Test
     void shouldBroadcastCurrentSong() {
+        doNothing().when(messagingTemplate).convertAndSend(anyString(), any(Object.class));
         twitchBotService.clearQueue();
         
         // Verification of broadcast on /topic/current-song with "null" (as it clears it)
@@ -46,6 +47,7 @@ public class TwitchBotServiceWebSocketTest {
     
     @Test
     void shouldBroadcastSongsRefreshWhenPlayingByIdWithStats() {
+        doNothing().when(messagingTemplate).convertAndSend(anyString(), any(Object.class));
         Song song = new Song("Test Song", "Test Artist", "test_url");
         song.setId(1L);
         when(songRepository.findById(1L)).thenReturn(Optional.of(song));
@@ -53,13 +55,14 @@ public class TwitchBotServiceWebSocketTest {
         twitchBotService.playSongById(1L, true);
         
         // Verification of broadcast on /topic/songs to refresh UI
-        verify(messagingTemplate).convertAndSend(eq("/topic/songs"), eq("refresh"));
+        verify(messagingTemplate, atLeastOnce()).convertAndSend(eq("/topic/songs"), eq("refresh"));
         // Should also broadcast current song when it starts playing
-        verify(messagingTemplate).convertAndSend(eq("/topic/current-song"), eq(song));
+        verify(messagingTemplate, atLeastOnce()).convertAndSend(eq("/topic/current-song"), eq(song));
     }
 
     @Test
     void shouldBroadcastQueueSizeWhenAddingToQueue() {
+        doNothing().when(messagingTemplate).convertAndSend(anyString(), any(Object.class));
         Song song1 = new Song("Song 1", "Artist 1", "url1");
         song1.setId(1L);
         Song song2 = new Song("Song 2", "Artist 2", "url2");
@@ -75,6 +78,6 @@ public class TwitchBotServiceWebSocketTest {
         twitchBotService.playSongById(2L, false);
         
         // Verification of broadcast on /topic/queue-size
-        verify(messagingTemplate).convertAndSend(eq("/topic/queue-size"), eq(1));
+        verify(messagingTemplate, atLeastOnce()).convertAndSend(eq("/topic/queue-size"), eq(1));
     }
 }

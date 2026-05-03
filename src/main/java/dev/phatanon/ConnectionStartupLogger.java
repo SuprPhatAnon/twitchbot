@@ -66,7 +66,7 @@ public class ConnectionStartupLogger implements CommandLineRunner {
 
         checkDatabaseConnection();
         checkTwitchConnection();
-        backfillCoverArt();
+        backfillMetadata();
         initializeAdminUser();
 
         logger.info("Startup connection checks completed.");
@@ -81,27 +81,27 @@ public class ConnectionStartupLogger implements CommandLineRunner {
         }
     }
 
-    private void backfillCoverArt() {
+    private void backfillMetadata() {
         try {
-            logger.info("Checking for songs without cover art to backfill...");
+            logger.info("Checking for songs with missing metadata (cover art or duration) to backfill...");
             List<dev.phatanon.entity.Song> songs = songRepository.findAll();
             int backfilledCount = 0;
             for (dev.phatanon.entity.Song song : songs) {
-                if (song.getCoverArt() == null) {
+                if (song.getCoverArt() == null || song.getDurationSeconds() == null) {
                     songService.updateMetadata(song);
-                    if (song.getCoverArt() != null) {
+                    if (song.getCoverArt() != null || song.getDurationSeconds() != null) {
                         songRepository.save(song);
                         backfilledCount++;
                     }
                 }
             }
             if (backfilledCount > 0) {
-                logger.info("✅ Backfilled cover art for {} songs.", backfilledCount);
+                logger.info("✅ Backfilled metadata for {} songs.", backfilledCount);
             } else {
-                logger.info("No cover art backfill needed.");
+                logger.info("No metadata backfill needed.");
             }
         } catch (Exception e) {
-            logger.error("❌ Error backfilling cover art: {}", e.getMessage());
+            logger.error("❌ Error backfilling metadata: {}", e.getMessage());
         }
     }
 

@@ -52,3 +52,6 @@ build/
 
 /current_changes.diff
 /test_output.txt
+/test_run.log
+/full_test_output.txt
+/full_test_run.log

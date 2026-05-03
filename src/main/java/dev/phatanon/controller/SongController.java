@@ -59,24 +59,34 @@ public class SongController {
      */
     @GetMapping
     @Operation(summary = "Get all songs")
-    public List<Song> getAllSongs(@RequestParam(required = false, defaultValue = "name") String sort,
+    public List<SongStatsDTO> getAllSongs(@RequestParam(required = false, defaultValue = "name") String sort,
                                   @RequestParam(required = false, defaultValue = "false") boolean includeDisabled) {
-        if ("newest".equalsIgnoreCase(sort)) {
-            if (includeDisabled) {
-                return songRepository.findAllByOrderByCreatedTimestampDesc();
-            }
-            // There is no findAllByEnabledTrueOrderByCreatedTimestampDesc in repository yet, but we can filter or add it.
-            // Let's stick to what we have or add it to repository if needed.
-            // For now, filtering is fine as the number of songs is likely small.
-            return songRepository.findAllByOrderByCreatedTimestampDesc().stream()
-                    .filter(Song::isEnabled)
-                    .toList();
-        }
-        
+        List<SongStatsDTO> songs;
         if (includeDisabled) {
-            return songRepository.findAllByOrderBySortNameAsc();
+            songs = new java.util.ArrayList<>(songRepository.findAllWithPlayCount());
+        } else {
+            songs = new java.util.ArrayList<>(songRepository.findAllEnabledWithPlayCount());
         }
-        return songRepository.findAllByEnabledTrueOrderBySortNameAsc();
+
+        if ("newest".equalsIgnoreCase(sort)) {
+            songs.sort((a, b) -> {
+                LocalDateTime t1 = a.getCreatedTimestamp();
+                LocalDateTime t2 = b.getCreatedTimestamp();
+                if (t1 == null) return (t2 == null) ? 0 : 1;
+                if (t2 == null) return -1;
+                return t2.compareTo(t1); // Descending
+            });
+        } else {
+            // Default sort by sortName
+            songs.sort((a, b) -> {
+                String sn1 = a.getSortName();
+                String sn2 = b.getSortName();
+                if (sn1 == null) return (sn2 == null) ? 0 : 1;
+                if (sn2 == null) return -1;
+                return sn1.compareToIgnoreCase(sn2);
+            });
+        }
+        return songs;
     }
 
     /**
@@ -86,11 +96,14 @@ public class SongController {
      */
     @GetMapping("/{id}")
     @Operation(summary = "Get a song by ID")
-    public ResponseEntity<Song> getSongById(@PathVariable Long id,
+    public ResponseEntity<SongStatsDTO> getSongById(@PathVariable Long id,
                                             @RequestParam(required = false, defaultValue = "false") boolean includeDisabled) {
         return songRepository.findById(id)
                 .filter(song -> includeDisabled || song.isEnabled())
-                .map(ResponseEntity::ok)
+                .map(song -> {
+                    long playCount = songPlayRepository.countBySong(song);
+                    return ResponseEntity.ok(new SongStatsDTO(song, playCount));
+                })
                 .orElse(ResponseEntity.notFound().build());
     }
 
@@ -273,6 +286,36 @@ public class SongController {
             return ResponseEntity.noContent().build();
         }
         return ResponseEntity.ok(song);
+    }
+
+    @PostMapping("/pause")
+    @PreAuthorize("hasAnyRole('STREAMER', 'ADMIN')")
+    @Operation(summary = "Pause playback")
+    public ResponseEntity<Void> pausePlayback() {
+        twitchBotService.pausePlayback();
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/resume")
+    @PreAuthorize("hasAnyRole('STREAMER', 'ADMIN')")
+    @Operation(summary = "Resume playback")
+    public ResponseEntity<Void> resumePlayback() {
+        twitchBotService.resumePlayback();
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/skip")
+    @PreAuthorize("hasAnyRole('STREAMER', 'ADMIN')")
+    @Operation(summary = "Skip current song")
+    public ResponseEntity<Void> skipSong() {
+        twitchBotService.skipSong();
+        return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/paused")
+    @Operation(summary = "Check if playback is paused")
+    public boolean isPaused() {
+        return twitchBotService.isPaused();
     }
 
     /**

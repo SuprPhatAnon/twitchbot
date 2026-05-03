@@ -34,6 +34,7 @@ import dev.phatanon.repository.TwitchConfigRepository;
 import dev.phatanon.model.ChatMessageContext;
 import dev.phatanon.service.chat.ChatMessageService;
 import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -104,6 +105,12 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
     private String currentWebhookSecret;
     private int currentSongDelaySeconds;
 
+    private OAuth2Credential streamerCredential;
+    private OAuth2Credential botCredential;
+    private TwitchIdentityProvider identityProvider;
+    private LocalDateTime streamerTokenRefreshedAt;
+    private LocalDateTime botTokenRefreshedAt;
+
     private final java.util.Queue<QueuedSong> songQueue = new java.util.concurrent.LinkedBlockingQueue<>();
     private boolean isSongPlaying = false;
     private Song currentlyPlayingSong = null;
@@ -153,6 +160,11 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
     private final ScheduledExecutorService scheduler;
     private final ChatMessageService chatMessageService;
     private ScheduledFuture<?> tokenRefreshTask;
+    private ScheduledFuture<?> songEndTask;
+    private LocalDateTime songStartTime;
+    private long remainingSeconds;
+
+    private final AtomicBoolean isPaused = new AtomicBoolean(false);
 
     public TwitchBotService(SimpMessagingTemplate messagingTemplate, SongRepository songRepository, SongPlayRepository songPlayRepository, TwitchConfigRepository twitchConfigRepository, ScheduledExecutorService scheduler, ChatMessageService chatMessageService) {
         this.messagingTemplate = messagingTemplate;
@@ -278,12 +290,32 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
         init();
     }
 
+    @PreDestroy
+    public void cleanup() {
+        log.info("Cleaning up TwitchBotService...");
+        if (tokenRefreshTask != null) {
+            tokenRefreshTask.cancel(true);
+            tokenRefreshTask = null;
+        }
+        if (twitchClient != null) {
+            log.info("Closing streamer TwitchClient...");
+            twitchClient.close();
+            twitchClient = null;
+        }
+        if (botTwitchClient != null) {
+            log.info("Closing bot TwitchClient...");
+            botTwitchClient.close();
+            botTwitchClient = null;
+        }
+    }
+
     /**
      * Initializes the Twitch client and registers event listeners.
      * This method is called after dependency injection is complete.
      */
     @PostConstruct
     public void init() {
+        broadcastPauseStatus();
         try {
             log.info("Checking for existing Twitch configuration...");
             List<TwitchConfig> configs = twitchConfigRepository.findAll();
@@ -314,10 +346,10 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
             log.info("Has Bot Access Token: {}", config.getBotAccessToken() != null && !config.getBotAccessToken().isBlank());
             
             this.credentialManager = CredentialManagerBuilder.builder().build();
-            TwitchIdentityProvider identityProvider = new TwitchIdentityProvider(config.getClientId(), config.getClientSecret(), null);
+            this.identityProvider = new TwitchIdentityProvider(config.getClientId(), config.getClientSecret(), null);
             credentialManager.registerIdentityProvider(identityProvider);
             
-            OAuth2Credential streamerCredential = new OAuth2Credential(
+            this.streamerCredential = new OAuth2Credential(
                     TwitchIdentityProvider.PROVIDER_NAME,
                     config.getAccessToken(),
                     config.getRefreshToken(),
@@ -326,6 +358,7 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
                     config.getExpiresIn(),
                     null
             );
+            this.streamerTokenRefreshedAt = LocalDateTime.now();
             log.info("Streamer credential scopes: {}", streamerCredential.getScopes());
             
             // Force refresh streamer token on startup
@@ -340,15 +373,16 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
                         config.setExpiresIn(newCredential.getExpiresIn());
                         twitchConfigRepository.save(config);
                         currentAccessToken = config.getAccessToken();
+                        this.streamerCredential = newCredential;
+                        this.streamerTokenRefreshedAt = LocalDateTime.now();
                     }
                 });
             } catch (Exception e) {
                 log.warn("Failed to refresh streamer token on startup: {}", e.getMessage());
             }
 
-            OAuth2Credential botCredential;
             if (config.getBotAccessToken() != null && !config.getBotAccessToken().isBlank()) {
-                botCredential = new OAuth2Credential(
+                this.botCredential = new OAuth2Credential(
                         TwitchIdentityProvider.PROVIDER_NAME,
                         config.getBotAccessToken(),
                         config.getBotRefreshToken(),
@@ -357,6 +391,7 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
                         config.getBotExpiresIn(),
                         null
                 );
+                this.botTokenRefreshedAt = LocalDateTime.now();
                 log.info("Bot credential scopes: {}", botCredential.getScopes());
 
                 // Force refresh bot token on startup
@@ -371,13 +406,16 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
                             config.setBotExpiresIn(newCredential.getExpiresIn());
                             twitchConfigRepository.save(config);
                             currentBotAccessToken = config.getBotAccessToken();
+                            this.botCredential = newCredential;
+                            this.botTokenRefreshedAt = LocalDateTime.now();
                         }
                     });
                 } catch (Exception e) {
                     log.warn("Failed to refresh bot token on startup: {}", e.getMessage());
                 }
             } else {
-                botCredential = streamerCredential;
+                this.botCredential = streamerCredential;
+                this.botTokenRefreshedAt = streamerTokenRefreshedAt;
             }
             
             log.info("Building TwitchClients...");
@@ -453,13 +491,18 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
                         boolean updated = false;
 
                         // Check streamer token
-                        if (streamerCredential.getExpiresIn() != null && streamerCredential.getExpiresIn() < 600) {
-                            log.info("[TOKEN] Streamer token expiring soon ({}s). Refreshing...", streamerCredential.getExpiresIn());
+                        long streamerElapsed = java.time.Duration.between(streamerTokenRefreshedAt, LocalDateTime.now()).toSeconds();
+                        long streamerRemaining = (streamerCredential.getExpiresIn() != null ? streamerCredential.getExpiresIn() : 0) - streamerElapsed;
+
+                        if (streamerRemaining < 600) {
+                            log.info("[TOKEN] Streamer token expiring soon ({}s remaining). Refreshing...", streamerRemaining);
                             identityProvider.refreshCredential(streamerCredential).ifPresent(newCredential -> {
                                 currentConfig.setAccessToken(newCredential.getAccessToken());
                                 currentConfig.setRefreshToken(newCredential.getRefreshToken());
                                 currentConfig.setExpiresIn(newCredential.getExpiresIn());
                                 currentAccessToken = currentConfig.getAccessToken();
+                                this.streamerCredential = newCredential;
+                                this.streamerTokenRefreshedAt = LocalDateTime.now();
                             });
                             updated = true;
                         } else if (streamerCredential.getAccessToken() != null && !streamerCredential.getAccessToken().equals(currentConfig.getAccessToken())) {
@@ -468,18 +511,24 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
                             currentConfig.setRefreshToken(streamerCredential.getRefreshToken());
                             currentConfig.setExpiresIn(streamerCredential.getExpiresIn());
                             currentAccessToken = currentConfig.getAccessToken();
+                            this.streamerTokenRefreshedAt = LocalDateTime.now();
                             updated = true;
                         }
 
                         // Check bot token
                         if (botCredential != streamerCredential) {
-                            if (botCredential.getExpiresIn() != null && botCredential.getExpiresIn() < 600) {
-                                log.info("[TOKEN] Bot token expiring soon ({}s). Refreshing...", botCredential.getExpiresIn());
+                            long botElapsed = java.time.Duration.between(botTokenRefreshedAt, LocalDateTime.now()).toSeconds();
+                            long botRemaining = (botCredential.getExpiresIn() != null ? botCredential.getExpiresIn() : 0) - botElapsed;
+
+                            if (botRemaining < 600) {
+                                log.info("[TOKEN] Bot token expiring soon ({}s remaining). Refreshing...", botRemaining);
                                 identityProvider.refreshCredential(botCredential).ifPresent(newCredential -> {
                                     currentConfig.setBotAccessToken(newCredential.getAccessToken());
                                     currentConfig.setBotRefreshToken(newCredential.getRefreshToken());
                                     currentConfig.setBotExpiresIn(newCredential.getExpiresIn());
                                     currentBotAccessToken = currentConfig.getBotAccessToken();
+                                    this.botCredential = newCredential;
+                                    this.botTokenRefreshedAt = LocalDateTime.now();
                                 });
                                 updated = true;
                             } else if (botCredential.getAccessToken() != null && !botCredential.getAccessToken().equals(currentConfig.getBotAccessToken())) {
@@ -488,6 +537,7 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
                                 currentConfig.setBotRefreshToken(botCredential.getRefreshToken());
                                 currentConfig.setBotExpiresIn(botCredential.getExpiresIn());
                                 currentBotAccessToken = currentConfig.getBotAccessToken();
+                                this.botTokenRefreshedAt = LocalDateTime.now();
                                 updated = true;
                             }
                         }
@@ -849,12 +899,12 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
         Song song = songs.get(random.nextInt(songs.size()));
         log.info("Queueing song: {} by {} for redeem: {}", song.getName(), song.getArtist(), redeemName);
 
+        songQueue.add(new QueuedSong(song, redeemName, true));
+        log.info("Song added to queue. Queue size: {}", songQueue.size());
+        broadcastQueueSize();
+
         if (!isSongPlaying) {
-            playSong(song, redeemName, true);
-        } else {
-            songQueue.add(new QueuedSong(song, redeemName, true));
-            log.info("Song added to queue. Queue size: {}", songQueue.size());
-            broadcastQueueSize();
+            playNextFromQueue();
         }
     }
 
@@ -864,6 +914,10 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
      */
     public synchronized void clearQueue() {
         log.info("Clearing song queue and stopping current playback.");
+        if (songEndTask != null) {
+            songEndTask.cancel(false);
+            songEndTask = null;
+        }
         songQueue.clear();
         isSongPlaying = false;
         currentlyPlayingSong = null;
@@ -872,19 +926,52 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
     }
 
     private void playSong(Song song, String source, boolean incrementStats) {
+        if (songEndTask != null) {
+            songEndTask.cancel(false);
+            songEndTask = null;
+        }
+
         isSongPlaying = true;
         currentlyPlayingSong = song;
         log.info("Playing song: {} by {} (source: {}, incrementStats: {})", song.getName(), song.getArtist(), source, incrementStats);
 
         if (incrementStats) {
-            song.incrementPlayCount();
-            songRepository.save(song);
             songPlayRepository.save(new SongPlay(song, LocalDateTime.now(), source));
             broadcastSongsRefresh();
         }
 
         messagingTemplate.convertAndSend("/topic/play", song);
         broadcastCurrentSong();
+
+        // Send chat message
+        sendChatMessage(String.format("Now Playing - %s - %s", song.getArtist(), song.getName()));
+
+        // Schedule song end based on duration
+        int duration = (song.getDurationSeconds() != null && song.getDurationSeconds() > 0) ? song.getDurationSeconds() : 180; // Default 3 mins if missing
+        log.info("Scheduling song end in {} seconds", duration);
+        songStartTime = LocalDateTime.now();
+        remainingSeconds = duration;
+        songEndTask = scheduler.schedule(this::handleSongFinished, duration, TimeUnit.SECONDS);
+    }
+
+    /**
+     * Broadcasts the current pause status to all connected clients.
+     */
+    public void broadcastPauseStatus() {
+        messagingTemplate.convertAndSend("/topic/pause-status", isPaused.get());
+    }
+
+    private synchronized void playNextFromQueue() {
+        if (!songQueue.isEmpty()) {
+            QueuedSong next = songQueue.poll();
+            log.info("Queue polling successful. Next song: {} by {}", next.song().getName(), next.song().getArtist());
+            playSong(next.song(), next.source(), next.incrementStats());
+            broadcastQueueSize();
+        } else {
+            log.info("Queue is empty, no more songs to play.");
+            currentlyPlayingSong = null;
+            broadcastCurrentSong();
+        }
     }
 
     /**
@@ -892,6 +979,11 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
      * Triggers the playback of the next song in the queue after a configured delay.
      */
     public synchronized void handleSongFinished() {
+        if (songEndTask != null) {
+            songEndTask.cancel(false);
+            songEndTask = null;
+        }
+
         if (!isSongPlaying && currentlyPlayingSong == null && songQueue.isEmpty()) {
             log.info("handleSongFinished called but nothing is playing and queue is empty. Ignoring.");
             return;
@@ -904,20 +996,15 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
 
         scheduler.schedule(() -> {
             synchronized (this) {
+                if (isPaused.get()) {
+                    log.info("Playback is paused. Waiting for resume.");
+                    return;
+                }
                 if (isSongPlaying) {
                     log.info("Another song started during delay. Skipping queue poll.");
                     return;
                 }
-                if (!songQueue.isEmpty()) {
-                    QueuedSong next = songQueue.poll();
-                    log.info("Queue polling successful. Next song: {} by {}", next.song().getName(), next.song().getArtist());
-                    playSong(next.song(), next.source(), next.incrementStats());
-                    broadcastQueueSize();
-                } else {
-                    log.info("Queue is empty, no more songs to play.");
-                    currentlyPlayingSong = null;
-                    broadcastCurrentSong();
-                }
+                playNextFromQueue();
             }
         }, currentSongDelaySeconds, java.util.concurrent.TimeUnit.SECONDS);
     }
@@ -941,12 +1028,13 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
                 return;
             }
             log.info("Manually queueing song: {} by {} (incrementStats: {})", song.getName(), song.getArtist(), incrementStats);
+
+            songQueue.add(new QueuedSong(song, "manual", incrementStats));
+            log.info("Song added to queue. Queue size: {}", songQueue.size());
+            broadcastQueueSize();
+
             if (!isSongPlaying) {
-                playSong(song, "manual", incrementStats);
-            } else {
-                songQueue.add(new QueuedSong(song, "manual", incrementStats));
-                log.info("Song added to queue. Queue size: {}", songQueue.size());
-                broadcastQueueSize();
+                playNextFromQueue();
             }
         });
     }
@@ -958,6 +1046,53 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
      */
     public synchronized void playSongById(Long id) {
         playSongById(id, false);
+    }
+
+    public synchronized void pausePlayback() {
+        log.info("Pausing playback.");
+        isPaused.set(true);
+        if (songEndTask != null) {
+            songEndTask.cancel(false);
+            songEndTask = null;
+            if (songStartTime != null) {
+                long elapsedSeconds = java.time.Duration.between(songStartTime, LocalDateTime.now()).getSeconds();
+                remainingSeconds = Math.max(0, remainingSeconds - elapsedSeconds);
+                log.info("Song paused. Remaining time: {} seconds", remainingSeconds);
+            }
+        }
+        broadcastPauseStatus();
+    }
+
+    public synchronized void resumePlayback() {
+        log.info("Resuming playback.");
+        isPaused.set(false);
+        broadcastPauseStatus();
+        if (isSongPlaying && remainingSeconds > 0) {
+            log.info("Rescheduling song end in {} seconds", remainingSeconds);
+            songStartTime = LocalDateTime.now();
+            songEndTask = scheduler.schedule(this::handleSongFinished, remainingSeconds, TimeUnit.SECONDS);
+        } else if (!isSongPlaying) {
+            handleSongFinished();
+        }
+    }
+
+    /**
+     * Skips the currently playing song and starts the next one in the queue.
+     */
+    public synchronized void skipSong() {
+        log.info("Skip song requested.");
+        if (songEndTask != null) {
+            songEndTask.cancel(false);
+            songEndTask = null;
+        }
+
+        // Immediately trigger the next song logic
+        isSongPlaying = false;
+        playNextFromQueue();
+    }
+
+    public boolean isPaused() {
+        return isPaused.get();
     }
 
     /**
@@ -1065,12 +1200,12 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
         Song song = songs.get(random.nextInt(songs.size()));
         log.info("Queueing song: {} by {}", song.getName(), song.getArtist());
 
+        songQueue.add(new QueuedSong(song, "random", true));
+        log.info("Song added to queue. Queue size: {}", songQueue.size());
+        broadcastQueueSize();
+
         if (!isSongPlaying) {
-            playSong(song, "random", true);
-        } else {
-            songQueue.add(new QueuedSong(song, "random", true));
-            log.info("Song added to queue. Queue size: {}", songQueue.size());
-            broadcastQueueSize();
+            playNextFromQueue();
         }
     }
 }

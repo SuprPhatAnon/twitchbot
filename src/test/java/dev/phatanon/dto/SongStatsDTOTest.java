@@ -26,7 +26,7 @@ class SongStatsDTOTest {
 
     @Test
     void testConstructorWithoutCoverArt() {
-        SongStatsDTO dto = new SongStatsDTO("Name", "Artist", 10L);
+        SongStatsDTO dto = new SongStatsDTO("Name", "Artist", null, 10L);
         assertEquals("Name", dto.getName());
         assertEquals("Artist", dto.getArtist());
         assertNull(dto.getCoverArt());

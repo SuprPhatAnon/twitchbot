@@ -50,6 +50,8 @@ public class SongService {
 
             if (file != null && file.exists() && file.isFile()) {
                 Mp3File mp3file = new Mp3File(file);
+                song.setDurationSeconds((int) mp3file.getLengthInSeconds());
+
                 if (mp3file.hasId3v2Tag()) {
                     ID3v2 id3v2Tag = mp3file.getId3v2Tag();
 

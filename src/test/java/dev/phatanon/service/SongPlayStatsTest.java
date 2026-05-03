@@ -50,12 +50,10 @@ public class SongPlayStatsTest {
 
         // Start playing song 1 (will increment stats as it starts playing immediately)
         twitchBotService.playSongById(1L, true);
-        verify(songRepository, times(1)).save(song1);
         verify(songPlayRepository, times(1)).save(any(SongPlay.class));
 
         // Queue song 2 (should NOT increment stats yet)
         twitchBotService.playSongById(2L, true);
-        verify(songRepository, never()).save(song2);
         verify(songPlayRepository, times(1)).save(any(SongPlay.class)); // Still only the first one
     }
 
@@ -74,7 +72,6 @@ public class SongPlayStatsTest {
         
         // Queue song 2
         twitchBotService.playSongById(2L, true);
-        verify(songRepository, never()).save(song2);
 
         // Finish song 1, which should eventually trigger song 2
         twitchBotService.handleSongFinished();
@@ -85,7 +82,6 @@ public class SongPlayStatsTest {
         
         Thread.sleep(6000); // Wait for more than 5 seconds
 
-        verify(songRepository, times(1)).save(song2);
         verify(songPlayRepository, times(2)).save(any(SongPlay.class));
     }
 }

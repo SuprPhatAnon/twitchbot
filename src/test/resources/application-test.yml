@@ -1,4 +1,7 @@
 spring:
+  flyway:
+    placeholders:
+      twitch.redirect-uri-host: localhost
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:h2:mem:testdb;MODE=MariaDB;DB_CLOSE_DELAY=-1}
     driver-class-name: ${SPRING_DATASOURCE_DRIVER:org.h2.Driver}
@@ -20,3 +23,4 @@ twitch:
   redeem-title: Play Random Song
   api-key: test-api-key
   song-delay-seconds: 5
+  redirect-uri-host: localhost

@@ -33,7 +33,6 @@ public class StreamerFunctionalityTest extends BaseSeleniumTest {
         // Create a test song
         Song song = new Song("Streamer Song", "Streamer Artist", "streamer.mp3");
         song.setEnabled(true);
-        song.setPlayCount(10);
         songRepository.save(song);
     }
 
@@ -114,7 +113,7 @@ public class StreamerFunctionalityTest extends BaseSeleniumTest {
         // Wait for queue to become 1 OR playing to become something else
         wait.until(d -> {
             String q = d.findElement(By.id("stat-queue")).getText();
-            String p = d.findElement(By.id("stat-playing")).getText();
+            String p = (String) ((JavascriptExecutor) d).executeScript("return document.getElementById('stat-playing').textContent;");
             return !q.equals("0") || !p.equals("None");
         });
     }
@@ -134,7 +133,7 @@ public class StreamerFunctionalityTest extends BaseSeleniumTest {
         
         // Check play count badge
         WebElement playCountBadge = driver.findElement(By.cssSelector("#songs-table-body .badge"));
-        assertEquals("10", playCountBadge.getText());
+        assertEquals("0", playCountBadge.getText());
     }
 
     @Test
@@ -178,21 +177,22 @@ public class StreamerFunctionalityTest extends BaseSeleniumTest {
     }
 
     @Test
-    @DisplayName("Streamer page should update current song via WebSocket")
+    @DisplayName("Streamer page should update player UI via WebSocket")
     void testCurrentSongUpdate() {
         loginAsStreamer();
         waitForWebSocket();
         
-        WebElement playingStat = driver.findElement(By.id("stat-playing"));
-        assertEquals("None", playingStat.getText());
+        WebElement noSong = driver.findElement(By.id("no-song-selected"));
+        assertTrue(noSong.isDisplayed());
 
         // Start playing a song
         Song song = songRepository.findAll().get(0);
         twitchBotService.playSongById(song.getId());
 
         new WebDriverWait(driver, Duration.ofSeconds(10)).until(
-            ExpectedConditions.textToBePresentInElementLocated(By.id("stat-playing"), "Streamer Song - Streamer Artist")
+            ExpectedConditions.visibilityOfElementLocated(By.id("active-player-ui"))
         );
+        assertEquals(song.getName(), driver.findElement(By.id("display-song-name")).getText());
     }
 
     @Test

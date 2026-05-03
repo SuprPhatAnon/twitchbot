@@ -14,6 +14,13 @@ import java.util.List;
 @Repository
 public interface SongPlayRepository extends JpaRepository<SongPlay, Long> {
     /**
+     * Counts play instances for a specific song.
+     * @param song The song to count plays for.
+     * @return The number of plays.
+     */
+    long countBySong(dev.phatanon.entity.Song song);
+
+    /**
      * Finds the most recent song plays.
      * @param pageable The pagination information.
      * @return A list of the most recent {@link SongPlay} entities.
@@ -37,7 +44,7 @@ public interface SongPlayRepository extends JpaRepository<SongPlay, Long> {
      * @param since The start date/time for the statistics.
      * @return A list of {@link SongStatsDTO} with artist names and their play counts.
      */
-    @Query("SELECT new dev.phatanon.dto.SongStatsDTO(null, s.artist, COUNT(sp)) " +
+    @Query("SELECT new dev.phatanon.dto.SongStatsDTO(s.artist, COUNT(sp)) " +
            "FROM SongPlay sp JOIN sp.song s " +
            "WHERE sp.timestamp >= :since " +
            "GROUP BY s.artist " +

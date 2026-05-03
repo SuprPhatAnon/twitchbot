@@ -100,6 +100,7 @@ Agents should familiarize themselves with the project structure and subsystems b
 - **Maintain OpenAPI documentation**: Ensure annotations in controllers are accurate.
 - **Maintain Security Directives**: Update CSP and other headers in `SecurityConfig.java` when needed.
 - **State Isolation in Tests**: When adding JPA entities, you MUST update `BaseSeleniumTest.resetDatabase()` to include the new repository and ensure proper deletion order.
+- **Verification Tests**: When implementing a new feature or fixing a bug, always include a verification test in the appropriate test file. DO NOT delete these tests after the task is completed; they should remain in the codebase to prevent regressions.
 
 ## Environment Setup for Agents
 

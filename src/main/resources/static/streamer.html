@@ -30,6 +30,39 @@
         .player-art { width: 100%; max-width: 250px; aspect-ratio: 1; object-fit: cover; border-radius: 8px; margin-bottom: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
         .no-art-placeholder { width: 100%; max-width: 250px; aspect-ratio: 1; background: #eee; border-radius: 8px; margin-bottom: 15px; display: flex; align-items: center; justify-content: center; font-size: 2.5rem; color: #ccc; }
         [data-bs-theme="dark"] .no-art-placeholder { background: #343a40; color: #495057; }
+        
+        /* Expand songs database to fill vertical space */
+        .left-panel {
+            display: flex;
+            flex-direction: column;
+        }
+        .left-panel .card {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            margin-bottom: 0;
+        }
+        .left-panel .card-body {
+            flex: 1;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        .left-panel .table-responsive {
+            flex: 1;
+            max-height: none;
+        }
+        .table thead th {
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            background-color: var(--bs-light);
+        }
+        [data-bs-theme="dark"] .table thead th {
+            background-color: #2a2a2a;
+            color: #fff;
+        }
     </style>
 </head>
 <body>
@@ -49,16 +82,14 @@
                 <span id="stat-queue" class="status-value">0</span>
                 <span id="stat-queue-count" style="display: none;">0</span>
             </div>
-            <div class="status-item">
-                <span class="status-label">Playing:</span>
-                <span id="stat-playing" class="status-value text-info">None</span>
-                <span id="stat-play-status" style="display: none;">Idle</span>
-            </div>
             <div class="status-item ms-3 d-flex align-items-center">
                 <span class="status-label me-2">Volume:</span>
                 <input type="range" class="form-range" id="player-volume" min="0" max="1" step="0.01" value="0.5" style="width: 100px;">
             </div>
             <button class="btn btn-primary btn-sm ms-2" onclick="playRandomSong()" title="Play a random song">Play Random</button>
+            <span id="stat-playing" style="display: none;">None</span>
+            <span id="stat-play-status" style="display: none;">Idle</span>
+            <span id="stat-pause-status" style="display: none;">PAUSED</span>
         </div>
         <audio id="audio-player"></audio>
         <div>
@@ -77,10 +108,12 @@
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <span>Songs Database</span>
-                    <div class="d-flex gap-2">
+                    <div class="d-flex gap-2 align-items-center">
+                        <input type="text" id="song-search" class="form-control form-control-sm" placeholder="Search songs..." style="width: 200px;" oninput="renderSongsTable()">
                         <select id="song-sort" class="form-select form-select-sm" style="width: auto;" onchange="renderSongsTable()">
                             <option value="name">Sort by Name</option>
                             <option value="date" selected>Sort by Date (Newest)</option>
+                            <option value="plays">Sort by Plays</option>
                         </select>
                         <button class="btn btn-sm btn-outline-secondary" onclick="fetchSongs()">Refresh</button>
                     </div>
@@ -88,12 +121,14 @@
                 <div class="card-body p-0">
                     <div class="table-responsive">
                         <table class="table table-hover mb-0">
-                            <thead class="table-light">
+                            <thead>
                                 <tr>
                                     <th>ID</th>
                                     <th>Art</th>
                                     <th>Name</th>
                                     <th>Artist</th>
+                                    <th>Duration</th>
+                                    <th>Added</th>
                                     <th>Plays</th>
                                     <th>Redeems</th>
                                     <th>Actions</th>
@@ -123,6 +158,12 @@
                     <h5 id="display-song-artist" class="text-muted mb-3"></h5>
                     
                     <div class="d-flex justify-content-center gap-3">
+                        <button id="pause-btn" class="btn btn-outline-warning" onclick="pausePlayback()">
+                            Pause ⏸️
+                        </button>
+                        <button id="resume-btn" class="btn btn-outline-success" onclick="resumePlayback()" style="display: none;">
+                            Resume ▶️
+                        </button>
                         <button class="btn btn-outline-primary" onclick="playNextSong()">
                             Skip Song ⏭️
                         </button>
@@ -189,6 +230,9 @@
                 });
                 stompClient.subscribe('/topic/songs', function (response) {
                     fetchSongs();
+                });
+                stompClient.subscribe('/topic/pause-status', function (response) {
+                    updatePauseStatusDisplay(JSON.parse(response.body));
                 });
             }, function (error) {
                 console.error('WebSocket Error: ' + error);
@@ -297,11 +341,15 @@
             const displaySongArtist = document.getElementById('display-song-artist');
 
             if (song) {
-                const text = `${song.name} - ${song.artist}`;
-                el.innerText = text;
-                el.classList.add('text-info');
-                statusEl.innerText = "Playing";
-                statusEl.className = "stat-count text-info";
+                if (el) {
+                    const text = `${song.name} - ${song.artist}`;
+                    el.innerText = text;
+                    el.classList.add('text-info');
+                }
+                if (statusEl) {
+                    statusEl.innerText = "Playing";
+                    statusEl.className = "stat-count text-info";
+                }
 
                 // Update right panel player UI
                 noSongSelected.style.display = 'none';
@@ -314,14 +362,38 @@
                 displaySongName.textContent = song.name;
                 displaySongArtist.textContent = song.artist;
             } else {
-                el.innerText = 'None';
-                el.classList.remove('text-info');
-                statusEl.innerText = "Idle";
-                statusEl.className = "stat-count";
+                if (el) {
+                    el.innerText = 'None';
+                    el.classList.remove('text-info');
+                }
+                if (statusEl) {
+                    statusEl.innerText = "Idle";
+                    statusEl.className = "stat-count";
+                }
 
                 // Reset right panel player UI
                 noSongSelected.style.display = 'block';
                 activePlayerUi.style.display = 'none';
+            }
+        }
+
+        function updatePauseStatusDisplay(isPaused) {
+            const pauseBadge = document.getElementById('stat-pause-status');
+            const pauseBtn = document.getElementById('pause-btn');
+            const resumeBtn = document.getElementById('resume-btn');
+
+            if (isPaused) {
+                if (pauseBadge) pauseBadge.style.display = 'inline-block';
+                if (pauseBtn) pauseBtn.style.display = 'none';
+                if (resumeBtn) resumeBtn.style.display = 'inline-block';
+                audioPlayer.pause();
+            } else {
+                if (pauseBadge) pauseBadge.style.display = 'none';
+                if (pauseBtn) pauseBtn.style.display = 'inline-block';
+                if (resumeBtn) resumeBtn.style.display = 'none';
+                if (audioPlayer.src && audioPlayer.src !== window.location.href) {
+                     audioPlayer.play().catch(e => console.warn("Auto-resume failed:", e));
+                }
             }
         }
 
@@ -349,6 +421,10 @@
                 if (res.status === 200) updateCurrentSongDisplay(await res.json());
                 else updateCurrentSongDisplay(null);
 
+                // Pause status
+                res = await fetch('/api/songs/paused', { headers });
+                if (res.ok) updatePauseStatusDisplay(await res.json());
+
                 // Initial songs and stats
                 fetchSongs();
             } catch (e) { console.error('Error refreshing status:', e); }
@@ -372,8 +448,15 @@
         function renderSongsTable() {
             const tbody = document.getElementById('songs-table-body');
             const sortMode = document.getElementById('song-sort').value;
+            const searchTerm = document.getElementById('song-search').value.toLowerCase();
             
-            let sortedSongs = [...allSongs];
+            let filteredSongs = allSongs.filter(song => 
+                song.name.toLowerCase().includes(searchTerm) || 
+                song.artist.toLowerCase().includes(searchTerm) ||
+                (song.redeems && song.redeems.some(r => r.title.toLowerCase().includes(searchTerm)))
+            );
+
+            let sortedSongs = [...filteredSongs];
             if (sortMode === 'name') {
                 sortedSongs.sort((a, b) => a.name.localeCompare(b.name));
             } else if (sortMode === 'date') {
@@ -382,6 +465,8 @@
                     const dateB = b.createdTimestamp ? new Date(b.createdTimestamp) : new Date(0);
                     return dateB - dateA; // Newest first
                 });
+            } else if (sortMode === 'plays') {
+                sortedSongs.sort((a, b) => (b.playCount || 0) - (a.playCount || 0));
             }
 
             tbody.innerHTML = '';
@@ -389,11 +474,25 @@
                 const tr = document.createElement('tr');
                 const redeemTitles = song.redeems.map(r => r.title).join(', ');
                 const artImg = song.coverArt ? `<img src="${song.coverArt}" alt="Art" style="width: 30px; height: 30px; object-fit: cover; border-radius: 2px;">` : '';
+                
+                // Format duration MM:SS
+                let durationStr = '--:--';
+                if (song.durationSeconds) {
+                    const mins = Math.floor(song.durationSeconds / 60);
+                    const secs = song.durationSeconds % 60;
+                    durationStr = `${mins}:${secs.toString().padStart(2, '0')}`;
+                }
+
+                // Format date
+                const dateStr = song.createdTimestamp ? new Date(song.createdTimestamp).toLocaleDateString() : 'N/A';
+
                 tr.innerHTML = `
                     <td>${song.id}</td>
                     <td>${artImg}</td>
                     <td>${song.name}</td>
                     <td>${song.artist}</td>
+                    <td>${durationStr}</td>
+                    <td>${dateStr}</td>
                     <td><span class="badge bg-light text-dark">${song.playCount || 0}</span></td>
                     <td>${redeemTitles}</td>
                     <td>
@@ -525,6 +624,22 @@
                 if (response.ok) { /* WebSocket will update current song */ }
                 else { alert(await response.text()); }
             } catch (error) { console.error('Error skipping song:', error); }
+        }
+
+        async function pausePlayback() {
+            try {
+                const response = await fetch('/api/songs/pause', { method: 'POST' });
+                if (response.status === 401 || response.status === 403) return;
+                if (!response.ok) alert(await response.text());
+            } catch (error) { console.error('Error pausing playback:', error); }
+        }
+
+        async function resumePlayback() {
+            try {
+                const response = await fetch('/api/songs/resume', { method: 'POST' });
+                if (response.status === 401 || response.status === 403) return;
+                if (!response.ok) alert(await response.text());
+            } catch (error) { console.error('Error resuming playback:', error); }
         }
 
         refreshInitialStatus();

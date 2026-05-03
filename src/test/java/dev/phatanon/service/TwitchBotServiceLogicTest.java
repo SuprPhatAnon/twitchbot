@@ -66,8 +66,33 @@ public class TwitchBotServiceLogicTest {
         assertTrue(twitchBotService.isSongPlaying());
         assertEquals(song, twitchBotService.getCurrentlyPlayingSong());
         verify(messagingTemplate).convertAndSend(eq("/topic/play"), eq(song));
-        verify(songRepository).save(song);
         verify(songPlayRepository).save(any());
+    }
+
+    @Test
+    void shouldSendChatMessageWhenSongStartsPlaying() {
+        Song song = new Song("Test Song", "Test Artist", "url");
+        song.setId(1L);
+
+        // We need to mock isTwitchConnected to return true if we want to test the full flow
+        // but TwitchBotService uses internal state and Helix client.
+        // Actually, playSong calls sendChatMessage, so we can spy or check behavior.
+        // Since we can't easily mock the Helix client inside TwitchBotService without more setup,
+        // we might just want to verify that sendChatMessage is called if we make it public or if we can observe its effect.
+        
+        // Wait, TwitchBotService.sendChatMessage is public. 
+        // But it's NOT a mock, it's the class under test.
+        
+        // If I use a spy on twitchBotService:
+        TwitchBotService spyService = spy(twitchBotService);
+        doNothing().when(spyService).sendChatMessage(anyString());
+        
+        // Directly calling playSong because it's private might be tricky in some setups, 
+        // but playSongById calls it.
+        when(songRepository.findById(1L)).thenReturn(Optional.of(song));
+        spyService.playSongById(1L, true);
+        
+        verify(spyService).sendChatMessage("Now Playing - Test Artist - Test Song");
     }
 
     @Test
@@ -128,6 +153,9 @@ public class TwitchBotServiceLogicTest {
 
         twitchBotService.playSongById(1L);
         twitchBotService.playSongById(2L);
+
+        // Reset scheduler because playSong already schedules one task
+        clearInvocations(scheduler);
 
         twitchBotService.handleSongFinished();
 
@@ -215,9 +243,9 @@ public class TwitchBotServiceLogicTest {
         when(songRepository.findById(1L)).thenReturn(Optional.of(song));
         
         twitchBotService.playSongById(1L);
-        // Initially, playSong broadcasts the song. Reset the mock for clean verify.
-        clearInvocations(messagingTemplate);
-        
+        // Reset scheduler because playSong already schedules one task
+        clearInvocations(scheduler);
+
         twitchBotService.handleSongFinished();
         
         // handleSongFinished should NOT broadcast null immediately if it wants to keep current song on UI
@@ -264,6 +292,9 @@ public class TwitchBotServiceLogicTest {
         when(songRepository.findById(1L)).thenReturn(Optional.of(song));
         twitchBotService.playSongById(1L);
         
+        // Reset scheduler because playSong already schedules one task
+        clearInvocations(scheduler);
+
         twitchBotService.handleSongFinished();
         
         assertFalse(twitchBotService.isSongPlaying());

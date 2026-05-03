@@ -1,11 +1,14 @@
 package dev.phatanon.controller;
 
+import dev.phatanon.dto.RainEffectDTO;
 import dev.phatanon.service.TwitchBotService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -16,9 +19,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class TestController {
 
     private final TwitchBotService twitchBotService;
+    private final SimpMessagingTemplate messagingTemplate;
 
-    public TestController(TwitchBotService twitchBotService) {
+    public TestController(TwitchBotService twitchBotService, SimpMessagingTemplate messagingTemplate) {
         this.twitchBotService = twitchBotService;
+        this.messagingTemplate = messagingTemplate;
     }
 
     /**
@@ -43,5 +48,19 @@ public class TestController {
     public String triggerFinish() {
         twitchBotService.handleSongFinished();
         return "Song finish triggered!";
+    }
+
+    /**
+     * Triggers a rain effect on the overlay.
+     * @param content The emoji or URL to rain down.
+     * @param duration Duration in milliseconds.
+     * @return A success message.
+     */
+    @GetMapping("/rain")
+    @Operation(summary = "Trigger a rain effect on the overlay")
+    public String triggerRain(@RequestParam(defaultValue = "🌧️") String content,
+                              @RequestParam(defaultValue = "5000") int duration) {
+        messagingTemplate.convertAndSend("/topic/rain", new RainEffectDTO(content, duration));
+        return "Rain effect triggered with content: " + content;
     }
 }

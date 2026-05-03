@@ -17,7 +17,7 @@ public class TwitchBotApplication {
         SpringApplication.run(TwitchBotApplication.class, args);
     }
 
-    @Bean
+    @Bean(destroyMethod = "shutdown")
     public ScheduledExecutorService scheduledExecutorService() {
         return Executors.newSingleThreadScheduledExecutor();
     }
