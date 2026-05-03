@@ -66,6 +66,13 @@
     <audio id="audio-player"></audio>
 
     <script>
+        function escapeHtml(text) {
+            if (!text) return "";
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
         const songDisplay = document.getElementById('song-display');
         const songTitle = document.getElementById('song-title');
         const songArt = document.getElementById('song-art');
@@ -162,6 +169,7 @@
             }
             songTitle.innerText = song.name + ' - ' + song.artist;
             if (song.coverArt) {
+                // escapeHtml not needed for simple attribute assignment, but good practice if it's dynamic
                 songArt.src = song.coverArt;
                 songArt.style.display = 'block';
             } else {

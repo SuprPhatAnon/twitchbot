@@ -78,4 +78,21 @@ public class TwitchBotServiceWebSocketTest {
         // Verification of broadcast on /topic/queue-size
         verify(messagingTemplate, atLeastOnce()).convertAndSend(eq("/topic/queue-size"), eq(1));
     }
+
+    @Test
+    void shouldHandleSongsWithSingleQuote() {
+        doNothing().when(messagingTemplate).convertAndSend(anyString(), any(Object.class));
+        twitchBotService.clearQueue();
+        reset(messagingTemplate);
+        
+        Song song = new Song("Don't Stop Believin'", "Journey", "journey.mp3");
+        song.setId(3L);
+        song.setEnabled(true);
+        when(songRepository.findById(3L)).thenReturn(Optional.of(song));
+
+        twitchBotService.playSongById(3L, false);
+
+        verify(messagingTemplate, atLeastOnce()).convertAndSend(eq("/topic/play"), eq(song));
+        verify(messagingTemplate, atLeastOnce()).convertAndSend(eq("/topic/current-song"), eq(song));
+    }
 }

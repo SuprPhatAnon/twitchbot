@@ -73,6 +73,13 @@
 
     <script src="/js/common.js"></script>
     <script>
+        function escapeHtml(text) {
+            if (!text) return "";
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
         async function loadStatistics() {
             const range = document.getElementById('range').value;
             const groupBy = document.getElementById('groupBy').value;
@@ -99,9 +106,9 @@
                     const tr = document.createElement('tr');
                     if (groupBy === 'song') {
                         const artImg = item.coverArt ? `<img src="${item.coverArt}" alt="Art" style="width: 30px; height: 30px; object-fit: cover; border-radius: 2px;">` : '';
-                        tr.innerHTML = `<td>${artImg}</td><td>${item.name}</td><td>${item.artist}</td><td>${item.playCount}</td>`;
+                        tr.innerHTML = `<td>${artImg}</td><td>${escapeHtml(item.name)}</td><td>${escapeHtml(item.artist)}</td><td>${item.playCount}</td>`;
                     } else {
-                        tr.innerHTML = `<td>${item.artist}</td><td>${item.playCount}</td>`;
+                        tr.innerHTML = `<td>${escapeHtml(item.artist)}</td><td>${item.playCount}</td>`;
                     }
                     body.appendChild(tr);
                 });
