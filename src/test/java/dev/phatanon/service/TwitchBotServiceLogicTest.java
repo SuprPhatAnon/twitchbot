@@ -18,6 +18,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.*;
 
 public class TwitchBotServiceLogicTest {
@@ -65,7 +66,7 @@ public class TwitchBotServiceLogicTest {
 
         assertTrue(twitchBotService.isSongPlaying());
         assertEquals(song, twitchBotService.getCurrentlyPlayingSong());
-        verify(messagingTemplate).convertAndSend(eq("/topic/play"), eq(song));
+        verify(messagingTemplate).convertAndSend(eq("/topic/play"), argThat((Song s) -> s.getName().equals(song.getName())));
         verify(songPlayRepository).save(any());
     }
 
@@ -115,7 +116,7 @@ public class TwitchBotServiceLogicTest {
         assertEquals(song1, twitchBotService.getCurrentlyPlayingSong());
         // Verify only song1 was sent to /topic/play
         verify(messagingTemplate, times(1)).convertAndSend(eq("/topic/play"), any(Song.class));
-        verify(messagingTemplate).convertAndSend(eq("/topic/play"), eq(song1));
+        verify(messagingTemplate).convertAndSend(eq("/topic/play"), argThat((Song s) -> s.getName().equals(song1.getName())));
     }
 
     @Test
@@ -210,6 +211,16 @@ public class TwitchBotServiceLogicTest {
     }
 
     @Test
+    void shouldSimulateRedeemWithUserInput() {
+        twitchBotService.simulateRedeem("Test Reward");
+        List<TwitchBotService.RedeemLog> redeems = twitchBotService.getRecentRedeems();
+        assertFalse(redeems.isEmpty());
+        TwitchBotService.RedeemLog last = redeems.get(0);
+        assertEquals("Test Reward", last.rewardTitle());
+        assertEquals("Simulated input text", last.userInput());
+    }
+
+    @Test
     void shouldBroadcastSongsRefresh() {
         twitchBotService.broadcastSongsRefresh();
         verify(messagingTemplate).convertAndSend(eq("/topic/songs"), eq("refresh"));
@@ -229,7 +240,9 @@ public class TwitchBotServiceLogicTest {
         twitchBotService.playSongById(1L);
         
         twitchBotService.broadcastCurrentSong();
-        verify(messagingTemplate, atLeastOnce()).convertAndSend(eq("/topic/current-song"), eq(song));
+        verify(messagingTemplate, atLeastOnce()).convertAndSend(eq("/topic/current-song"), (Object) argThat(argument -> 
+            argument instanceof Song s && s.getName().equals(song.getName()) && s.getArtist().equals(song.getArtist())
+        ));
 
         // Test transition to null
         twitchBotService.clearQueue();

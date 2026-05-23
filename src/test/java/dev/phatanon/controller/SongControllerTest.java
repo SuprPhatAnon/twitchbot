@@ -3,6 +3,8 @@ package dev.phatanon.controller;
 import dev.phatanon.dto.SongStatsDTO;
 import dev.phatanon.entity.Redeem;
 import dev.phatanon.entity.Song;
+import dev.phatanon.entity.SongChatMessage;
+import dev.phatanon.entity.SongEffect;
 import dev.phatanon.entity.SongPlay;
 import dev.phatanon.repository.SongPlayRepository;
 import dev.phatanon.repository.SongRepository;
@@ -11,6 +13,7 @@ import dev.phatanon.service.SongService;
 import dev.phatanon.service.TwitchBotService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
@@ -26,6 +29,8 @@ import java.util.Optional;
 
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -478,5 +483,61 @@ public class SongControllerTest {
                 .sorted(java.util.Comparator.reverseOrder())
                 .map(java.nio.file.Path::toFile)
                 .forEach(java.io.File::delete);
+    }
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void shouldAddSongChatMessage() throws Exception {
+        Song song = new Song("Test Song", "Artist", "url");
+        song.setId(1L);
+        when(songRepository.findById(1L)).thenReturn(Optional.of(song));
+
+        mockMvc.perform(post("/api/songs/1/chat-messages")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"message\":\"Hello\",\"triggerTimeSeconds\":10}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.message").value("Hello"))
+                .andExpect(jsonPath("$.triggerTimeSeconds").value(10));
+
+        verify(songRepository).save(song);
+        assertEquals(1, song.getChatMessages().size());
+        assertEquals("Hello", song.getChatMessages().get(0).getMessage());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void shouldAddSongEffect() throws Exception {
+        Song song = new Song("Test Song", "Artist", "url");
+        song.setId(1L);
+        when(songRepository.findById(1L)).thenReturn(Optional.of(song));
+
+        mockMvc.perform(post("/api/songs/1/effects")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"effectType\":\"RAIN\",\"triggerTimeSeconds\":5,\"durationMilliseconds\":1000}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.effectType").value("RAIN"))
+                .andExpect(jsonPath("$.triggerTimeSeconds").value(5));
+
+        verify(songRepository).save(song);
+        assertEquals(1, song.getEffects().size());
+        assertEquals("RAIN", song.getEffects().get(0).getEffectType());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void shouldRemoveSongChatMessage() throws Exception {
+        Song song = new Song("Test Song", "Artist", "url");
+        song.setId(1L);
+        SongChatMessage msg = new SongChatMessage();
+        msg.setId(10L);
+        msg.setSong(song);
+        song.getChatMessages().add(msg);
+        
+        when(songRepository.findById(1L)).thenReturn(Optional.of(song));
+
+        mockMvc.perform(delete("/api/songs/1/chat-messages/10"))
+                .andExpect(status().isNoContent());
+
+        verify(songRepository).save(song);
+        assertTrue(song.getChatMessages().isEmpty());
     }
 }

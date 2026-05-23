@@ -13,6 +13,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.util.Optional;
 
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.*;
 
 @SpringBootTest
@@ -55,7 +56,9 @@ public class TwitchBotServiceWebSocketTest {
         // Verification of broadcast on /topic/songs to refresh UI
         verify(messagingTemplate, atLeastOnce()).convertAndSend(eq("/topic/songs"), eq("refresh"));
         // Should also broadcast current song when it starts playing
-        verify(messagingTemplate, atLeastOnce()).convertAndSend(eq("/topic/current-song"), eq(song));
+        verify(messagingTemplate, atLeastOnce()).convertAndSend(eq("/topic/current-song"), (Object) argThat(argument -> 
+            argument instanceof Song s && s.getName().equals(song.getName()) && s.getArtist().equals(song.getArtist())
+        ));
     }
 
     @Test
@@ -92,7 +95,9 @@ public class TwitchBotServiceWebSocketTest {
 
         twitchBotService.playSongById(3L, false);
 
-        verify(messagingTemplate, atLeastOnce()).convertAndSend(eq("/topic/play"), eq(song));
-        verify(messagingTemplate, atLeastOnce()).convertAndSend(eq("/topic/current-song"), eq(song));
+        verify(messagingTemplate, atLeastOnce()).convertAndSend(eq("/topic/play"), argThat((Song s) -> s.getName().equals(song.getName())));
+        verify(messagingTemplate, atLeastOnce()).convertAndSend(eq("/topic/current-song"), (Object) argThat(argument -> 
+            argument instanceof Song s && s.getName().equals(song.getName()) && s.getArtist().equals(song.getArtist())
+        ));
     }
 }

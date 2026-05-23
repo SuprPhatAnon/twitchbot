@@ -49,6 +49,11 @@
             max-width: 50px;
             max-height: 50px;
         }
+        .placement-effect {
+            position: absolute;
+            z-index: 60;
+            pointer-events: none;
+        }
         @keyframes fall {
             to {
                 transform: translateY(110vh) rotate(360deg);
@@ -84,47 +89,87 @@
         let currentSong = null;
 
         function connect() {
-            console.log("Connecting to /ws...");
-            const socket = new SockJS('/ws');
+            console.log("WebSocket: Initiating connection to " + window.location.origin + "/ws");
+            const socket = new SockJS(window.location.origin + '/ws');
             stompClient = Stomp.over(socket);
-            // stompClient.debug = null; // Disable debug logging to console
+            stompClient.heartbeat.outgoing = 10000;
+            stompClient.heartbeat.incoming = 10000;
+            stompClient.debug = function(str) {
+                console.log('STOMP Debug: ' + str);
+            };
             
             stompClient.connect({}, function (frame) {
-                console.log('Connected: ' + frame);
+                console.log('WebSocket: Connected successfully. Frame: ' + frame);
                 window.connectedAt = new Date().getTime();
                 reconnectDelay = 1000; // Reset delay on successful connection
                 
                 // Request current state immediately after connecting
+                console.log('WebSocket: Requesting initial state...');
                 stompClient.send("/app/request-state", {}, {});
                 
                 stompClient.subscribe('/topic/play', function (message) {
-                    const song = JSON.parse(message.body);
-                    playSong(song);
+                    try {
+                        const body = message.body;
+                        if (body && body.length > 1000) {
+                            console.log('WebSocket: Received large play command (length: ' + body.length + ')');
+                        } else {
+                            console.log('WebSocket: Received play command: ' + body);
+                        }
+                        const song = (body && body !== 'null' && body !== '') ? JSON.parse(body) : null;
+                        if (song) {
+                            console.log('WebSocket: Received play command for song: ' + song.name);
+                            playSong(song);
+                        }
+                    } catch (error) {
+                        console.error('Error parsing play command:', error);
+                    }
                 });
 
                 stompClient.subscribe('/topic/current-song', function (message) {
-                    console.log("[DEBUG_LOG] Received message on /topic/current-song:", message.body);
-                    const song = (message.body && message.body !== 'null' && message.body !== '') ? JSON.parse(message.body) : null;
-                    if (!song) {
-                        console.log("[DEBUG_LOG] Clearing display and stopping audio because song is null (queue cleared)");
-                        stopPlayback();
-                    } else {
-                        // Current song is playing, update display (case where overlay reloads while song is active)
-                        updateDisplay(song);
+                    try {
+                        const body = message.body;
+                        if (body && body.length > 1000) {
+                            console.log('WebSocket: Received large current song update (length: ' + body.length + ')');
+                        } else {
+                            console.log('WebSocket: Received current song update: ' + body);
+                        }
+                        const song = (body && body !== 'null' && body !== '') ? JSON.parse(body) : null;
+                        console.log('WebSocket: Received current song update: ' + (song ? song.name : 'null'));
+                        if (song === null) {
+                            stopPlayback();
+                        } else {
+                            updateDisplay(song);
+                            // If we received a current song but nothing is playing, play it
+                            if (audioPlayer && (audioPlayer.paused || !audioPlayer.src || audioPlayer.src.endsWith('/null') || audioPlayer.src.endsWith('undefined'))) {
+                                console.log('WebSocket: Auto-playing current song...');
+                                playSong(song);
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Error parsing current song update:', error);
                     }
                 });
 
                 stompClient.subscribe('/topic/pause-status', function (message) {
                     const isPaused = JSON.parse(message.body);
+                    console.log('WebSocket: Received pause status update: ' + (isPaused ? 'PAUSED' : 'PLAYING'));
                     handlePauseStatus(isPaused);
                 });
 
                 stompClient.subscribe('/topic/rain', function (message) {
+                    console.log('WebSocket: Received rain effect event');
                     const rainEffect = JSON.parse(message.body);
                     triggerRainEffect(rainEffect);
                 });
+
+                stompClient.subscribe('/topic/placement-effect', function (message) {
+                    console.log('WebSocket: Received placement effect event');
+                    const placementEffect = JSON.parse(message.body);
+                    triggerPlacementEffect(placementEffect);
+                });
             }, function (error) {
-                console.log('STOMP error: ' + error + '. Retrying in ' + (reconnectDelay / 1000) + 's');
+                console.error('WebSocket Error: ', error);
+                console.log('WebSocket: Attempting to reconnect in ' + (reconnectDelay / 1000) + 's...');
                 setTimeout(connect, reconnectDelay);
                 // Exponential backoff
                 reconnectDelay = Math.min(reconnectDelay * 2, maxReconnectDelay);
@@ -132,33 +177,35 @@
         }
 
         function playSong(song) {
+            if (!song) return;
             updateDisplay(song);
-            audioPlayer.src = song.url;
             
-            const playPromise = audioPlayer.play();
+            let url = song.url;
             
-            if (playPromise !== undefined) {
-                playPromise.catch(error => {
-                    console.error("Playback failed:", error);
-                    // If playback fails (e.g. autoplay blocked or 404), notify server after 3 seconds
-                    // to avoid stalling the queue completely.
-                    // setTimeout(notifySongFinished, 3000); // Logic moved to server-side duration
-                });
-            }
-
-            audioPlayer.onended = () => {
-                clearDisplay();
-                // notifySongFinished(); // Logic moved to server-side duration
-            };
-            audioPlayer.onerror = () => {
-                if (audioPlayer.src && !audioPlayer.src.endsWith('/null') && !audioPlayer.src.endsWith('undefined')) {
-                    console.error("Audio error occurred for src:", audioPlayer.src);
-                    clearDisplay();
-                    // setTimeout(notifySongFinished, 2000); // Logic moved to server-side duration
-                } else {
-                    console.log("[DEBUG_LOG] Audio error ignored for empty/null src");
+            if (audioPlayer) {
+                // Ensure the URL starts with / if it doesn't and is not absolute
+                if (url && !url.startsWith('http') && !url.startsWith('/')) {
+                    url = '/' + url;
                 }
-            };
+                audioPlayer.src = url || '';
+                
+                const playPromise = audioPlayer.play();
+                
+                if (playPromise !== undefined) {
+                    playPromise.catch(error => {
+                        console.error("Playback failed:", error);
+                    });
+                }
+
+                audioPlayer.onended = () => {
+                    clearDisplay();
+                };
+                audioPlayer.onerror = () => {
+                    if (audioPlayer.src && !audioPlayer.src.endsWith('/null') && !audioPlayer.src.endsWith('undefined')) {
+                        clearDisplay();
+                    }
+                };
+            }
         }
 
         function updateDisplay(song) {
@@ -167,30 +214,45 @@
                 clearDisplay();
                 return;
             }
-            songTitle.innerText = song.name + ' - ' + song.artist;
-            if (song.coverArt) {
-                // escapeHtml not needed for simple attribute assignment, but good practice if it's dynamic
-                songArt.src = song.coverArt;
-                songArt.style.display = 'block';
-            } else {
-                songArt.src = '';
-                songArt.style.display = 'none';
+            const songDisplay = document.getElementById('song-display');
+            const songTitle = document.getElementById('song-title');
+            const songArt = document.getElementById('song-art');
+
+            if (songTitle) {
+                songTitle.textContent = (song.name || '') + ' - ' + (song.artist || '');
+            }
+            if (songArt) {
+                if (song.coverArt) {
+                    let artUrl = song.coverArt;
+                    if (artUrl && !artUrl.startsWith('http') && !artUrl.startsWith('data:') && !artUrl.startsWith('/')) {
+                        artUrl = '/' + artUrl;
+                    }
+                    songArt.src = artUrl;
+                    songArt.style.display = 'block';
+                } else {
+                    songArt.src = '';
+                    songArt.style.display = 'none';
+                }
             }
             checkVisibility();
         }
 
         function checkVisibility() {
+            const songDisplay = document.getElementById('song-display');
+            const audioPlayer = document.getElementById('audio-player');
             if (!currentSong) {
-                songDisplay.style.display = 'none';
+                if (songDisplay) songDisplay.style.display = 'none';
                 return;
             }
+
+            if (!audioPlayer) return;
 
             const currentTime = audioPlayer.currentTime;
             const duration = currentSong.durationSeconds || audioPlayer.duration;
 
-            if (!duration || isNaN(duration)) {
-                // If duration is not available yet, show it anyway for now
-                songDisplay.style.display = 'flex';
+            if (!duration || isNaN(duration) || duration <= 0) {
+                // If duration is not available yet, show it anyway
+                if (songDisplay) songDisplay.style.display = 'flex';
                 return;
             }
 
@@ -198,22 +260,29 @@
             const showEndTime = duration - 5;
 
             if (currentTime <= showStartTime || currentTime >= showEndTime) {
-                songDisplay.style.display = 'flex';
+                if (songDisplay) songDisplay.style.display = 'flex';
             } else {
-                songDisplay.style.display = 'none';
+                if (songDisplay) songDisplay.style.display = 'none';
             }
         }
 
-        audioPlayer.ontimeupdate = () => {
-            checkVisibility();
-        };
+        if (audioPlayer) {
+            audioPlayer.ontimeupdate = () => {
+                checkVisibility();
+            };
+        }
 
         function clearDisplay() {
             currentSong = null;
-            songDisplay.style.display = 'none';
-            songTitle.innerText = '';
-            songArt.src = '';
-            songArt.style.display = 'none';
+            const songDisplay = document.getElementById('song-display');
+            const songTitle = document.getElementById('song-title');
+            const songArt = document.getElementById('song-art');
+            if (songDisplay) songDisplay.style.display = 'none';
+            if (songTitle) songTitle.textContent = '';
+            if (songArt) {
+                songArt.src = '';
+                songArt.style.display = 'none';
+            }
         }
 
         function stopPlayback() {
@@ -226,6 +295,7 @@
             if (isPaused) {
                 audioPlayer.pause();
             } else if (audioPlayer.src && audioPlayer.src !== "" && !audioPlayer.src.endsWith('/null')) {
+                // If src was encoded, it might be already good, but play() is called on current src
                 audioPlayer.play().catch(error => {
                     console.error("Failed to resume playback:", error);
                 });
@@ -273,6 +343,42 @@
             setTimeout(() => {
                 item.remove();
             }, fallDuration * 1000 + 100);
+        }
+
+        function triggerPlacementEffect(effect) {
+            const img = document.createElement('img');
+            
+            let url = effect.url;
+            img.src = url;
+            
+            img.className = 'placement-effect';
+            
+            if (effect.x !== undefined && effect.x !== null) {
+                img.style.left = effect.x + (Number.isInteger(effect.x) ? 'px' : '');
+            } else {
+                img.style.left = '50%';
+                img.style.transform = 'translateX(-50%)';
+            }
+            
+            if (effect.y !== undefined && effect.y !== null) {
+                img.style.top = effect.y + (Number.isInteger(effect.y) ? 'px' : '');
+            } else {
+                img.style.top = '50%';
+                if (img.style.transform) {
+                    img.style.transform += ' translateY(-50%)';
+                } else {
+                    img.style.transform = 'translateY(-50%)';
+                }
+            }
+            
+            if (effect.width) img.style.width = effect.width + 'px';
+            if (effect.height) img.style.height = effect.height + 'px';
+            
+            document.body.appendChild(img);
+            
+            setTimeout(() => {
+                img.remove();
+            }, effect.duration || 5000);
         }
 
         function notifySongFinished() {

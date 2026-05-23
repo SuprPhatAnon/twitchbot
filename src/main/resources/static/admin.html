@@ -17,6 +17,9 @@
         .card-header.collapsed .collapse-toggle::after {
             transform: rotate(-90deg);
         }
+        .nav-tabs {
+            margin-bottom: 1rem;
+        }
     </style>
 </head>
 <body>
@@ -56,7 +59,24 @@
 
     <div class="main-container">
         <div class="left-panel">
-            <div class="card" id="card-redeems">
+            <ul class="nav nav-tabs" id="adminTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="songs-tab" data-bs-toggle="tab" data-bs-target="#songs-content" type="button" role="tab">Songs</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="commands-tab" data-bs-toggle="tab" data-bs-target="#commands-content" type="button" role="tab">Commands</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="effects-tab" data-bs-toggle="tab" data-bs-target="#effects-content" type="button" role="tab">Effects & Messages</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="twitch-tab" data-bs-toggle="tab" data-bs-target="#twitch-content" type="button" role="tab">Twitch</button>
+                </li>
+            </ul>
+
+            <div class="tab-content" id="adminTabsContent">
+                <div class="tab-pane fade show active" id="songs-content" role="tabpanel">
+                    <div class="card" id="card-redeems">
                 <div class="card-header d-flex justify-content-between align-items-center" onclick="toggleCard('card-redeems')">
                     Manage Redeems
                     <div class="d-flex align-items-center">
@@ -321,6 +341,115 @@
                     </div>
                 </div>
             </div>
+                </div>
+
+                <div class="tab-pane fade" id="commands-content" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            Manage Commands
+                            <button class="btn btn-sm btn-outline-secondary" onclick="fetchCommands()">Refresh</button>
+                        </div>
+                        <div class="card-body">
+                            <form id="add-command-form" class="mb-3">
+                                <div class="row g-2">
+                                    <div class="col-md-3">
+                                        <input type="text" id="new-command-name" class="form-control form-control-sm" placeholder="!command" required>
+                                    </div>
+                                    <div class="col-md-5">
+                                        <input type="text" id="new-command-response" class="form-control form-control-sm" placeholder="Response text" required>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <input type="text" id="new-command-java" class="form-control form-control-sm" placeholder="Java Method (Optional)">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <button class="btn btn-primary btn-sm w-100" type="submit">Add</button>
+                                    </div>
+                                </div>
+                            </form>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Command</th>
+                                            <th>Response</th>
+                                            <th>Java Method</th>
+                                            <th>Enabled</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="commands-table-body"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-pane fade" id="effects-content" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header">Effects & Messages Management</div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label">Select Song</label>
+                                <select id="effects-song-select" class="form-select" onchange="loadSongEffectsAndMessages()">
+                                    <option value="">-- Select a Song --</option>
+                                </select>
+                            </div>
+
+                            <div class="mb-3 border rounded p-3">
+                                <label class="form-label h6">Manual Effect Trigger</label>
+                                <div class="input-group input-group-sm">
+                                    <input type="text" id="manual-emoji-input" class="form-control" placeholder="Emoji (e.g. 🌧️)" value="🌧️">
+                                    <button class="btn btn-primary" onclick="triggerManualEffect()">Trigger Rain</button>
+                                </div>
+                            </div>
+
+                            <div id="song-details-container" style="display: none;">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <h6>Chat Messages</h6>
+                                        <form id="add-song-message-form" class="mb-2">
+                                            <div class="input-group input-group-sm mb-1">
+                                                <input type="text" id="song-message-text" class="form-control" placeholder="Message content" required>
+                                                <input type="number" id="song-message-time" class="form-control" placeholder="Time (sec)" style="max-width: 80px;" required>
+                                                <button class="btn btn-primary" type="submit">Add</button>
+                                            </div>
+                                        </form>
+                                        <ul id="song-messages-list" class="list-group list-group-flush mb-3"></ul>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <h6>Effects</h6>
+                                        <form id="add-song-effect-form" class="mb-2">
+                                            <div class="row g-1 mb-1">
+                                                <div class="col-md-5">
+                                                    <select id="song-effect-type" class="form-select form-select-sm" required>
+                                                        <option value="RAIN">Rain</option>
+                                                        <option value="SNOW">Snow</option>
+                                                        <option value="FIREWORKS">Fireworks</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <input type="number" id="song-effect-time" class="form-control form-control-sm" placeholder="Start" required>
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <input type="number" id="song-effect-duration" class="form-control form-control-sm" placeholder="Dur(ms)" required>
+                                                </div>
+                                                <div class="col-md-1">
+                                                    <button class="btn btn-primary btn-sm w-100" type="submit">+</button>
+                                                </div>
+                                            </div>
+                                        </form>
+                                        <ul id="song-effects-list" class="list-group list-group-flush"></ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-pane fade" id="twitch-content" role="tabpanel">
+                    <!-- Moved Twitch Configuration here if needed, but for now I'll just close it -->
+                </div>
+            </div>
         </div>
 
         <div class="right-panel">
@@ -378,7 +507,7 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.5.1/sockjs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
     <script src="/js/common.js"></script>
     <script>
@@ -398,42 +527,68 @@
         }
 
         function connectWebSocket() {
-            const socket = new SockJS('/ws');
+            console.log('WebSocket: Initiating connection to ' + window.location.origin + '/ws');
+            const socket = new SockJS(window.location.origin + '/ws');
             stompClient = Stomp.over(socket);
-            stompClient.debug = null;
+            stompClient.heartbeat.outgoing = 10000;
+            stompClient.heartbeat.incoming = 10000;
+            stompClient.debug = function(str) {
+                console.log('STOMP Debug: ' + str);
+            };
             stompClient.connect({}, function (frame) {
+                console.log('WebSocket: Connected successfully. Frame: ' + frame);
                 stompClient.subscribe('/topic/redeems', function (response) {
+                    console.log('WebSocket: Received redeem event');
                     addRedeemToLog(JSON.parse(response.body));
                 });
                 stompClient.subscribe('/topic/queue-size', function (response) {
-                    updateQueueSizeDisplay(JSON.parse(response.body));
+                    const size = JSON.parse(response.body);
+                    console.log('WebSocket: Received queue size update: ' + size);
+                    updateQueueSizeDisplay(size);
                 });
                 stompClient.subscribe('/topic/queue', function (response) {
+                    console.log('WebSocket: Received queue update');
                     updateQueueDisplay(JSON.parse(response.body));
                 });
                 stompClient.subscribe('/topic/stream-status', function (response) {
-                    updateStreamStatusDisplay(JSON.parse(response.body));
+                    const status = JSON.parse(response.body);
+                    console.log('WebSocket: Received stream status update: ' + (status ? 'ONLINE' : 'OFFLINE'));
+                    updateStreamStatusDisplay(status);
                 });
                 stompClient.subscribe('/topic/streamer-connection-status', function (response) {
-                    updateStreamerConnectionStatusDisplay(JSON.parse(response.body));
+                    const status = JSON.parse(response.body);
+                    console.log('WebSocket: Received streamer connection status update: ' + (status ? 'CONNECTED' : 'DISCONNECTED'));
+                    updateStreamerConnectionStatusDisplay(status);
                 });
                 stompClient.subscribe('/topic/bot-connection-status', function (response) {
-                    updateBotConnectionStatusDisplay(JSON.parse(response.body));
+                    const status = JSON.parse(response.body);
+                    console.log('WebSocket: Received bot connection status update: ' + (status ? 'CONNECTED' : 'DISCONNECTED'));
+                    updateBotConnectionStatusDisplay(status);
                 });
                 stompClient.subscribe('/topic/current-song', function (response) {
                     const body = response.body;
+                    if (body && body.length > 1000) {
+                        console.log('WebSocket: Received large current song update (length: ' + body.length + ')');
+                    } else {
+                        console.log('WebSocket: Received current song update: ' + body);
+                    }
                     const song = (body && body !== 'null' && body !== '') ? JSON.parse(body) : null;
+                    console.log('WebSocket: Received current song update: ' + (song ? song.name : 'null'));
                     updateCurrentSongDisplay(song);
                 });
                 stompClient.subscribe('/topic/songs', function (response) {
+                    console.log('WebSocket: Received songs update notification');
                     fetchSongs();
                 });
                 stompClient.subscribe('/topic/redeems-list', function (response) {
+                    console.log('WebSocket: Received redeems list update notification');
                     fetchRedeems();
                 });
             }, function (error) {
-                console.error('WebSocket Error: ' + error);
-                setTimeout(connectWebSocket, 5000);
+                console.error('WebSocket Error: ', error);
+                const retryDelay = 5000;
+                console.log('WebSocket: Attempting to reconnect in ' + (retryDelay / 1000) + 's...');
+                setTimeout(connectWebSocket, retryDelay);
             });
         }
 
@@ -708,6 +863,7 @@
                 }
                 allSongs = await response.json();
                 renderSongsTable();
+                updateEffectsSongSelect();
                 
                 // Also fetch recent plays
                 fetchRecentPlays();
@@ -1038,6 +1194,20 @@
             } catch (error) { console.error('Error playing random song:', error); }
         }
 
+        async function triggerManualEffect() {
+            const content = document.getElementById('manual-emoji-input').value || '🌧️';
+            try {
+                const response = await fetch(`/api/test/rain?content=${encodeURIComponent(content)}&duration=5000`, {
+                    headers: getHeaders()
+                });
+                if (!response.ok) {
+                    alert('Failed to trigger effect: ' + await response.text());
+                }
+            } catch (error) {
+                console.error('Error triggering manual effect:', error);
+            }
+        }
+
         function generateAuthUrl(type = 'streamer') {
             const clientId = document.getElementById('twitch-client-id').value;
             const redirectUri = document.getElementById('oauth-redirect-uri').value;
@@ -1214,6 +1384,181 @@
             }
         };
 
+        async function fetchCommands() {
+            try {
+                const response = await fetch('/api/commands', { headers: getHeaders() });
+                const commands = await response.json();
+                const tbody = document.getElementById('commands-table-body');
+                tbody.innerHTML = '';
+                commands.forEach(cmd => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${cmd.commandName}</td>
+                        <td>${cmd.response || ''}</td>
+                        <td>${cmd.javaMethodName || ''}</td>
+                        <td>${cmd.enabled ? '✅' : '❌'}</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-danger" onclick="deleteCommand(${cmd.id})">Del</button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (err) { console.error('Error fetching commands:', err); }
+        }
+
+        document.getElementById('add-command-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const cmd = {
+                commandName: document.getElementById('new-command-name').value,
+                response: document.getElementById('new-command-response').value,
+                javaMethodName: document.getElementById('new-command-java').value || null,
+                enabled: true
+            };
+            try {
+                const response = await fetch('/api/commands', {
+                    method: 'POST',
+                    headers: getHeaders(),
+                    body: JSON.stringify(cmd)
+                });
+                if (response.ok) {
+                    document.getElementById('add-command-form').reset();
+                    fetchCommands();
+                }
+            } catch (err) { console.error('Error adding command:', err); }
+        };
+
+        async function deleteCommand(id) {
+            if (!confirm('Delete this command?')) return;
+            try {
+                const response = await fetch(`/api/commands/${id}`, {
+                    method: 'DELETE',
+                    headers: getHeaders()
+                });
+                if (response.ok) fetchCommands();
+            } catch (err) { console.error('Error deleting command:', err); }
+        }
+
+        function updateEffectsSongSelect() {
+            const select = document.getElementById('effects-song-select');
+            const currentValue = select.value;
+            select.innerHTML = '<option value="">-- Select a Song --</option>';
+            allSongs.forEach(song => {
+                const opt = document.createElement('option');
+                opt.value = song.id;
+                opt.textContent = `${song.artist} - ${song.name}`;
+                select.appendChild(opt);
+            });
+            select.value = currentValue;
+        }
+
+        async function loadSongEffectsAndMessages() {
+            const select = document.getElementById('effects-song-select');
+            const songId = select.value;
+            const container = document.getElementById('song-details-container');
+            if (!songId) {
+                container.style.display = 'none';
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/songs/${songId}?includeDisabled=true`, { headers: getHeaders() });
+                const song = await response.json();
+                
+                // Messages
+                const msgList = document.getElementById('song-messages-list');
+                msgList.innerHTML = '';
+                const chatMessages = song.chatMessages || [];
+                chatMessages.forEach(msg => {
+                    const li = document.createElement('li');
+                    li.className = 'list-group-item d-flex justify-content-between align-items-center py-1';
+                    li.innerHTML = `
+                        <span class="small">${msg.triggerTimeSeconds}s: ${msg.message}</span>
+                        <button class="btn btn-sm btn-link text-danger p-0" onclick="deleteSongMessage(${song.id}, ${msg.id})">×</button>
+                    `;
+                    msgList.appendChild(li);
+                });
+
+                // Effects
+                const effList = document.getElementById('song-effects-list');
+                effList.innerHTML = '';
+                const effects = song.effects || [];
+                effects.forEach(eff => {
+                    const li = document.createElement('li');
+                    li.className = 'list-group-item d-flex justify-content-between align-items-center py-1';
+                    li.innerHTML = `
+                        <span class="small">${eff.triggerTimeSeconds}s: ${eff.effectType} (${eff.durationMilliseconds}ms)</span>
+                        <button class="btn btn-sm btn-link text-danger p-0" onclick="deleteSongEffect(${song.id}, ${eff.id})">×</button>
+                    `;
+                    effList.appendChild(li);
+                });
+
+                container.style.display = 'block';
+            } catch (err) { console.error('Error loading song details:', err); }
+        }
+
+        document.getElementById('add-song-message-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const songId = document.getElementById('effects-song-select').value;
+            const msg = {
+                message: document.getElementById('song-message-text').value,
+                triggerTimeSeconds: parseInt(document.getElementById('song-message-time').value)
+            };
+            try {
+                const response = await fetch(`/api/songs/${songId}/chat-messages`, {
+                    method: 'POST',
+                    headers: { ...getHeaders(), 'Content-Type': 'application/json' },
+                    body: JSON.stringify(msg)
+                });
+                if (response.ok) {
+                    document.getElementById('song-message-text').value = '';
+                    document.getElementById('song-message-time').value = '';
+                    await loadSongEffectsAndMessages();
+                }
+            } catch (err) { console.error('Error adding message:', err); }
+        };
+
+        document.getElementById('add-song-effect-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const songId = document.getElementById('effects-song-select').value;
+            const eff = {
+                effectType: document.getElementById('song-effect-type').value,
+                triggerTimeSeconds: parseInt(document.getElementById('song-effect-time').value),
+                durationMilliseconds: parseInt(document.getElementById('song-effect-duration').value)
+            };
+            try {
+                const response = await fetch(`/api/songs/${songId}/effects`, {
+                    method: 'POST',
+                    headers: { ...getHeaders(), 'Content-Type': 'application/json' },
+                    body: JSON.stringify(eff)
+                });
+                if (response.ok) {
+                    document.getElementById('song-effect-time').value = '';
+                    document.getElementById('song-effect-duration').value = '';
+                    await loadSongEffectsAndMessages();
+                }
+            } catch (err) { console.error('Error adding effect:', err); }
+        };
+
+        async function deleteSongMessage(songId, messageId) {
+            try {
+                const response = await fetch(`/api/songs/${songId}/chat-messages/${messageId}`, {
+                    method: 'DELETE',
+                    headers: getHeaders()
+                });
+                if (response.ok) await loadSongEffectsAndMessages();
+            } catch (err) { console.error('Error deleting message:', err); }
+        }
+
+        async function deleteSongEffect(songId, effectId) {
+            try {
+                const response = await fetch(`/api/songs/${songId}/effects/${effectId}`, {
+                    method: 'DELETE',
+                    headers: getHeaders()
+                });
+                if (response.ok) await loadSongEffectsAndMessages();
+            } catch (err) { console.error('Error deleting effect:', err); }
+        }
+
         function init() {
             refreshInitialStatus();
             fetchRedeems();
@@ -1222,6 +1567,7 @@
             fetchRecentRedeems();
             connectWebSocket();
             restoreCollapsedStates();
+            fetchCommands();
         }
 
         init();

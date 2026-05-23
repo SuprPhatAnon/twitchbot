@@ -74,6 +74,12 @@ public class Song {
     )
     private java.util.Set<Redeem> redeems = new java.util.HashSet<>();
 
+    @jakarta.persistence.OneToMany(mappedBy = "song", cascade = jakarta.persistence.CascadeType.ALL, orphanRemoval = true, fetch = jakarta.persistence.FetchType.EAGER)
+    private java.util.List<SongChatMessage> chatMessages = new java.util.ArrayList<>();
+
+    @jakarta.persistence.OneToMany(mappedBy = "song", cascade = jakarta.persistence.CascadeType.ALL, orphanRemoval = true, fetch = jakarta.persistence.FetchType.EAGER)
+    private java.util.List<SongEffect> effects = new java.util.ArrayList<>();
+
     private boolean enabled = true;
 
     @CreatedBy

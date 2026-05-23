@@ -5,6 +5,7 @@ import com.github.philippheuer.credentialmanager.CredentialManagerBuilder;
 import com.github.philippheuer.credentialmanager.domain.OAuth2Credential;
 import com.github.twitch4j.TwitchClient;
 import com.github.twitch4j.auth.providers.TwitchIdentityProvider;
+import com.github.twitch4j.common.util.TypeConvert;
 import com.github.twitch4j.TwitchClientBuilder;
 import com.github.twitch4j.eventsub.EventSubSubscription;
 import com.github.twitch4j.eventsub.EventSubSubscriptionStatus;
@@ -62,7 +63,11 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
     /**
      * Record to log recent channel point redeems.
      */
-    public record RedeemLog(String user, String rewardTitle, LocalDateTime timestamp) {}
+    public record RedeemLog(String user, String rewardTitle, String userInput, LocalDateTime timestamp) {
+        public RedeemLog(String user, String rewardTitle, LocalDateTime timestamp) {
+            this(user, rewardTitle, null, timestamp);
+        }
+    }
 
     /**
      * Represents a song in the queue with its trigger source.
@@ -142,7 +147,65 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
      * Broadcasts the currently playing song to WebSocket subscribers on /topic/current-song.
      */
     public void broadcastCurrentSong() {
-        messagingTemplate.convertAndSend("/topic/current-song", currentlyPlayingSong != null ? currentlyPlayingSong : "null");
+        Song songToBroadcast = currentlyPlayingSong;
+        Object payload = "null";
+        if (songToBroadcast != null) {
+            payload = prepareSongForBroadcast(songToBroadcast);
+        }
+        messagingTemplate.convertAndSend("/topic/current-song", payload);
+    }
+
+    private Song prepareSongForBroadcast(Song song) {
+        // Create a copy to avoid modifying the original entity in the persistence context
+        Song copy = new Song(song.getName(), song.getArtist(), song.getUrl());
+        copy.setId(song.getId());
+        // Set cover art to a URL endpoint instead of full Base64 data to keep WebSocket messages small
+        if (song.getCoverArt() != null && song.getCoverArt().startsWith("data:")) {
+            copy.setCoverArt("/api/songs/" + song.getId() + "/cover-art");
+        } else {
+            copy.setCoverArt(song.getCoverArt());
+        }
+        copy.setDurationSeconds(song.getDurationSeconds());
+        
+        // Encode the URL before broadcasting to ensure frontend gets a valid URL
+        String rawUrl = copy.getUrl();
+        if (rawUrl != null && !rawUrl.contains("%") && (rawUrl.startsWith("/") || !rawUrl.startsWith("http"))) {
+            try {
+                String[] parts = rawUrl.split("/");
+                StringBuilder encodedUrl = new StringBuilder();
+                if (rawUrl.startsWith("/")) {
+                    encodedUrl.append("/");
+                }
+                boolean first = true;
+                for (String part : parts) {
+                    if (!part.isEmpty()) {
+                        if (!first || rawUrl.startsWith("/")) {
+                            encodedUrl.append("/");
+                        }
+                        encodedUrl.append(java.net.URLEncoder.encode(part, java.nio.charset.StandardCharsets.UTF_8).replace("+", "%20"));
+                        first = false;
+                    }
+                }
+                if (rawUrl.endsWith("/") && encodedUrl.length() > 0 && encodedUrl.charAt(encodedUrl.length() - 1) != '/') {
+                    encodedUrl.append("/");
+                }
+                
+                String finalUrl = encodedUrl.toString();
+                // Fix double slash at beginning if it happened
+                if (finalUrl.startsWith("//")) {
+                    finalUrl = finalUrl.substring(1);
+                }
+                // Ensure leading slash for local paths
+                if (!finalUrl.startsWith("/") && !finalUrl.startsWith("http")) {
+                    finalUrl = "/" + finalUrl;
+                }
+                
+                copy.setUrl(finalUrl);
+            } catch (Exception e) {
+                log.warn("Failed to encode song URL for broadcast: {}", e.getMessage());
+            }
+        }
+        return copy;
     }
 
     /**
@@ -160,6 +223,7 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
     private final ChatMessageService chatMessageService;
     private ScheduledFuture<?> tokenRefreshTask;
     private ScheduledFuture<?> songEndTask;
+    private final List<ScheduledFuture<?>> songActionTasks = new java.util.ArrayList<>();
     private LocalDateTime songStartTime;
     private long remainingSeconds;
 
@@ -691,9 +755,10 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
         twitchClient.getEventManager().onEvent(CustomRewardRedemptionAddEvent.class, event -> {
             String title = event.getReward().getTitle();
             String user = event.getUserName();
-            log.info("[EVENT] Reward '{}' redeemed by {}", title, user);
+            String userInput = event.getUserInput();
+            log.info("[EVENT] Reward '{}' redeemed by {} (input: {})", title, user, userInput);
 
-            RedeemLog redeemLog = new RedeemLog(user, title, LocalDateTime.now());
+            RedeemLog redeemLog = new RedeemLog(user, title, userInput, LocalDateTime.now());
             synchronized (recentRedeems) {
                 if (recentRedeems.size() >= MAX_REDEEM_LOGS) {
                     recentRedeems.remove(0);
@@ -770,9 +835,10 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
             String user = event.getUserName();
             int months = event.getCumulativeMonths();
             String tier = event.getTier().name();
-            log.info("[EVENT] {} resubscribed for {} months (Tier {})", user, months, tier);
+            String message = event.getMessage().getText();
+            log.info("[EVENT] {} resubscribed for {} months (Tier {}) - message: {}", user, months, tier, message);
 
-            RedeemLog redeemLog = new RedeemLog(user, "Resubscribed (" + months + " months, Tier " + tier + ")", LocalDateTime.now());
+            RedeemLog redeemLog = new RedeemLog(user, "Resubscribed (" + months + " months, Tier " + tier + ")", message, LocalDateTime.now());
             synchronized (recentRedeems) {
                 if (recentRedeems.size() >= MAX_REDEEM_LOGS) {
                     recentRedeems.remove(0);
@@ -913,10 +979,7 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
      */
     public synchronized void clearQueue() {
         log.info("Clearing song queue and stopping current playback.");
-        if (songEndTask != null) {
-            songEndTask.cancel(false);
-            songEndTask = null;
-        }
+        cancelSongTasks();
         songQueue.clear();
         isSongPlaying = false;
         currentlyPlayingSong = null;
@@ -924,11 +987,17 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
         broadcastCurrentSong();
     }
 
-    private void playSong(Song song, String source, boolean incrementStats) {
+    private void cancelSongTasks() {
         if (songEndTask != null) {
             songEndTask.cancel(false);
             songEndTask = null;
         }
+        songActionTasks.forEach(task -> task.cancel(false));
+        songActionTasks.clear();
+    }
+
+    private void playSong(Song song, String source, boolean incrementStats) {
+        cancelSongTasks();
 
         isSongPlaying = true;
         currentlyPlayingSong = song;
@@ -939,11 +1008,14 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
             broadcastSongsRefresh();
         }
 
-        messagingTemplate.convertAndSend("/topic/play", song);
+        messagingTemplate.convertAndSend("/topic/play", prepareSongForBroadcast(song));
         broadcastCurrentSong();
 
         // Send chat message
         sendChatMessage(String.format("Now Playing - %s - %s", song.getArtist(), song.getName()));
+
+        // Schedule song actions (chat messages and effects)
+        scheduleSongActions(song);
 
         // Schedule song end based on duration
         int duration = (song.getDurationSeconds() != null && song.getDurationSeconds() > 0) ? song.getDurationSeconds() : 180; // Default 3 mins if missing
@@ -951,6 +1023,43 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
         songStartTime = LocalDateTime.now();
         remainingSeconds = duration;
         songEndTask = scheduler.schedule(this::handleSongFinished, duration, TimeUnit.SECONDS);
+    }
+
+    private void scheduleSongActions(Song song) {
+        if (song.getChatMessages() != null) {
+            for (dev.phatanon.entity.SongChatMessage chatMsg : song.getChatMessages()) {
+                ScheduledFuture<?> task = scheduler.schedule(() -> {
+                    sendChatMessage(chatMsg.getMessage());
+                }, chatMsg.getTriggerTimeSeconds(), TimeUnit.SECONDS);
+                songActionTasks.add(task);
+            }
+        }
+
+        if (song.getEffects() != null) {
+            for (dev.phatanon.entity.SongEffect effect : song.getEffects()) {
+                ScheduledFuture<?> task = scheduler.schedule(() -> {
+                    if ("rain".equalsIgnoreCase(effect.getEffectType())) {
+                        messagingTemplate.convertAndSend("/topic/rain", new dev.phatanon.dto.RainEffectDTO(effect.getEffectData(), effect.getDurationMilliseconds() != null ? effect.getDurationMilliseconds() : 5000));
+                    } else if ("placement".equalsIgnoreCase(effect.getEffectType()) || "image".equalsIgnoreCase(effect.getEffectType())) {
+                        try {
+                            dev.phatanon.dto.PlacementEffectDTO dto = TypeConvert.getObjectMapper().readValue(effect.getEffectData(), dev.phatanon.dto.PlacementEffectDTO.class);
+                            if (dto.getDuration() == null && effect.getDurationMilliseconds() != null) {
+                                dto.setDuration(effect.getDurationMilliseconds());
+                            } else if (dto.getDuration() == null) {
+                                dto.setDuration(5000);
+                            }
+                            messagingTemplate.convertAndSend("/topic/placement-effect", dto);
+                        } catch (Exception e) {
+                            log.error("Failed to parse placement effect data: {}", effect.getEffectData(), e);
+                        }
+                    } else {
+                        // Generic effect topic
+                        messagingTemplate.convertAndSend("/topic/effect", effect);
+                    }
+                }, effect.getTriggerTimeSeconds(), TimeUnit.SECONDS);
+                songActionTasks.add(task);
+            }
+        }
     }
 
     /**
@@ -978,10 +1087,7 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
      * Triggers the playback of the next song in the queue after a configured delay.
      */
     public synchronized void handleSongFinished() {
-        if (songEndTask != null) {
-            songEndTask.cancel(false);
-            songEndTask = null;
-        }
+        cancelSongTasks();
 
         if (!isSongPlaying && currentlyPlayingSong == null && songQueue.isEmpty()) {
             log.info("handleSongFinished called but nothing is playing and queue is empty. Ignoring.");
@@ -1100,7 +1206,7 @@ public class TwitchBotService implements ConnectionStartupLogger.ITwitchBotServi
      */
     public void simulateRedeem(String title) {
         log.info("Simulating redeem: {}", title);
-        RedeemLog redeemLog = new RedeemLog("TestUser", title, LocalDateTime.now());
+        RedeemLog redeemLog = new RedeemLog("TestUser", title, "Simulated input text", LocalDateTime.now());
         synchronized (recentRedeems) {
             if (recentRedeems.size() >= MAX_REDEEM_LOGS) {
                 recentRedeems.remove(0);

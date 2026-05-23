@@ -178,7 +178,7 @@
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.5.1/sockjs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
     <script src="/js/common.js"></script>
     <script>
@@ -207,49 +207,81 @@
         }
 
         function connectWebSocket() {
-            const socket = new SockJS('/ws');
+            console.log('WebSocket: Initiating connection to ' + window.location.origin + '/ws');
+            const socket = new SockJS(window.location.origin + '/ws');
             stompClient = Stomp.over(socket);
-            stompClient.debug = null;
+            stompClient.heartbeat.outgoing = 10000;
+            stompClient.heartbeat.incoming = 10000;
+            stompClient.debug = function(str) {
+                console.log('STOMP Debug: ' + str);
+            };
             stompClient.connect({}, function (frame) {
+                console.log('WebSocket: Connected successfully. Frame: ' + frame);
                 stompClient.subscribe('/topic/redeems', function (response) {
+                    console.log('WebSocket: Received redeem event');
                     addRedeemToLog(JSON.parse(response.body));
                 });
                 stompClient.subscribe('/topic/queue-size', function (response) {
-                    updateQueueSizeDisplay(JSON.parse(response.body));
+                    const size = JSON.parse(response.body);
+                    console.log('WebSocket: Received queue size update: ' + size);
+                    updateQueueSizeDisplay(size);
                 });
                 stompClient.subscribe('/topic/stream-status', function (response) {
-                    updateStreamStatusDisplay(JSON.parse(response.body));
+                    const status = JSON.parse(response.body);
+                    console.log('WebSocket: Received stream status update: ' + (status ? 'ONLINE' : 'OFFLINE'));
+                    updateStreamStatusDisplay(status);
                 });
                 stompClient.subscribe('/topic/connection-status', function (response) {
-                    updateConnectionStatusDisplay(JSON.parse(response.body));
+                    const status = JSON.parse(response.body);
+                    console.log('WebSocket: Received connection status update: ' + (status ? 'CONNECTED' : 'DISCONNECTED'));
+                    updateConnectionStatusDisplay(status);
                 });
                 stompClient.subscribe('/topic/current-song', function (response) {
                     const body = response.body;
                     const song = (body && body !== 'null' && body !== '') ? JSON.parse(body) : null;
+                    console.log('WebSocket: Received current song update: ' + (song ? song.name : 'null'));
                     updateCurrentSongDisplay(song);
                     if (!song) {
                         stopPlayback();
                     }
                 });
                 stompClient.subscribe('/topic/play', function (message) {
-                    const song = JSON.parse(message.body);
-                    playAudio(song);
+                    const body = message.body;
+                    const song = (body && body !== 'null' && body !== '') ? JSON.parse(body) : null;
+                    if (song) {
+                        console.log('WebSocket: Received play command for song: ' + song.name);
+                        playAudio(song);
+                    }
                 });
                 stompClient.subscribe('/topic/songs', function (response) {
+                    console.log('WebSocket: Received songs update notification');
                     fetchSongs();
                 });
                 stompClient.subscribe('/topic/pause-status', function (response) {
-                    updatePauseStatusDisplay(JSON.parse(response.body));
+                    const isPaused = JSON.parse(response.body);
+                    console.log('WebSocket: Received pause status update: ' + (isPaused ? 'PAUSED' : 'PLAYING'));
+                    updatePauseStatusDisplay(isPaused);
                 });
             }, function (error) {
-                console.error('WebSocket Error: ' + error);
-                setTimeout(connectWebSocket, 5000);
+                console.error('WebSocket Error: ', error);
+                const retryDelay = 5000;
+                console.log('WebSocket: Attempting to reconnect in ' + (retryDelay / 1000) + 's...');
+                setTimeout(connectWebSocket, retryDelay);
             });
         }
 
         function playAudio(song) {
             if (!song || !song.url) return;
-            audioPlayer.src = song.url;
+
+            let url = song.url;
+            if (url && !url.startsWith('http')) {
+                // Ensure leading slash
+                if (!url.startsWith('/')) {
+                    url = '/' + url;
+                }
+            }
+
+            audioPlayer.src = url;
             // Ensure volume is applied
             if (volumeControl) {
                 audioPlayer.volume = parseFloat(volumeControl.value);
@@ -269,9 +301,11 @@
             const entry = document.createElement('div');
             entry.className = 'redeem-entry';
             const time = new Date(redeem.timestamp).toLocaleTimeString();
+            const userInputHtml = redeem.userInput ? `<div class="redeem-input mt-1 text-muted small" style="border-left: 2px solid #dee2e6; padding-left: 8px; font-style: italic;">${escapeHtml(redeem.userInput)}</div>` : '';
             entry.innerHTML = `
                 <div class="redeem-time">${time}</div>
-                <div><span class="redeem-user">${redeem.user}</span>: <span class="redeem-reward">${redeem.rewardTitle}</span></div>
+                <div><span class="redeem-user">${escapeHtml(redeem.user)}</span>: <span class="redeem-reward">${escapeHtml(redeem.rewardTitle)}</span></div>
+                ${userInputHtml}
             `;
             if (prepend) {
                 logEl.insertBefore(entry, logEl.firstChild);

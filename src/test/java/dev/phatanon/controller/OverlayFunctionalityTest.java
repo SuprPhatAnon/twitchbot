@@ -124,7 +124,6 @@ public class OverlayFunctionalityTest extends BaseSeleniumTest {
         WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(15));
         
         // 1. Start song BEFORE loading overlay
-        System.out.println("[DEBUG_LOG] Starting song before loading overlay");
         twitchBotService.playSongById(testSong.getId());
         
         // Wait for song to be "playing" in service
@@ -139,17 +138,20 @@ public class OverlayFunctionalityTest extends BaseSeleniumTest {
         ((JavascriptExecutor) driver).executeScript("stompClient.send('/app/request-state', {}, {});");
 
         // 3. Verify it shows the song info immediately (or after WS connect and state request)
-        wait.until(d -> {
+        // We use a custom wait that returns the text when it's found to avoid race conditions
+        // where it might be present momentarily and then cleared due to audio error in headless chrome.
+        String songTitleText = wait.until(d -> {
             try {
                 String titleText = (String) ((JavascriptExecutor) driver).executeScript("return document.getElementById('song-title').innerText;");
-                System.out.println("[DEBUG_LOG] State Sync - Title: '" + titleText + "'");
-                return titleText != null && titleText.contains("Test Song");
+                if (titleText != null && titleText.contains("Test Song")) {
+                    return titleText;
+                }
+                return null;
             } catch (Exception e) {
-                return false;
+                return null;
             }
         });
         
-        String songTitleText = (String) ((JavascriptExecutor) driver).executeScript("return document.getElementById('song-title').innerText;");
         assertEquals("Test Song - Test Artist", songTitleText);
     }
 
@@ -178,8 +180,12 @@ public class OverlayFunctionalityTest extends BaseSeleniumTest {
         
         // 3. Verify display is hidden
         wait.until(d -> {
-            String displayStyle = (String) ((JavascriptExecutor) d).executeScript("return document.getElementById('song-display').style.display;");
-            return "none".equals(displayStyle);
+            try {
+                String displayStyle = (String) ((JavascriptExecutor) d).executeScript("return window.getComputedStyle(document.getElementById('song-display')).display;");
+                return "none".equals(displayStyle);
+            } catch (Exception e) {
+                return false;
+            }
         });
     }
     
@@ -207,8 +213,7 @@ public class OverlayFunctionalityTest extends BaseSeleniumTest {
             }
         });
         
-        WebElement songArt = driver.findElement(By.id("song-art"));
-        String artDisplay = (String) ((JavascriptExecutor) driver).executeScript("return document.getElementById('song-art').style.display;");
+        String artDisplay = (String) ((JavascriptExecutor) driver).executeScript("return window.getComputedStyle(document.getElementById('song-art')).display;");
         assertEquals("none", artDisplay, "Song art should NOT be visible for song without cover art");
     }
 }

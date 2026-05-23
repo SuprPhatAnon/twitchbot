@@ -3,6 +3,8 @@ package dev.phatanon.controller;
 import dev.phatanon.dto.SongStatsDTO;
 import dev.phatanon.entity.Song;
 import dev.phatanon.entity.SongPlay;
+import dev.phatanon.entity.SongChatMessage;
+import dev.phatanon.entity.SongEffect;
 import dev.phatanon.repository.SongPlayRepository;
 import dev.phatanon.repository.SongRepository;
 import dev.phatanon.service.SongService;
@@ -96,13 +98,40 @@ public class SongController {
      */
     @GetMapping("/{id}")
     @Operation(summary = "Get a song by ID")
-    public ResponseEntity<SongStatsDTO> getSongById(@PathVariable Long id,
+    public ResponseEntity<Song> getSongById(@PathVariable Long id,
                                             @RequestParam(required = false, defaultValue = "false") boolean includeDisabled) {
         return songRepository.findById(id)
                 .filter(song -> includeDisabled || song.isEnabled())
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    /**
+     * Retrieves the cover art for a specific song.
+     * @param id The unique ID of the song.
+     * @return A {@link ResponseEntity} containing the cover art image.
+     */
+    @GetMapping("/{id}/cover-art")
+    @Operation(summary = "Get a song's cover art by ID")
+    public ResponseEntity<byte[]> getSongCoverArt(@PathVariable Long id) {
+        return songRepository.findById(id)
                 .map(song -> {
-                    long playCount = songPlayRepository.countBySong(song);
-                    return ResponseEntity.ok(new SongStatsDTO(song, playCount));
+                    String coverArt = song.getCoverArt();
+                    if (coverArt == null || !coverArt.startsWith("data:")) {
+                        return ResponseEntity.notFound().<byte[]>build();
+                    }
+                    try {
+                        String[] parts = coverArt.split(",");
+                        String header = parts[0];
+                        String base64Data = parts[1];
+                        String contentType = header.substring(header.indexOf(":") + 1, header.indexOf(";"));
+                        byte[] data = java.util.Base64.getDecoder().decode(base64Data);
+                        return ResponseEntity.ok()
+                                .contentType(MediaType.parseMediaType(contentType))
+                                .body(data);
+                    } catch (Exception e) {
+                        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).<byte[]>build();
+                    }
                 })
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -458,6 +487,58 @@ public class SongController {
      * Lists ghost records (DB records with missing files).
      * @return A list of song entities whose files are missing.
      */
+    @PostMapping("/{id}/chat-messages")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Add a chat message to a song")
+    public ResponseEntity<SongChatMessage> addSongChatMessage(@PathVariable Long id, @RequestBody SongChatMessage message) {
+        return songRepository.findById(id).map(song -> {
+            message.setSong(song);
+            song.getChatMessages().add(message);
+            songRepository.save(song);
+            return ResponseEntity.status(HttpStatus.CREATED).body(message);
+        }).orElse(ResponseEntity.notFound().build());
+    }
+
+    @DeleteMapping("/{id}/chat-messages/{messageId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Remove a chat message from a song")
+    public ResponseEntity<Void> removeSongChatMessage(@PathVariable Long id, @PathVariable Long messageId) {
+        return songRepository.findById(id).map(song -> {
+            boolean removed = song.getChatMessages().removeIf(m -> m.getId().equals(messageId));
+            if (removed) {
+                songRepository.save(song);
+                return ResponseEntity.noContent().<Void>build();
+            }
+            return ResponseEntity.notFound().<Void>build();
+        }).orElse(ResponseEntity.notFound().build());
+    }
+
+    @PostMapping("/{id}/effects")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Add an effect to a song")
+    public ResponseEntity<SongEffect> addSongEffect(@PathVariable Long id, @RequestBody SongEffect effect) {
+        return songRepository.findById(id).map(song -> {
+            effect.setSong(song);
+            song.getEffects().add(effect);
+            songRepository.save(song);
+            return ResponseEntity.status(HttpStatus.CREATED).body(effect);
+        }).orElse(ResponseEntity.notFound().build());
+    }
+
+    @DeleteMapping("/{id}/effects/{effectId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Remove an effect from a song")
+    public ResponseEntity<Void> removeSongEffect(@PathVariable Long id, @PathVariable Long effectId) {
+        return songRepository.findById(id).map(song -> {
+            boolean removed = song.getEffects().removeIf(e -> e.getId().equals(effectId));
+            if (removed) {
+                songRepository.save(song);
+                return ResponseEntity.noContent().<Void>build();
+            }
+            return ResponseEntity.notFound().<Void>build();
+        }).orElse(ResponseEntity.notFound().build());
+    }
+
     @GetMapping("/ghost-records")
     @Operation(summary = "List ghost records (DB records with missing files)")
     public List<Song> getGhostRecords() {

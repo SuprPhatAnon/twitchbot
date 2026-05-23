@@ -115,8 +115,6 @@
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
     <script src="/js/common.js"></script>
     <script>
         let allSongs = [];
@@ -126,8 +124,6 @@
         let isShuffle = false;
         let shuffleQueue = [];
         let currentSort = 'name';
-
-        let stompClient = null;
 
         const audioPlayer = document.getElementById('audio-player');
         const songsContainer = document.getElementById('songs-container');
@@ -162,38 +158,6 @@
                 }
             });
         })();
-
-        function connectWebSocket() {
-            const socket = new SockJS('/ws');
-            stompClient = Stomp.over(socket);
-            stompClient.debug = null;
-            stompClient.connect({}, function (frame) {
-                stompClient.subscribe('/topic/current-song', function (response) {
-                    const body = response.body;
-                    const song = (body && body !== 'null' && body !== '') ? JSON.parse(body) : null;
-                    if (song) {
-                         playSong(song.id);
-                    }
-                });
-                stompClient.subscribe('/topic/play', function (message) {
-                    const song = JSON.parse(message.body);
-                    playSong(song.id);
-                });
-                stompClient.subscribe('/topic/pause-status', function (response) {
-                    const isPaused = JSON.parse(response.body);
-                    if (isPaused) {
-                        audioPlayer.pause();
-                    } else {
-                        if (audioPlayer.src && audioPlayer.src !== window.location.href) {
-                            audioPlayer.play().catch(e => console.warn("Auto-resume failed:", e));
-                        }
-                    }
-                });
-            }, function (error) {
-                console.error('WebSocket Error: ' + error);
-                setTimeout(connectWebSocket, 5000);
-            });
-        }
 
         async function fetchSongs() {
             try {
@@ -312,7 +276,17 @@
             const createdDate = song.createdTimestamp ? new Date(song.createdTimestamp).toLocaleDateString() : 'Unknown';
             displaySongDate.textContent = `Added on ${createdDate}`;
 
-            audioPlayer.src = song.url;
+            // Encode the URL to handle special characters like spaces and single quotes
+            let url = song.url;
+            if (url && !url.startsWith('http')) {
+                // For local paths like "/Doin' a thumbo.mp3", we need to encode each segment
+                // but keep the leading slash if it exists.
+                const parts = url.split('/');
+                const encodedParts = parts.map(part => encodeURIComponent(part));
+                url = encodedParts.join('/');
+            }
+
+            audioPlayer.src = url;
             // Ensure volume is applied
             if (volumeControl) {
                 audioPlayer.volume = parseFloat(volumeControl.value);
@@ -355,7 +329,6 @@
         }
 
         fetchSongs();
-        connectWebSocket();
     </script>
 </body>
 </html>

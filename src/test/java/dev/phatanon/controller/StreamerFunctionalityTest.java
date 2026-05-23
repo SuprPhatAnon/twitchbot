@@ -196,6 +196,47 @@ public class StreamerFunctionalityTest extends BaseSeleniumTest {
     }
 
     @Test
+    @DisplayName("Streamer page should sync state if loaded while a song is already playing")
+    void testStreamerStateSync() {
+        // 1. Start song BEFORE loading streamer page
+        Song song = songRepository.findAll().get(0);
+        twitchBotService.playSongById(song.getId());
+        
+        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(10));
+        wait.until(d -> twitchBotService.isSongPlaying());
+        
+        // 2. Login and load streamer page
+        loginAsStreamer();
+        waitForWebSocket();
+        
+        // 3. Verify it shows the song info
+        wait.until(ExpectedConditions.visibilityOfElementLocated(By.id("active-player-ui")));
+        assertEquals(song.getName(), driver.findElement(By.id("display-song-name")).getText());
+        assertEquals(song.getArtist(), driver.findElement(By.id("display-song-artist")).getText());
+    }
+
+    @Test
+    @DisplayName("Streamer page should clear display when queue is cleared")
+    void testStreamerQueueClear() {
+        loginAsStreamer();
+        waitForWebSocket();
+        
+        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(10));
+        
+        // 1. Start song
+        Song song = songRepository.findAll().get(0);
+        twitchBotService.playSongById(song.getId());
+        wait.until(ExpectedConditions.visibilityOfElementLocated(By.id("active-player-ui")));
+        
+        // 2. Clear queue
+        twitchBotService.clearQueue();
+        
+        // 3. Verify display is hidden
+        wait.until(ExpectedConditions.visibilityOfElementLocated(By.id("no-song-selected")));
+        assertFalse(driver.findElement(By.id("active-player-ui")).isDisplayed());
+    }
+
+    @Test
     @DisplayName("Streamer page should add redeems to log via WebSocket")
     void testRedeemLogUpdate() {
         loginAsStreamer();

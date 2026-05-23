@@ -12,6 +12,8 @@ import org.springframework.stereotype.Service;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -86,18 +88,43 @@ public class SongService {
     }
 
     private File getFileFromUrl(String url) {
+        if (url == null) return null;
+        
+        // Try raw URL first
+        File file = attemptGetFile(url);
+        if (file != null) return file;
+        
+        // Try decoding it if it contains % (might be encoded)
+        if (url.contains("%")) {
+            try {
+                String decodedUrl = java.net.URLDecoder.decode(url, java.nio.charset.StandardCharsets.UTF_8);
+                file = attemptGetFile(decodedUrl);
+                if (file != null) return file;
+            } catch (Exception e) {
+                logger.warn("Failed to decode URL {}: {}", url, e.getMessage());
+            }
+        }
+        
+        return null;
+    }
+
+    private File attemptGetFile(String url) {
         // Check if it's a local file
         File file = new File(url);
         if (!file.exists()) {
             // Try relative to current directory if it doesn't exist
-            file = Paths.get(url).toFile();
+            try {
+                file = Paths.get(url).toFile();
+            } catch (Exception e) {
+                // ignore
+            }
         }
 
         // If still not exists and starts with /, try relative to uploadPath
-        if (!file.exists() && url.startsWith("/")) {
+        if ((file == null || !file.exists()) && url.startsWith("/")) {
             file = Paths.get(uploadPath, url.substring(1)).toFile();
         }
-        return file.exists() ? file : null;
+        return (file != null && file.exists()) ? file : null;
     }
 
     /**
@@ -157,7 +184,13 @@ public class SongService {
                     writer.write("#EXTINF:-1," + song.getArtist() + " - " + song.getName() + "\n");
                     String songUrl = song.getUrl();
                     if (songUrl != null && songUrl.startsWith("/")) {
-                        // For M3U in the same directory, use relative path without leading slash
+                        // For M3U, we should probably encode the filename if it contains special characters
+                        // But most players expect raw filenames if they are local. 
+                        // However, since this is for a web-based system, let's see.
+                        // The previous code used raw substring(1).
+                        
+                        // We will keep it as is for now to avoid breaking existing players 
+                        // that expect raw local paths in M3U, unless we are sure.
                         writer.write(songUrl.substring(1) + "\n");
                     } else {
                         writer.write(songUrl + "\n");
